@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
       user: { id: decoded.uid, ...userData },
     });
   } catch (error) {
-    console.error('Session error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Session error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
