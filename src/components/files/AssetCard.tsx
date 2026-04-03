@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useRef, useState, useEffect } from 'react';
+import { useRef } from 'react';
 import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers } from 'lucide-react';
 import { formatDuration, formatBytes } from '@/lib/utils';
 import type { Asset } from '@/types';
@@ -23,49 +23,6 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded }: Asse
   const fileInputRef = useRef<HTMLInputElement>(null);
   const versionCount = (asset as any)._versionCount || 1;
   const signedUrl = (asset as any).signedUrl as string | undefined;
-  const [videoThumb, setVideoThumb] = useState<string | null>(null);
-
-  // Extract a video frame via canvas for the thumbnail
-  useEffect(() => {
-    if (asset.type !== 'video' || !signedUrl) return;
-    let cancelled = false;
-
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.preload = 'metadata';
-    video.muted = true;
-    video.src = signedUrl;
-
-    video.onloadedmetadata = () => {
-      video.currentTime = Math.min(2, video.duration * 0.1);
-    };
-
-    video.onseeked = () => {
-      if (cancelled) return;
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 360;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          setVideoThumb(canvas.toDataURL('image/jpeg', 0.75));
-        }
-      } catch {
-        // CORS taint or other error — leave thumb as null
-      }
-      video.src = '';
-    };
-
-    video.onerror = () => {
-      // leave thumb as null, fallback icon shown
-    };
-
-    return () => {
-      cancelled = true;
-      video.src = '';
-    };
-  }, [asset.type, signedUrl]);
 
   const handleUploadVersion = () => {
     fileInputRef.current?.click();
@@ -120,11 +77,17 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded }: Asse
             className="object-cover"
             unoptimized
           />
-        ) : asset.type === 'video' && videoThumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={videoThumb}
-            alt={asset.name}
+        ) : asset.type === 'video' && signedUrl ? (
+          // Native video element — no CORS/canvas issues, browser renders the frame
+          <video
+            src={signedUrl}
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              v.currentTime = Math.min(2, v.duration * 0.1);
+            }}
             className="w-full h-full object-cover"
           />
         ) : (

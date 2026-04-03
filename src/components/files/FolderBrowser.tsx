@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useDropzone } from 'react-dropzone';
 import { useAuth } from '@/hooks/useAuth';
 import { useProject } from '@/hooks/useProject';
 import { useAssets, useUpload } from '@/hooks/useAssets';
@@ -24,6 +23,7 @@ import {
   Link as LinkIcon,
   CheckCircle,
   AlertCircle,
+  FolderOpen,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import { getProjectColor, formatBytes } from '@/lib/utils';
@@ -49,30 +49,11 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFiles = useCallback(async (files: File[]) => {
-    if (!files.length) return;
-    const results = await Promise.all(files.map((f) => uploadFile(f, projectId, folderId)));
-    if (results.some((r) => r !== null)) refetchAssets();
-  }, [projectId, folderId, uploadFile, refetchAssets]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: handleFiles,
-    noClick: true,
-    accept: {
-      'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'],
-      'image/*': ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],
-    },
-    multiple: true,
-  });
-
-  const handleFileInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    e.target.value = '';
-    await handleFiles(files);
-  }, [handleFiles]);
-
+  // ── Folder API helpers ──────────────────────────────────────────────────
   const fetchFolders = useCallback(async () => {
     try {
       const token = await getIdToken();
@@ -114,31 +95,58 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     fetchCurrentFolder();
   }, [fetchFolders, fetchCurrentFolder]);
 
-  // Fetch ancestor folders from path[] stored on the current folder
+  // ── Breadcrumbs ──────────────────────────────────────────────────────────
+  // Walk parentId chain upward to build the full path (handles folders
+  // created before path[] was stored, as well as new ones)
   useEffect(() => {
-    if (!currentFolder?.path?.length) {
+    if (!currentFolder) {
       setAncestorFolders([]);
       return;
     }
+
     const fetchAncestors = async () => {
       try {
         const token = await getIdToken();
-        const results = await Promise.all(
-          currentFolder.path.map((id) =>
-            fetch(`/api/folders/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-              .then((r) => (r.ok ? r.json() : null))
-              .then((d) => d?.folder ?? null)
-          )
-        );
-        setAncestorFolders(results.filter(Boolean) as FolderType[]);
+
+        // Fast path: use stored path[] if complete
+        if (currentFolder.path?.length) {
+          const results = await Promise.all(
+            currentFolder.path.map((id) =>
+              fetch(`/api/folders/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => d?.folder ?? null)
+            )
+          );
+          const found = results.filter(Boolean) as FolderType[];
+          if (found.length === currentFolder.path.length) {
+            setAncestorFolders(found);
+            return;
+          }
+        }
+
+        // Fallback: walk parentId chain one by one
+        const ancestors: FolderType[] = [];
+        let parentId: string | null = currentFolder.parentId;
+        while (parentId) {
+          const res = await fetch(`/api/folders/${parentId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) break;
+          const data = await res.json();
+          const parent: FolderType | null = data?.folder ?? null;
+          if (!parent) break;
+          ancestors.unshift(parent);
+          parentId = parent.parentId;
+        }
+        setAncestorFolders(ancestors);
       } catch {
         setAncestorFolders([]);
       }
     };
+
     fetchAncestors();
   }, [currentFolder, getIdToken]);
 
-  // Build breadcrumbs with full path
   useEffect(() => {
     const crumbs: Array<{ id: string | null; name: string }> = [
       { id: null, name: project?.name || 'Project' },
@@ -152,11 +160,117 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     setBreadcrumbs(crumbs);
   }, [project, currentFolder, ancestorFolders]);
 
-  const handleDeleteFolder = async (folderId: string) => {
+  // ── Folder drag & drop (preserves tree structure) ───────────────────────
+  const createFolderInApi = async (name: string, parentFolderId: string | null): Promise<string | null> => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, projectId, parentId: parentFolderId }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.folder?.id ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const readAllDirEntries = (reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> =>
+    new Promise((resolve, reject) => {
+      const all: FileSystemEntry[] = [];
+      const read = () =>
+        reader.readEntries((batch) => {
+          if (!batch.length) return resolve(all);
+          all.push(...batch);
+          read(); // Chrome returns max 100 per call — keep reading
+        }, reject);
+      read();
+    });
+
+  const processEntry = async (entry: FileSystemEntry, parentFolderId: string | null): Promise<void> => {
+    if (entry.isFile) {
+      const file = await new Promise<File>((res, rej) =>
+        (entry as FileSystemFileEntry).file(res, rej)
+      );
+      if (file.type.startsWith('video/') || file.type.startsWith('image/')) {
+        await uploadFile(file, projectId, parentFolderId);
+      }
+    } else if (entry.isDirectory) {
+      const newFolderId = await createFolderInApi(entry.name, parentFolderId);
+      if (!newFolderId) return;
+      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      const children = await readAllDirEntries(reader);
+      await Promise.all(children.map((child) => processEntry(child, newFolderId)));
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current--;
+    if (dragCounter.current === 0) setIsDragActive(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragActive(false);
+
+    const items = Array.from(e.dataTransfer.items);
+    const entries = items
+      .map((item) => (item as any).webkitGetAsEntry() as FileSystemEntry | null)
+      .filter((entry): entry is FileSystemEntry => entry !== null);
+
+    if (!entries.length) return;
+
+    const hasDirectory = entries.some((entry) => entry.isDirectory);
+
+    if (hasDirectory) {
+      // Process full folder tree
+      await Promise.all(entries.map((entry) => processEntry(entry, folderId)));
+      fetchFolders();
+      refetchAssets();
+    } else {
+      // Plain files only
+      const files = items
+        .map((item) => item.getAsFile())
+        .filter((f): f is File => f !== null)
+        .filter((f) => f.type.startsWith('video/') || f.type.startsWith('image/'));
+      if (files.length) {
+        const results = await Promise.all(files.map((f) => uploadFile(f, projectId, folderId)));
+        if (results.some((r) => r !== null)) refetchAssets();
+      }
+    }
+  };
+
+  // ── Other handlers ───────────────────────────────────────────────────────
+  const handleFileInputChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+      if (!files.length) return;
+      const results = await Promise.all(files.map((f) => uploadFile(f, projectId, folderId)));
+      if (results.some((r) => r !== null)) refetchAssets();
+    },
+    [projectId, folderId, uploadFile, refetchAssets]
+  );
+
+  const handleDeleteFolder = async (deleteFolderId: string) => {
     if (!confirm('Delete this folder?')) return;
     try {
       const token = await getIdToken();
-      const res = await fetch(`/api/folders/${folderId}`, {
+      const res = await fetch(`/api/folders/${deleteFolderId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -178,7 +292,6 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
   }
 
   const color = project ? getProjectColor(project.color) : '#6c5ce7';
-  const isOwner = project?.ownerId === user?.id;
 
   return (
     <div className="flex flex-col h-full">
@@ -265,7 +378,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
         </div>
       </div>
 
-      {/* Hidden file input for the Upload button */}
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -275,16 +388,21 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
         onChange={handleFileInputChange}
       />
 
-      {/* Content — entire area is a drop zone */}
-      <div {...getRootProps()} className="flex-1 overflow-y-auto p-8 space-y-6 relative outline-none">
-        <input {...getInputProps()} />
-
-        {/* Full-page drag overlay */}
+      {/* Content — full drop zone */}
+      <div
+        className="flex-1 overflow-y-auto p-8 space-y-6 relative outline-none"
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {/* Drag overlay */}
         {isDragActive && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-frame-accent/10 border-2 border-dashed border-frame-accent rounded-xl m-2 pointer-events-none">
             <div className="text-center">
-              <Upload className="w-12 h-12 text-frame-accent mx-auto mb-3" />
-              <p className="text-frame-accent font-semibold text-lg">Drop to upload</p>
+              <FolderOpen className="w-12 h-12 text-frame-accent mx-auto mb-3" />
+              <p className="text-frame-accent font-semibold text-lg">Drop files or folders</p>
+              <p className="text-frame-accent/70 text-sm mt-1">Folder structure will be preserved</p>
             </div>
           </div>
         )}
@@ -330,7 +448,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">No files yet</h3>
             <p className="text-frame-textSecondary text-sm max-w-xs mb-6">
-              Drag files here or click Upload to get started.
+              Drag files or folders here, or click Upload to get started.
             </p>
             <Button
               onClick={() => fileInputRef.current?.click()}
