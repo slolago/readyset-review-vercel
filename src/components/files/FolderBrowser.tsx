@@ -44,6 +44,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
   const { uploads, uploadFile, clearCompleted } = useUpload();
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [currentFolder, setCurrentFolder] = useState<FolderType | null>(null);
+  const [ancestorFolders, setAncestorFolders] = useState<FolderType[]>([]);
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ id: string | null; name: string }>>([]);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(false);
@@ -113,16 +114,43 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     fetchCurrentFolder();
   }, [fetchFolders, fetchCurrentFolder]);
 
-  // Build breadcrumbs
+  // Fetch ancestor folders from path[] stored on the current folder
+  useEffect(() => {
+    if (!currentFolder?.path?.length) {
+      setAncestorFolders([]);
+      return;
+    }
+    const fetchAncestors = async () => {
+      try {
+        const token = await getIdToken();
+        const results = await Promise.all(
+          currentFolder.path.map((id) =>
+            fetch(`/api/folders/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((d) => d?.folder ?? null)
+          )
+        );
+        setAncestorFolders(results.filter(Boolean) as FolderType[]);
+      } catch {
+        setAncestorFolders([]);
+      }
+    };
+    fetchAncestors();
+  }, [currentFolder, getIdToken]);
+
+  // Build breadcrumbs with full path
   useEffect(() => {
     const crumbs: Array<{ id: string | null; name: string }> = [
       { id: null, name: project?.name || 'Project' },
     ];
+    for (const ancestor of ancestorFolders) {
+      crumbs.push({ id: ancestor.id, name: ancestor.name });
+    }
     if (currentFolder) {
       crumbs.push({ id: currentFolder.id, name: currentFolder.name });
     }
     setBreadcrumbs(crumbs);
-  }, [project, currentFolder]);
+  }, [project, currentFolder, ancestorFolders]);
 
   const handleDeleteFolder = async (folderId: string) => {
     if (!confirm('Delete this folder?')) return;
@@ -158,25 +186,47 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
       <div className="px-8 py-4 border-b border-frame-border flex items-center justify-between bg-frame-sidebar">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1 text-sm overflow-x-auto">
-          <Link
-            href={`/projects/${projectId}`}
-            className="flex items-center gap-1.5 text-frame-textSecondary hover:text-white transition-colors flex-shrink-0"
-          >
-            <div
-              className="w-5 h-5 rounded flex items-center justify-center"
-              style={{ backgroundColor: color + '20', color }}
-            >
-              <Home className="w-3 h-3" />
-            </div>
-            <span className="font-medium">{project?.name}</span>
-          </Link>
+          {breadcrumbs.map((crumb, i) => {
+            const isLast = i === breadcrumbs.length - 1;
+            const isRoot = i === 0;
+            const href = crumb.id
+              ? `/projects/${projectId}/folders/${crumb.id}`
+              : `/projects/${projectId}`;
 
-          {currentFolder && (
-            <>
-              <ChevronRight className="w-4 h-4 text-frame-textMuted flex-shrink-0" />
-              <span className="text-white font-medium flex-shrink-0">{currentFolder.name}</span>
-            </>
-          )}
+            return (
+              <span key={crumb.id ?? 'root'} className="flex items-center gap-1 flex-shrink-0">
+                {i > 0 && <ChevronRight className="w-4 h-4 text-frame-textMuted" />}
+                {isLast ? (
+                  <span className="flex items-center gap-1.5 text-white font-medium">
+                    {isRoot && (
+                      <div
+                        className="w-5 h-5 rounded flex items-center justify-center"
+                        style={{ backgroundColor: color + '20', color }}
+                      >
+                        <Home className="w-3 h-3" />
+                      </div>
+                    )}
+                    {crumb.name}
+                  </span>
+                ) : (
+                  <Link
+                    href={href}
+                    className="flex items-center gap-1.5 text-frame-textSecondary hover:text-white transition-colors"
+                  >
+                    {isRoot && (
+                      <div
+                        className="w-5 h-5 rounded flex items-center justify-center"
+                        style={{ backgroundColor: color + '20', color }}
+                      >
+                        <Home className="w-3 h-3" />
+                      </div>
+                    )}
+                    {crumb.name}
+                  </Link>
+                )}
+              </span>
+            );
+          })}
         </nav>
 
         {/* Actions */}
