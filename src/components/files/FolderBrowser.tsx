@@ -18,12 +18,15 @@ import {
   ChevronRight,
   Home,
   Folder,
+  FolderOpen,
   MoreHorizontal,
   Trash2,
   Link as LinkIcon,
   CheckCircle,
   AlertCircle,
-  FolderOpen,
+  Check,
+  Move,
+  X,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import { getProjectColor, formatBytes } from '@/lib/utils';
@@ -42,18 +45,34 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
   const { project, loading: projectLoading, refetch: refetchProject } = useProject(projectId);
   const { assets, loading: assetsLoading, refetch: refetchAssets } = useAssets(projectId, folderId);
   const { uploads, uploadFile, clearCompleted } = useUpload();
+
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [currentFolder, setCurrentFolder] = useState<FolderType | null>(null);
   const [ancestorFolders, setAncestorFolders] = useState<FolderType[]>([]);
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ id: string | null; name: string }>>([]);
+
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCollaborators, setShowCollaborators] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [isDragActive, setIsDragActive] = useState(false);
-  const dragCounter = useRef(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [allFolders, setAllFolders] = useState<FolderType[]>([]);
 
-  // ── Folder API helpers ──────────────────────────────────────────────────
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rubberBand, setRubberBand] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
+  const rubberBandRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
+  // Drag-to-drop state
+  const [isDragActive, setIsDragActive] = useState(false);
+  const dropDragCounter = useRef(0);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // ── Folder fetching ──────────────────────────────────────────────────────
   const fetchFolders = useCallback(async () => {
     try {
       const token = await getIdToken();
@@ -97,6 +116,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     fetchCurrentFolder();
   }, [fetchFolders, fetchCurrentFolder]);
 
+  // Breadcrumbs
   useEffect(() => {
     const crumbs: Array<{ id: string | null; name: string }> = [
       { id: null, name: project?.name || 'Project' },
@@ -110,7 +130,146 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     setBreadcrumbs(crumbs);
   }, [project, currentFolder, ancestorFolders]);
 
-  // ── Folder drag & drop (preserves tree structure) ───────────────────────
+  // ── Multi-select: rubber band ────────────────────────────────────────────
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      if (!isDraggingRef.current && Math.hypot(dx, dy) > 5) isDraggingRef.current = true;
+      if (isDraggingRef.current) {
+        const band = {
+          x1: dragStartRef.current.x,
+          y1: dragStartRef.current.y,
+          x2: e.clientX,
+          y2: e.clientY,
+        };
+        rubberBandRef.current = band;
+        setRubberBand({ ...band });
+      }
+    };
+
+    const onUp = () => {
+      if (isDraggingRef.current && rubberBandRef.current) {
+        const { x1, y1, x2, y2 } = rubberBandRef.current;
+        const bx1 = Math.min(x1, x2);
+        const bx2 = Math.max(x1, x2);
+        const by1 = Math.min(y1, y2);
+        const by2 = Math.max(y1, y2);
+        const newSel = new Set<string>();
+        document.querySelectorAll<HTMLElement>('[data-selectable]').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.left < bx2 && r.right > bx1 && r.top < by2 && r.bottom > by1) {
+            newSel.add(el.dataset.selectable!);
+          }
+        });
+        if (newSel.size > 0) setSelectedIds(newSel);
+      }
+      dragStartRef.current = null;
+      isDraggingRef.current = false;
+      rubberBandRef.current = null;
+      setRubberBand(null);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const handleContentMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('[data-selectable]')) return;
+    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) setSelectedIds(new Set());
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    isDraggingRef.current = false;
+  };
+
+  const toggleSelect = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // ── Batch actions ────────────────────────────────────────────────────────
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Delete ${selectedIds.size} item(s)?`)) return;
+    try {
+      const token = await getIdToken();
+      const ids = Array.from(selectedIds);
+      const assetIds = ids.filter((id) => assets.some((a) => a.id === id));
+      const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
+
+      await Promise.all([
+        ...assetIds.map((id) =>
+          fetch(`/api/assets/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+        ),
+        ...folderIds.map((id) =>
+          fetch(`/api/folders/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+        ),
+      ]);
+
+      toast.success(`Deleted ${selectedIds.size} item(s)`);
+      setSelectedIds(new Set());
+      refetchAssets();
+      fetchFolders();
+    } catch {
+      toast.error('Failed to delete items');
+    }
+  };
+
+  const handleOpenMoveModal = async () => {
+    const token = await getIdToken();
+    const res = await fetch(`/api/folders?projectId=${projectId}&all=true`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setAllFolders(data.folders);
+    }
+    setShowMoveModal(true);
+  };
+
+  const handleMoveSelected = async (targetFolderId: string | null) => {
+    try {
+      const token = await getIdToken();
+      const ids = Array.from(selectedIds);
+      const assetIds = ids.filter((id) => assets.some((a) => a.id === id));
+      const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
+
+      await Promise.all([
+        ...assetIds.map((id) =>
+          fetch(`/api/assets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ folderId: targetFolderId }),
+          })
+        ),
+        ...folderIds.map((id) =>
+          fetch(`/api/folders/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ parentId: targetFolderId }),
+          })
+        ),
+      ]);
+
+      toast.success(`Moved ${selectedIds.size} item(s)`);
+      setSelectedIds(new Set());
+      setShowMoveModal(false);
+      refetchAssets();
+      fetchFolders();
+    } catch {
+      toast.error('Failed to move items');
+    }
+  };
+
+  // ── File/folder drag-and-drop upload ────────────────────────────────────
   const createFolderInApi = async (name: string, parentFolderId: string | null): Promise<string | null> => {
     try {
       const token = await getIdToken();
@@ -134,7 +293,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
         reader.readEntries((batch) => {
           if (!batch.length) return resolve(all);
           all.push(...batch);
-          read(); // Chrome returns max 100 per call — keep reading
+          read();
         }, reject);
       read();
     });
@@ -158,14 +317,14 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current++;
+    dropDragCounter.current++;
     setIsDragActive(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current--;
-    if (dragCounter.current === 0) setIsDragActive(false);
+    dropDragCounter.current--;
+    if (dropDragCounter.current === 0) setIsDragActive(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -174,7 +333,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current = 0;
+    dropDragCounter.current = 0;
     setIsDragActive(false);
 
     const items = Array.from(e.dataTransfer.items);
@@ -185,14 +344,11 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     if (!entries.length) return;
 
     const hasDirectory = entries.some((entry) => entry.isDirectory);
-
     if (hasDirectory) {
-      // Process full folder tree
       await Promise.all(entries.map((entry) => processEntry(entry, folderId)));
       fetchFolders();
       refetchAssets();
     } else {
-      // Plain files only
       const files = items
         .map((item) => item.getAsFile())
         .filter((f): f is File => f !== null)
@@ -204,7 +360,6 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     }
   };
 
-  // ── Other handlers ───────────────────────────────────────────────────────
   const handleFileInputChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files || []);
@@ -294,59 +449,35 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowCollaborators(true)}
-            icon={<Users className="w-4 h-4" />}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setShowCollaborators(true)} icon={<Users className="w-4 h-4" />}>
             Team
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowReviewModal(true)}
-            icon={<LinkIcon className="w-4 h-4" />}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setShowReviewModal(true)} icon={<LinkIcon className="w-4 h-4" />}>
             Share
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowCreateFolder(true)}
-            icon={<Plus className="w-4 h-4" />}
-          >
+          <Button variant="secondary" size="sm" onClick={() => setShowCreateFolder(true)} icon={<Plus className="w-4 h-4" />}>
             Folder
           </Button>
-          <Button
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            icon={<Upload className="w-4 h-4" />}
-          >
+          <Button size="sm" onClick={() => fileInputRef.current?.click()} icon={<Upload className="w-4 h-4" />}>
             Upload
           </Button>
         </div>
       </div>
 
       {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        multiple
-        accept="video/*,image/*"
-        onChange={handleFileInputChange}
-      />
+      <input ref={fileInputRef} type="file" className="hidden" multiple accept="video/*,image/*" onChange={handleFileInputChange} />
 
-      {/* Content — full drop zone */}
+      {/* Content */}
       <div
-        className="flex-1 overflow-y-auto p-8 space-y-6 relative outline-none"
+        ref={contentRef}
+        className="flex-1 overflow-y-auto p-8 space-y-6 relative outline-none select-none"
+        onMouseDown={handleContentMouseDown}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {/* Drag overlay */}
+        {/* File drop overlay */}
         {isDragActive && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-frame-accent/10 border-2 border-dashed border-frame-accent rounded-xl m-2 pointer-events-none">
             <div className="text-center">
@@ -355,6 +486,19 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
               <p className="text-frame-accent/70 text-sm mt-1">Folder structure will be preserved</p>
             </div>
           </div>
+        )}
+
+        {/* Rubber band selection rect */}
+        {rubberBand && (
+          <div
+            className="pointer-events-none fixed z-40 border border-frame-accent bg-frame-accent/10"
+            style={{
+              left: Math.min(rubberBand.x1, rubberBand.x2),
+              top: Math.min(rubberBand.y1, rubberBand.y2),
+              width: Math.abs(rubberBand.x2 - rubberBand.x1),
+              height: Math.abs(rubberBand.y2 - rubberBand.y1),
+            }}
+          />
         )}
 
         {/* Folders */}
@@ -369,6 +513,8 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
                   key={folder.id}
                   folder={folder}
                   projectId={projectId}
+                  isSelected={selectedIds.has(folder.id)}
+                  onToggleSelect={(e) => toggleSelect(folder.id, e)}
                   onDelete={() => handleDeleteFolder(folder.id)}
                 />
               ))}
@@ -387,6 +533,8 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
             projectId={projectId}
             onAssetDeleted={refetchAssets}
             onVersionUploaded={refetchAssets}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
           />
         )}
 
@@ -400,27 +548,48 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
             <p className="text-frame-textSecondary text-sm max-w-xs mb-6">
               Drag files or folders here, or click Upload to get started.
             </p>
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              icon={<Upload className="w-4 h-4" />}
-            >
+            <Button onClick={() => fileInputRef.current?.click()} icon={<Upload className="w-4 h-4" />}>
               Upload files
             </Button>
           </div>
         )}
       </div>
 
-      {/* Floating upload progress panel */}
+      {/* Multi-select action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-5 py-3 bg-frame-card border border-frame-border rounded-2xl shadow-2xl">
+          <span className="text-sm text-white font-medium mr-1">{selectedIds.size} selected</span>
+          <button
+            onClick={handleOpenMoveModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-border hover:bg-frame-borderLight rounded-lg transition-colors"
+          >
+            <Move className="w-3.5 h-3.5" />
+            Move
+          </button>
+          <button
+            onClick={handleDeleteSelected}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-1 text-frame-textMuted hover:text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Upload progress panel */}
       {uploads.length > 0 && (
         <div className="fixed bottom-4 right-4 z-50 w-72 bg-frame-card border border-frame-border rounded-xl shadow-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-frame-border">
             <p className="text-xs font-semibold text-frame-textSecondary uppercase tracking-wider">
               Uploads ({uploads.length})
             </p>
-            <button
-              onClick={clearCompleted}
-              className="text-xs text-frame-textMuted hover:text-white transition-colors"
-            >
+            <button onClick={clearCompleted} className="text-xs text-frame-textMuted hover:text-white transition-colors">
               Dismiss
             </button>
           </div>
@@ -438,10 +607,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
           projectId={projectId}
           parentId={folderId}
           onClose={() => setShowCreateFolder(false)}
-          onCreated={() => {
-            fetchFolders();
-            setShowCreateFolder(false);
-          }}
+          onCreated={() => { fetchFolders(); setShowCreateFolder(false); }}
         />
       )}
 
@@ -449,10 +615,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
         <CollaboratorsPanel
           project={project}
           onClose={() => setShowCollaborators(false)}
-          onUpdated={() => {
-            refetchProject();
-            setShowCollaborators(false);
-          }}
+          onUpdated={() => { refetchProject(); setShowCollaborators(false); }}
         />
       )}
 
@@ -463,32 +626,64 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
           onClose={() => setShowReviewModal(false)}
         />
       )}
+
+      {showMoveModal && (
+        <MoveModal
+          folders={allFolders}
+          currentFolderId={folderId}
+          selectedCount={selectedIds.size}
+          onMove={handleMoveSelected}
+          onClose={() => setShowMoveModal(false)}
+        />
+      )}
     </div>
   );
 }
 
+// ── FolderCard ───────────────────────────────────────────────────────────────
+
 function FolderCard({
   folder,
   projectId,
+  isSelected,
+  onToggleSelect,
   onDelete,
 }: {
   folder: FolderType;
   projectId: string;
+  isSelected?: boolean;
+  onToggleSelect?: (e: React.MouseEvent) => void;
   onDelete: () => void;
 }) {
   const router = useRouter();
 
   return (
     <div
-      className="group bg-frame-card border border-frame-border hover:border-frame-borderLight rounded-xl p-3 cursor-pointer transition-all hover:bg-frame-cardHover"
+      data-selectable={folder.id}
+      className={`group relative bg-frame-card border rounded-xl p-3 cursor-pointer transition-all hover:bg-frame-cardHover ${
+        isSelected
+          ? 'border-frame-accent ring-1 ring-frame-accent'
+          : 'border-frame-border hover:border-frame-borderLight'
+      }`}
       onClick={() => router.push(`/projects/${projectId}/folders/${folder.id}`)}
     >
-      <div className="flex items-start justify-between mb-2">
-        <Folder className="w-8 h-8 text-frame-accent" />
+      {/* Checkbox */}
+      {onToggleSelect && (
         <div
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => e.stopPropagation()}
+          className={`absolute top-2 left-2 z-10 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
         >
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+            isSelected ? 'bg-frame-accent border-frame-accent' : 'bg-black/60 border-white/60 backdrop-blur-sm'
+          }`}>
+            {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-start justify-between mb-2 mt-1">
+        <Folder className="w-8 h-8 text-frame-accent" />
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           <Dropdown
             trigger={
               <button className="w-6 h-6 flex items-center justify-center rounded text-frame-textMuted hover:text-white hover:bg-frame-border transition-colors">
@@ -496,12 +691,7 @@ function FolderCard({
               </button>
             }
             items={[
-              {
-                label: 'Delete',
-                icon: <Trash2 className="w-4 h-4" />,
-                onClick: onDelete,
-                danger: true,
-              },
+              { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true },
             ]}
           />
         </div>
@@ -511,6 +701,77 @@ function FolderCard({
   );
 }
 
+// ── MoveModal ────────────────────────────────────────────────────────────────
+
+function MoveModal({
+  folders,
+  currentFolderId,
+  selectedCount,
+  onMove,
+  onClose,
+}: {
+  folders: FolderType[];
+  currentFolderId: string | null;
+  selectedCount: number;
+  onMove: (folderId: string | null) => void;
+  onClose: () => void;
+}) {
+  // Build a simple indented list showing the folder hierarchy
+  const buildTree = (parentId: string | null, depth: number): { folder: FolderType; depth: number }[] => {
+    const children = folders.filter((f) => (f.parentId ?? null) === parentId);
+    const result: { folder: FolderType; depth: number }[] = [];
+    for (const child of children) {
+      result.push({ folder: child, depth });
+      result.push(...buildTree(child.id, depth + 1));
+    }
+    return result;
+  };
+
+  const tree = buildTree(null, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-frame-card border border-frame-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-frame-border">
+          <h3 className="text-sm font-semibold text-white">Move {selectedCount} item(s)</h3>
+          <button onClick={onClose} className="text-frame-textMuted hover:text-white transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="max-h-72 overflow-y-auto py-2">
+          {/* Root option */}
+          <button
+            onClick={() => onMove(null)}
+            className="w-full flex items-center gap-2 px-5 py-2.5 text-sm text-frame-textSecondary hover:text-white hover:bg-frame-border/50 transition-colors text-left"
+          >
+            <Home className="w-4 h-4 flex-shrink-0" />
+            <span>Project root</span>
+          </button>
+
+          {tree.map(({ folder, depth }) => (
+            <button
+              key={folder.id}
+              onClick={() => onMove(folder.id)}
+              disabled={folder.id === currentFolderId}
+              className="w-full flex items-center gap-2 px-5 py-2.5 text-sm text-frame-textSecondary hover:text-white hover:bg-frame-border/50 transition-colors text-left disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ paddingLeft: `${20 + depth * 16}px` }}
+            >
+              <Folder className="w-4 h-4 flex-shrink-0 text-frame-accent" />
+              <span className="truncate">{folder.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── UploadProgressItem ───────────────────────────────────────────────────────
+
 function UploadProgressItem({ item }: { item: UploadItem }) {
   return (
     <div className="px-4 py-3 flex items-center gap-3">
@@ -519,15 +780,10 @@ function UploadProgressItem({ item }: { item: UploadItem }) {
         <p className="text-xs text-frame-textMuted">{formatBytes(item.file.size)}</p>
         {item.status === 'uploading' && (
           <div className="mt-1.5 bg-frame-bg rounded-full h-1">
-            <div
-              className="bg-frame-accent h-1 rounded-full transition-all"
-              style={{ width: `${item.progress}%` }}
-            />
+            <div className="bg-frame-accent h-1 rounded-full transition-all" style={{ width: `${item.progress}%` }} />
           </div>
         )}
-        {item.status === 'error' && (
-          <p className="text-xs text-red-400 mt-0.5">{item.error}</p>
-        )}
+        {item.status === 'error' && <p className="text-xs text-red-400 mt-0.5">{item.error}</p>}
       </div>
       <div className="flex-shrink-0">
         {item.status === 'uploading' && (

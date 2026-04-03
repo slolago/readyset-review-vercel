@@ -3,16 +3,24 @@
 import { useRouter } from 'next/navigation';
 import { AssetCard } from './AssetCard';
 import type { Asset } from '@/types';
-import { Film } from 'lucide-react';
 
 interface AssetGridProps {
   assets: Asset[];
   projectId: string;
   onAssetDeleted?: () => void;
   onVersionUploaded?: () => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string, e: React.MouseEvent) => void;
 }
 
-export function AssetGrid({ assets, projectId, onAssetDeleted, onVersionUploaded }: AssetGridProps) {
+export function AssetGrid({
+  assets,
+  projectId,
+  onAssetDeleted,
+  onVersionUploaded,
+  selectedIds,
+  onToggleSelect,
+}: AssetGridProps) {
   const router = useRouter();
 
   if (assets.length === 0) return null;
@@ -30,6 +38,8 @@ export function AssetGrid({ assets, projectId, onAssetDeleted, onVersionUploaded
             onClick={() => router.push(`/projects/${projectId}/assets/${asset.id}`)}
             onDeleted={onAssetDeleted}
             onVersionUploaded={onVersionUploaded}
+            isSelected={selectedIds?.has(asset.id)}
+            onToggleSelect={onToggleSelect ? (e) => onToggleSelect(asset.id, e) : undefined}
           />
         ))}
       </div>

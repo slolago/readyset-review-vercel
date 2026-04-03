@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const projectId = searchParams.get('projectId');
   const parentId = searchParams.get('parentId') || null;
+  const all = searchParams.get('all') === 'true';
 
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
 
@@ -18,12 +19,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = getAdminDb();
-    // Fetch all folders for the project, filter parentId in memory to avoid composite index
     const snap = await db.collection('folders').where('projectId', '==', projectId).get();
-    const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+    const allFolders = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
     const folders = all
-      .filter((f: any) => (f.parentId ?? null) === parentId)
-      .sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis());
+      ? allFolders.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis())
+      : allFolders
+          .filter((f: any) => (f.parentId ?? null) === parentId)
+          .sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis());
 
     return NextResponse.json({ folders });
   } catch (err) {

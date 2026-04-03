@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useRef } from 'react';
-import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers } from 'lucide-react';
+import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check } from 'lucide-react';
 import { formatDuration, formatBytes } from '@/lib/utils';
 import type { Asset } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -15,9 +15,11 @@ interface AssetCardProps {
   onClick?: () => void;
   onDeleted?: () => void;
   onVersionUploaded?: () => void;
+  isSelected?: boolean;
+  onToggleSelect?: (e: React.MouseEvent) => void;
 }
 
-export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded }: AssetCardProps) {
+export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSelected, onToggleSelect }: AssetCardProps) {
   const { getIdToken } = useAuth();
   const { uploadFile } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,9 +65,14 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded }: Asse
     <>
       <input ref={fileInputRef} type="file" accept="video/*,image/*" className="hidden" onChange={handleFileSelected} />
     <div
+      data-selectable={asset.id}
       onClick={isUploading ? undefined : onClick}
-      className={`group bg-frame-card border border-frame-border rounded-xl overflow-hidden transition-all ${
-        isUploading ? 'opacity-60' : 'hover:border-frame-borderLight hover:bg-frame-cardHover cursor-pointer'
+      className={`group bg-frame-card border rounded-xl overflow-hidden transition-all ${
+        isUploading
+          ? 'opacity-60 border-frame-border'
+          : isSelected
+          ? 'border-frame-accent ring-1 ring-frame-accent hover:bg-frame-cardHover cursor-pointer'
+          : 'border-frame-border hover:border-frame-borderLight hover:bg-frame-cardHover cursor-pointer'
       }`}
     >
       {/* Thumbnail */}
@@ -88,6 +95,20 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded }: Asse
             ) : (
               <ImageIcon className="w-10 h-10 text-frame-textMuted" />
             )}
+          </div>
+        )}
+
+        {/* Selection checkbox */}
+        {onToggleSelect && !isUploading && (
+          <div
+            className={`absolute top-2 left-2 z-10 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
+          >
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+              isSelected ? 'bg-frame-accent border-frame-accent' : 'bg-black/60 border-white/60 backdrop-blur-sm'
+            }`}>
+              {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+            </div>
           </div>
         )}
 

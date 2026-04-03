@@ -9,15 +9,21 @@ function captureThumbnail(file: File): Promise<Blob | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement('video');
-    video.preload = 'metadata';
     video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
     video.src = url;
 
-    video.onloadedmetadata = () => {
-      video.currentTime = Math.min(2, video.duration * 0.1);
+    let settled = false;
+    const done = (blob: Blob | null) => {
+      if (settled) return;
+      settled = true;
+      video.src = '';
+      URL.revokeObjectURL(url);
+      resolve(blob);
     };
 
-    video.onseeked = () => {
+    const capture = () => {
       try {
         const canvas = document.createElement('canvas');
         const w = Math.min(video.videoWidth || 640, 640);
@@ -27,18 +33,21 @@ function captureThumbnail(file: File): Promise<Blob | null> {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0, w, h);
-          canvas.toBlob((blob) => { URL.revokeObjectURL(url); resolve(blob); }, 'image/jpeg', 0.8);
+          canvas.toBlob((blob) => done(blob), 'image/jpeg', 0.8);
         } else {
-          URL.revokeObjectURL(url); resolve(null);
+          done(null);
         }
       } catch {
-        URL.revokeObjectURL(url); resolve(null);
+        done(null);
       }
     };
 
-    video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-    // timeout fallback
-    setTimeout(() => { URL.revokeObjectURL(url); resolve(null); }, 10000);
+    // loadeddata fires when the first frame is fully available — more reliable than seeked
+    video.addEventListener('loadeddata', capture, { once: true });
+    video.addEventListener('error', () => done(null), { once: true });
+
+    // Safety timeout
+    setTimeout(() => done(null), 15000);
   });
 }
 
