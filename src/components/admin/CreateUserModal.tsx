@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 interface CreateUserModalProps {
   onClose: () => void;
   onCreated: (user: any) => void;
-  getIdToken: () => Promise<string>;
+  getIdToken: () => Promise<string | null>;
 }
 
 export function CreateUserModal({ onClose, onCreated, getIdToken }: CreateUserModalProps) {
