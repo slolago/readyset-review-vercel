@@ -6,6 +6,10 @@ import { Toaster } from 'react-hot-toast';
 export const metadata: Metadata = {
   title: 'Ready Set — Media Review Platform',
   description: 'Professional video and image review platform for creative teams',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
