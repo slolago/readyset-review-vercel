@@ -19,7 +19,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const hasAccess = await canAccessProject(user.id, folder.projectId);
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    return NextResponse.json({ folder });
+    // Walk up the parentId chain to build ancestors array
+    const ancestors: any[] = [];
+    let parentId = folder.parentId;
+    while (parentId) {
+      const parentDoc = await db.collection('folders').doc(parentId).get();
+      if (!parentDoc.exists) break;
+      const parent = { id: parentDoc.id, ...parentDoc.data() };
+      ancestors.unshift(parent); // prepend to keep root-first order
+      parentId = (parent as any).parentId;
+    }
+
+    return NextResponse.json({ folder, ancestors });
   } catch {
     return NextResponse.json({ error: 'Failed to fetch folder' }, { status: 500 });
   }

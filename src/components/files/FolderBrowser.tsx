@@ -74,6 +74,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
   const fetchCurrentFolder = useCallback(async () => {
     if (!folderId) {
       setCurrentFolder(null);
+      setAncestorFolders([]);
       return;
     }
     try {
@@ -84,6 +85,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
       if (res.ok) {
         const data = await res.json();
         setCurrentFolder(data.folder);
+        setAncestorFolders(data.ancestors || []);
       }
     } catch (err) {
       console.error('Failed to fetch folder:', err);
@@ -94,58 +96,6 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     fetchFolders();
     fetchCurrentFolder();
   }, [fetchFolders, fetchCurrentFolder]);
-
-  // ── Breadcrumbs ──────────────────────────────────────────────────────────
-  // Walk parentId chain upward to build the full path (handles folders
-  // created before path[] was stored, as well as new ones)
-  useEffect(() => {
-    if (!currentFolder) {
-      setAncestorFolders([]);
-      return;
-    }
-
-    const fetchAncestors = async () => {
-      try {
-        const token = await getIdToken();
-
-        // Fast path: use stored path[] if complete
-        if (currentFolder.path?.length) {
-          const results = await Promise.all(
-            currentFolder.path.map((id) =>
-              fetch(`/api/folders/${id}`, { headers: { Authorization: `Bearer ${token}` } })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => d?.folder ?? null)
-            )
-          );
-          const found = results.filter(Boolean) as FolderType[];
-          if (found.length === currentFolder.path.length) {
-            setAncestorFolders(found);
-            return;
-          }
-        }
-
-        // Fallback: walk parentId chain one by one
-        const ancestors: FolderType[] = [];
-        let parentId: string | null = currentFolder.parentId;
-        while (parentId) {
-          const res = await fetch(`/api/folders/${parentId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) break;
-          const data = await res.json();
-          const parent: FolderType | null = data?.folder ?? null;
-          if (!parent) break;
-          ancestors.unshift(parent);
-          parentId = parent.parentId;
-        }
-        setAncestorFolders(ancestors);
-      } catch {
-        setAncestorFolders([]);
-      }
-    };
-
-    fetchAncestors();
-  }, [currentFolder, getIdToken]);
 
   useEffect(() => {
     const crumbs: Array<{ id: string | null; name: string }> = [

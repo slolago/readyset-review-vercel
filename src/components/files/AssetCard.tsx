@@ -23,6 +23,7 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded }: Asse
   const fileInputRef = useRef<HTMLInputElement>(null);
   const versionCount = (asset as any)._versionCount || 1;
   const signedUrl = (asset as any).signedUrl as string | undefined;
+  const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
 
   const handleUploadVersion = () => {
     fileInputRef.current?.click();
@@ -77,19 +78,9 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded }: Asse
             className="object-cover"
             unoptimized
           />
-        ) : asset.type === 'video' && signedUrl ? (
-          // Native video element — no CORS/canvas issues, browser renders the frame
-          <video
-            src={signedUrl}
-            muted
-            playsInline
-            preload="metadata"
-            onLoadedMetadata={(e) => {
-              const v = e.currentTarget;
-              v.currentTime = Math.min(2, v.duration * 0.1);
-            }}
-            className="w-full h-full object-cover"
-          />
+        ) : asset.type === 'video' && thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumbnailUrl} alt={asset.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-frame-bg">
             {asset.type === 'video' ? (

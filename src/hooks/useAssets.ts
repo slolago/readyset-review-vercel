@@ -5,6 +5,43 @@ import { useAuth } from './useAuth';
 import type { Asset, UploadItem } from '@/types';
 import { generateId } from '@/lib/utils';
 
+function captureThumbnail(file: File): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.src = url;
+
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(2, video.duration * 0.1);
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const w = Math.min(video.videoWidth || 640, 640);
+        const h = Math.round(w * ((video.videoHeight || 360) / (video.videoWidth || 640)));
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, w, h);
+          canvas.toBlob((blob) => { URL.revokeObjectURL(url); resolve(blob); }, 'image/jpeg', 0.8);
+        } else {
+          URL.revokeObjectURL(url); resolve(null);
+        }
+      } catch {
+        URL.revokeObjectURL(url); resolve(null);
+      }
+    };
+
+    video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    // timeout fallback
+    setTimeout(() => { URL.revokeObjectURL(url); resolve(null); }, 10000);
+  });
+}
+
 export function useAssets(projectId?: string, folderId?: string | null) {
   const { getIdToken } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -121,8 +158,26 @@ export function useUpload() {
       });
 
       if (!signedRes.ok) throw new Error('Failed to get signed URL');
-      const { signedUrl, assetId } = await signedRes.json();
+      const { signedUrl, assetId, thumbnailSignedUrl, thumbnailGcsPath } = await signedRes.json();
       updateUpload(uploadId, { assetId });
+
+      // Step 1b: Capture and upload thumbnail for videos
+      let resolvedThumbnailGcsPath: string | undefined;
+      if (thumbnailSignedUrl && file.type.startsWith('video/')) {
+        try {
+          const thumbBlob = await captureThumbnail(file);
+          if (thumbBlob) {
+            await fetch(thumbnailSignedUrl, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'image/jpeg' },
+              body: thumbBlob,
+            });
+            resolvedThumbnailGcsPath = thumbnailGcsPath;
+          }
+        } catch {
+          // thumbnail capture failure is non-fatal
+        }
+      }
 
       // Step 2: Upload to GCS
       await new Promise<void>((resolve, reject) => {
@@ -157,7 +212,10 @@ export function useUpload() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ assetId }),
+        body: JSON.stringify({
+          assetId,
+          ...(resolvedThumbnailGcsPath ? { thumbnailGcsPath: resolvedThumbnailGcsPath } : {}),
+        }),
       });
 
       if (!completeRes.ok) throw new Error('Failed to complete upload');

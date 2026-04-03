@@ -46,6 +46,9 @@ export async function GET(request: NextRequest) {
         if (asset.gcsPath && asset.status === 'ready') {
           asset.signedUrl = await generateReadSignedUrl(asset.gcsPath, 120);
         }
+        if (asset.thumbnailGcsPath && asset.status === 'ready') {
+          asset.thumbnailSignedUrl = await generateReadSignedUrl(asset.thumbnailGcsPath, 120);
+        }
         return asset;
       })
     );

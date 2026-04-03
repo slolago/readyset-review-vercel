@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { generateUploadSignedUrl, buildGcsPath, getPublicUrl } from '@/lib/gcs';
+import { generateUploadSignedUrl, buildGcsPath, buildThumbnailPath, getPublicUrl } from '@/lib/gcs';
 import { getAssetType } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
 import { randomUUID } from 'crypto';
@@ -91,6 +91,12 @@ export async function POST(request: NextRequest) {
       versionGroupId,
       createdAt: Timestamp.now(),
     });
+
+    if (assetType === 'video') {
+      const thumbnailGcsPath = buildThumbnailPath(projectId, assetId);
+      const thumbnailSignedUrl = await generateUploadSignedUrl(thumbnailGcsPath, 'image/jpeg');
+      return NextResponse.json({ signedUrl, assetId, gcsPath, thumbnailSignedUrl, thumbnailGcsPath });
+    }
 
     return NextResponse.json({ signedUrl, assetId, gcsPath });
   } catch (error) {

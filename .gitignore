@@ -37,3 +37,14 @@ next-env.d.ts
 service-account.json
 *-service-account.json
 firebase-adminsdk*.json
+
+# gcp service account JSONs
+frame-clone-*.json
+
+# claude local settings (may contain tokens)
+.claude/settings.local.json
+
+# local scripts with credentials
+scripts/set-cors.js
+scripts/set-cors.mjs
+scripts/test-gcs.mjs
