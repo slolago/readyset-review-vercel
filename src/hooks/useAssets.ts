@@ -173,7 +173,7 @@ export function useUpload() {
   };
 
   const clearCompleted = () => {
-    setUploads((prev) => prev.filter((u) => u.status !== 'complete'));
+    setUploads([]);
   };
 
   return { uploads, uploadFile, clearCompleted };
