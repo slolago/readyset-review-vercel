@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useProject } from '@/hooks/useProject';
@@ -11,11 +10,11 @@ import { CreateFolderModal } from './CreateFolderModal';
 import { CollaboratorsPanel } from '@/components/projects/CollaboratorsPanel';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumb } from '@/components/ui/Breadcrumb';
 import {
   Plus,
   Upload,
   Users,
-  ChevronRight,
   Home,
   Folder,
   FolderOpen,
@@ -490,49 +489,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
       {/* Header */}
       <div className="px-8 py-4 border-b border-frame-border flex items-center justify-between bg-frame-sidebar">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-1 text-sm overflow-x-auto">
-          {breadcrumbs.map((crumb, i) => {
-            const isLast = i === breadcrumbs.length - 1;
-            const isRoot = i === 0;
-            const href = crumb.id
-              ? `/projects/${projectId}/folders/${crumb.id}`
-              : `/projects/${projectId}`;
-
-            return (
-              <span key={crumb.id ?? 'root'} className="flex items-center gap-1 flex-shrink-0">
-                {i > 0 && <ChevronRight className="w-4 h-4 text-frame-textMuted" />}
-                {isLast ? (
-                  <span className="flex items-center gap-1.5 text-white font-medium">
-                    {isRoot && (
-                      <div
-                        className="w-5 h-5 rounded flex items-center justify-center"
-                        style={{ backgroundColor: color + '20', color }}
-                      >
-                        <Home className="w-3 h-3" />
-                      </div>
-                    )}
-                    {crumb.name}
-                  </span>
-                ) : (
-                  <Link
-                    href={href}
-                    className="flex items-center gap-1.5 text-frame-textSecondary hover:text-white transition-colors"
-                  >
-                    {isRoot && (
-                      <div
-                        className="w-5 h-5 rounded flex items-center justify-center"
-                        style={{ backgroundColor: color + '20', color }}
-                      >
-                        <Home className="w-3 h-3" />
-                      </div>
-                    )}
-                    {crumb.name}
-                  </Link>
-                )}
-              </span>
-            );
-          })}
-        </nav>
+        <Breadcrumb items={breadcrumbs} projectId={projectId} projectColor={color} />
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
