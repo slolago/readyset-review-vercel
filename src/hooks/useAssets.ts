@@ -44,8 +44,8 @@ function captureThumbnail(file: File): Promise<Blob | null> {
     // Add ALL listeners before setting src — blob URLs can fire events synchronously
     video.addEventListener('seeked', capture, { once: true });
     video.addEventListener('loadedmetadata', () => {
-      // Seek to 10% of duration or 1s, whichever is smaller — avoids black intro frames
-      video.currentTime = Math.min(video.duration * 0.1, 1) || 1;
+      // Seek to 25% of duration or 5s, whichever is smaller — avoids black intro frames
+      video.currentTime = Math.min(video.duration * 0.25, 5) || 1;
     }, { once: true });
     video.addEventListener('error', () => done(null), { once: true });
     setTimeout(() => done(null), 15000);

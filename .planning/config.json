@@ -1,5 +1,8 @@
 {
   "milestone_version": "v1.1",
   "milestone_name": "ui-features",
-  "profile": "balanced"
+  "profile": "balanced",
+  "workflow": {
+    "_auto_chain_active": false
+  }
 }
