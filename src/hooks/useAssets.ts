@@ -42,8 +42,25 @@ function captureThumbnail(file: File): Promise<Blob | null> {
       }
     };
 
-    // loadeddata fires when the first frame is fully available — more reliable than seeked
-    video.addEventListener('loadeddata', capture, { once: true });
+    // play then immediately pause to force the decoder to render a real frame
+    const onLoadedData = () => {
+      const playPromise = video.play();
+      if (playPromise) {
+        playPromise
+          .then(() => {
+            video.pause();
+            capture();
+          })
+          .catch(() => {
+            // fallback: try capturing without play
+            capture();
+          });
+      } else {
+        capture();
+      }
+    };
+
+    video.addEventListener('loadeddata', onLoadedData, { once: true });
     video.addEventListener('error', () => done(null), { once: true });
 
     // Safety timeout

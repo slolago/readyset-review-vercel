@@ -37,9 +37,10 @@ import { CreateReviewLinkModal } from '@/components/review/CreateReviewLinkModal
 interface FolderBrowserProps {
   projectId: string;
   folderId: string | null;
+  ancestorPath?: string; // comma-separated ancestor folder IDs from URL, used when Firestore parentId chain is missing
 }
 
-export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
+export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: FolderBrowserProps) {
   const { user, getIdToken } = useAuth();
   const router = useRouter();
   const { project, loading: projectLoading, refetch: refetchProject } = useProject(projectId);
@@ -104,12 +105,31 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
       if (res.ok) {
         const data = await res.json();
         setCurrentFolder(data.folder);
-        setAncestorFolders(data.ancestors || []);
+
+        if (data.ancestors?.length > 0) {
+          setAncestorFolders(data.ancestors);
+        } else if (ancestorPath) {
+          // Firestore parentId chain may be missing — fall back to URL-encoded path
+          const ids = ancestorPath.split(',').filter(Boolean);
+          const fetched = await Promise.all(
+            ids.map(async (id) => {
+              const r = await fetch(`/api/folders/${id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!r.ok) return null;
+              const d = await r.json();
+              return d.folder ?? null;
+            })
+          );
+          setAncestorFolders(fetched.filter(Boolean) as FolderType[]);
+        } else {
+          setAncestorFolders([]);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch folder:', err);
     }
-  }, [folderId, getIdToken]);
+  }, [folderId, ancestorPath, getIdToken]);
 
   useEffect(() => {
     fetchFolders();
@@ -129,6 +149,12 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
     }
     setBreadcrumbs(crumbs);
   }, [project, currentFolder, ancestorFolders]);
+
+  // Path string for child folder navigation (ancestor IDs + current folder ID)
+  const childAncestorPath = [
+    ...( ancestorPath ? ancestorPath.split(',').filter(Boolean) : []),
+    ...(folderId ? [folderId] : []),
+  ].join(',');
 
   // ── Multi-select: rubber band ────────────────────────────────────────────
   useEffect(() => {
@@ -180,6 +206,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
   }, []);
 
   const handleContentMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault(); // prevent browser text selection on drag
     if ((e.target as HTMLElement).closest('[data-selectable]')) return;
     if (!e.shiftKey && !e.ctrlKey && !e.metaKey) setSelectedIds(new Set());
     dragStartRef.current = { x: e.clientX, y: e.clientY };
@@ -471,6 +498,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
       <div
         ref={contentRef}
         className="flex-1 overflow-y-auto p-8 space-y-6 relative outline-none select-none"
+        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
         onMouseDown={handleContentMouseDown}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
@@ -513,6 +541,7 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
                   key={folder.id}
                   folder={folder}
                   projectId={projectId}
+                  ancestorPath={childAncestorPath}
                   isSelected={selectedIds.has(folder.id)}
                   onToggleSelect={(e) => toggleSelect(folder.id, e)}
                   onDelete={() => handleDeleteFolder(folder.id)}
@@ -645,12 +674,14 @@ export function FolderBrowser({ projectId, folderId }: FolderBrowserProps) {
 function FolderCard({
   folder,
   projectId,
+  ancestorPath,
   isSelected,
   onToggleSelect,
   onDelete,
 }: {
   folder: FolderType;
   projectId: string;
+  ancestorPath?: string;
   isSelected?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDelete: () => void;
@@ -665,7 +696,10 @@ function FolderCard({
           ? 'border-frame-accent ring-1 ring-frame-accent'
           : 'border-frame-border hover:border-frame-borderLight'
       }`}
-      onClick={() => router.push(`/projects/${projectId}/folders/${folder.id}`)}
+      onClick={() => {
+        const url = `/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`;
+        router.push(url);
+      }}
     >
       {/* Checkbox */}
       {onToggleSelect && (

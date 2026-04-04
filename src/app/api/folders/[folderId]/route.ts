@@ -32,18 +32,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const hasAccess = await canAccessProject(user.id, folder.projectId as string);
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    // Walk parentId chain upward to build full breadcrumb path
+    // Use the stored `path` array (array of ancestor IDs, root-first) when available.
+    // This is populated on creation and is much more reliable than walking parentId.
     const ancestors: Record<string, unknown>[] = [];
-    let parentId = folder.parentId as string | null | undefined;
-    let depth = 0;
+    const pathIds = (doc.data()!.path ?? []) as string[];
 
-    while (parentId && typeof parentId === 'string' && depth < 20) {
-      const parentDoc = await db.collection('folders').doc(parentId).get();
-      if (!parentDoc.exists) break;
-      const parent = serializeDoc(parentDoc.data()!, parentDoc.id);
-      ancestors.unshift(parent); // prepend → root first
-      parentId = parent.parentId as string | null | undefined;
-      depth++;
+    if (pathIds.length > 0) {
+      // Batch fetch all ancestors in parallel
+      const ancestorDocs = await Promise.all(
+        pathIds.map((id) => db.collection('folders').doc(id).get())
+      );
+      for (const aDoc of ancestorDocs) {
+        if (aDoc.exists) ancestors.push(serializeDoc(aDoc.data()!, aDoc.id));
+      }
+    } else {
+      // Fallback: walk parentId chain for folders created before `path` was added
+      let parentId = folder.parentId as string | null | undefined;
+      let depth = 0;
+      while (parentId && typeof parentId === 'string' && depth < 20) {
+        const parentDoc = await db.collection('folders').doc(parentId).get();
+        if (!parentDoc.exists) break;
+        const parent = serializeDoc(parentDoc.data()!, parentDoc.id);
+        ancestors.unshift(parent);
+        parentId = parent.parentId as string | null | undefined;
+        depth++;
+      }
     }
 
     return NextResponse.json({ folder, ancestors });
