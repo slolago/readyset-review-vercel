@@ -171,24 +171,24 @@ export function useUpload() {
       });
 
       if (!signedRes.ok) throw new Error('Failed to get signed URL');
-      const { signedUrl, assetId, thumbnailSignedUrl, thumbnailGcsPath } = await signedRes.json();
+      const { signedUrl, assetId } = await signedRes.json();
       updateUpload(uploadId, { assetId });
 
-      // Step 1b: Capture and upload thumbnail for videos
-      let resolvedThumbnailGcsPath: string | undefined;
-      if (thumbnailSignedUrl && file.type.startsWith('video/')) {
+      // Step 1b: Capture and upload thumbnail for videos (server-side via /api/upload/thumbnail)
+      if (file.type.startsWith('video/')) {
         try {
           const thumbBlob = await captureThumbnail(file);
           if (thumbBlob) {
-            const putRes = await fetch(thumbnailSignedUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'image/jpeg' },
-              body: thumbBlob,
+            const thumbForm = new FormData();
+            thumbForm.append('assetId', assetId);
+            thumbForm.append('thumbnail', thumbBlob, 'thumbnail.jpg');
+            const thumbRes = await fetch('/api/upload/thumbnail', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: thumbForm,
             });
-            if (putRes.ok) {
-              resolvedThumbnailGcsPath = thumbnailGcsPath;
-            } else {
-              console.warn('[thumbnail] PUT to GCS failed:', putRes.status, putRes.statusText);
+            if (!thumbRes.ok) {
+              console.warn('[thumbnail] server upload failed:', thumbRes.status, thumbRes.statusText);
             }
           } else {
             console.warn('[thumbnail] captureThumbnail returned null — no thumbnail will be stored');
@@ -231,10 +231,7 @@ export function useUpload() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          assetId,
-          ...(resolvedThumbnailGcsPath ? { thumbnailGcsPath: resolvedThumbnailGcsPath } : {}),
-        }),
+        body: JSON.stringify({ assetId }),
       });
 
       if (!completeRes.ok) throw new Error('Failed to complete upload');
