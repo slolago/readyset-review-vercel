@@ -80,3 +80,14 @@ export function buildThumbnailPath(
 ): string {
   return `projects/${projectId}/assets/${assetId}/thumbnail.jpg`;
 }
+
+export async function uploadBuffer(
+  gcsPath: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<void> {
+  const storage = getStorage();
+  const bucket = storage.bucket(BUCKET_NAME);
+  const file = bucket.file(gcsPath);
+  await file.save(buffer, { contentType, resumable: false });
+}
