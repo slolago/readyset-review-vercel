@@ -6,7 +6,7 @@ Add 4 UX features to the readyset-review (Frame.io clone) app: breadcrumb naviga
 
 ## Phases
 
-- [ ] **Phase 1: breadcrumb-nav** - Add breadcrumb navigation bar showing folder path with clickable crumbs
+- [x] **Phase 1: breadcrumb-nav** - Add breadcrumb navigation bar showing folder path with clickable crumbs
 - [ ] **Phase 2: video-thumbnails** - Generate and display video thumbnails on upload
 - [ ] **Phase 3: multi-select-drag** - Rubber-band multi-selection of assets and folders
 - [ ] **Phase 4: folder-drop-import** - Drag and drop OS folders preserving subfolder hierarchy
@@ -20,7 +20,7 @@ Add 4 UX features to the readyset-review (Frame.io clone) app: breadcrumb naviga
 **Plans:** 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Extract Breadcrumb component and wire into FolderBrowser
+- [x] 01-01-PLAN.md — Extract Breadcrumb component and wire into FolderBrowser
 
 **Success Criteria** (what must be TRUE):
   1. A breadcrumb bar is visible above the file browser showing the current folder path
