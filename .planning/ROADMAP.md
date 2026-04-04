@@ -7,7 +7,7 @@ Add 4 UX features to the readyset-review (Frame.io clone) app: breadcrumb naviga
 ## Phases
 
 - [x] **Phase 1: breadcrumb-nav** - Add breadcrumb navigation bar showing folder path with clickable crumbs
-- [ ] **Phase 2: video-thumbnails** - Generate and display video thumbnails on upload
+- [x] **Phase 2: video-thumbnails** - Generate and display video thumbnails on upload (server-side thumbnail upload via /api/upload/thumbnail)
 - [ ] **Phase 3: multi-select-drag** - Rubber-band multi-selection of assets and folders
 - [ ] **Phase 4: folder-drop-import** - Drag and drop OS folders preserving subfolder hierarchy
 
