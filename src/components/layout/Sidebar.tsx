@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useState } from 'react';
+import { ProjectTreeNav } from './ProjectTreeNav';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -85,6 +86,10 @@ export function Sidebar() {
             )}
           </Link>
         )}
+
+        {/* Project tree */}
+        <div className="mt-2 mx-1 h-px bg-frame-border" />
+        <ProjectTreeNav />
       </nav>
 
       {/* Bottom gradient separator */}
