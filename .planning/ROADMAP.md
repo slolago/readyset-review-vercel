@@ -15,7 +15,7 @@ v1.2 milestone — bug fixes + feature expansion based on Notion spec "In house 
 - [x] **Phase 7: version-management** - Version badges, manage version stack UI (completed 2026-04-06)
 - [x] **Phase 8: project-sidebar** - Collapsible project tree sidebar (completed 2026-04-06)
 - [x] **Phase 9: review-link-enhancements** - Allow downloads, advanced settings, folder share links, links manager tab (completed 2026-04-06)
-- [ ] **Phase 10: list-view** - List/grid toggle with date uploaded + uploaded by columns
+- [x] **Phase 10: list-view** - List/grid toggle with date uploaded + uploaded by columns (completed 2026-04-06)
 - [ ] **Phase 11: nice-to-have** - Guest name prompt for external commenters + shorter review link URLs
 
 ## Phase Details
@@ -136,7 +136,7 @@ Plans:
 **Goal**: Add a list/grid view toggle to the file browser. List view shows columns: Name, Status, Comments, Size, Date uploaded, Uploaded by.
 **Depends on**: Phase 9
 **Requirements**: REQ-10A, REQ-10B
-**Plans:** 1 plan
+**Plans:** 0/1 plans complete
 
 Plans:
 - [ ] 10-01-PLAN.md — AssetListView component + FolderBrowser toggle with localStorage persistence
