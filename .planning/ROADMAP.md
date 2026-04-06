@@ -14,7 +14,7 @@ v1.2 milestone — bug fixes + feature expansion based on Notion spec "In house 
 - [x] **Phase 6: asset-context-menu** - Rename, Copy to, Duplicate in context menu (completed 2026-04-06)
 - [x] **Phase 7: version-management** - Version badges, manage version stack UI (completed 2026-04-06)
 - [x] **Phase 8: project-sidebar** - Collapsible project tree sidebar (completed 2026-04-06)
-- [ ] **Phase 9: review-link-enhancements** - Allow downloads, advanced settings, folder share links, links manager tab
+- [x] **Phase 9: review-link-enhancements** - Allow downloads, advanced settings, folder share links, links manager tab (completed 2026-04-06)
 - [ ] **Phase 10: list-view** - List/grid toggle with date uploaded + uploaded by columns
 - [ ] **Phase 11: nice-to-have** - Guest name prompt for external commenters + shorter review link URLs
 
