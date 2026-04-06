@@ -49,7 +49,7 @@ export function useProjectTree() {
       if (!node.expanded && !node.foldersLoaded) {
         try {
           const token = await getIdToken();
-          const params = new URLSearchParams({ projectId, parentId: 'null' });
+          const params = new URLSearchParams({ projectId });
           const res = await fetch(`/api/folders?${params}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
