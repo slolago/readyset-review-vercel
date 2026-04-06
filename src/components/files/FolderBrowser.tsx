@@ -27,6 +27,8 @@ import {
   Move,
   X,
   Pencil,
+  Copy,
+  CopyPlus,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import { getProjectColor, formatBytes } from '@/lib/utils';
@@ -272,6 +274,18 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
       setAllFolders(data.folders);
     }
     setShowMoveModal(true);
+  };
+
+  const ensureAllFolders = async () => {
+    if (allFolders.length > 0) return; // already loaded
+    const token = await getIdToken();
+    const res = await fetch(`/api/folders?projectId=${projectId}&all=true`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setAllFolders(data.folders);
+    }
   };
 
   const handleMoveSelected = async (targetFolderId: string | null) => {
@@ -649,6 +663,44 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
                   onToggleSelect={(e) => toggleSelect(folder.id, e)}
                   onDelete={() => handleDeleteFolder(folder.id)}
                   onRename={fetchFolders}
+                  allFolders={allFolders}
+                  onBeforeCopyTo={ensureAllFolders}
+                  onCopyTo={async (targetParentId) => {
+                    try {
+                      const token = await getIdToken();
+                      const res = await fetch('/api/folders/copy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ folderId: folder.id, targetParentId }),
+                      });
+                      if (res.ok) {
+                        toast.success('Folder copied');
+                        fetchFolders();
+                      } else {
+                        toast.error('Copy failed');
+                      }
+                    } catch {
+                      toast.error('Copy failed');
+                    }
+                  }}
+                  onDuplicate={async () => {
+                    try {
+                      const token = await getIdToken();
+                      const res = await fetch('/api/folders/copy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ folderId: folder.id }),
+                      });
+                      if (res.ok) {
+                        toast.success('Folder duplicated');
+                        fetchFolders();
+                      } else {
+                        toast.error('Duplicate failed');
+                      }
+                    } catch {
+                      toast.error('Duplicate failed');
+                    }
+                  }}
                   onDragStart={(e) => handleItemDragStart(folder.id, e)}
                   onDragOver={(e) => handleFolderDragOver(folder.id, e)}
                   onDragLeave={(e) => handleFolderDragLeave(folder.id, e)}
@@ -670,6 +722,8 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
             projectId={projectId}
             onAssetDeleted={refetchAssets}
             onVersionUploaded={refetchAssets}
+            onCopied={refetchAssets}
+            onDuplicated={refetchAssets}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onAssetDragStart={handleItemDragStart}
@@ -789,6 +843,10 @@ function FolderCard({
   onToggleSelect,
   onDelete,
   onRename,
+  allFolders,
+  onBeforeCopyTo,
+  onCopyTo,
+  onDuplicate,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -802,6 +860,10 @@ function FolderCard({
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDelete: () => void;
   onRename?: () => void;
+  allFolders?: FolderType[];
+  onBeforeCopyTo?: () => Promise<void>;
+  onCopyTo?: (targetParentId: string | null) => void;
+  onDuplicate?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragLeave?: (e: React.DragEvent) => void;
@@ -812,6 +874,12 @@ function FolderCard({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const [showFolderCopyModal, setShowFolderCopyModal] = useState(false);
+
+  const handleOpenCopyModal = async () => {
+    await onBeforeCopyTo?.();
+    setShowFolderCopyModal(true);
+  };
 
   const handleRenameFolder = () => {
     setRenameValue(folder.name);
@@ -890,6 +958,8 @@ function FolderCard({
             }
             items={[
               { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRenameFolder },
+              { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: handleOpenCopyModal },
+              { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: onDuplicate ?? (() => {}) },
               { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true, divider: true },
             ]}
           />
@@ -911,6 +981,19 @@ function FolderCard({
       ) : (
         <p className="text-sm font-medium text-white truncate">{folder.name}</p>
       )}
+      {showFolderCopyModal && (
+        <MoveModal
+          folders={allFolders ?? []}
+          currentFolderId={null}
+          selectedCount={0}
+          title="Copy to folder"
+          onMove={(targetParentId) => {
+            onCopyTo?.(targetParentId);
+            setShowFolderCopyModal(false);
+          }}
+          onClose={() => setShowFolderCopyModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -921,12 +1004,14 @@ function MoveModal({
   folders,
   currentFolderId,
   selectedCount,
+  title,
   onMove,
   onClose,
 }: {
   folders: FolderType[];
   currentFolderId: string | null;
   selectedCount: number;
+  title?: string;
   onMove: (folderId: string | null) => void;
   onClose: () => void;
 }) {
@@ -950,7 +1035,7 @@ function MoveModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-frame-border">
-          <h3 className="text-sm font-semibold text-white">Move {selectedCount} item(s)</h3>
+          <h3 className="text-sm font-semibold text-white">{title ?? `Move ${selectedCount} item(s)`}</h3>
           <button onClick={onClose} className="text-frame-textMuted hover:text-white transition-colors">
             <X className="w-4 h-4" />
           </button>

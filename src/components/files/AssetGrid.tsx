@@ -9,6 +9,8 @@ interface AssetGridProps {
   projectId: string;
   onAssetDeleted?: () => void;
   onVersionUploaded?: () => void;
+  onCopied?: () => void;
+  onDuplicated?: () => void;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string, e: React.MouseEvent) => void;
   onAssetDragStart?: (assetId: string, e: React.DragEvent) => void;
@@ -19,6 +21,8 @@ export function AssetGrid({
   projectId,
   onAssetDeleted,
   onVersionUploaded,
+  onCopied,
+  onDuplicated,
   selectedIds,
   onToggleSelect,
   onAssetDragStart,
@@ -40,6 +44,8 @@ export function AssetGrid({
             onClick={() => router.push(`/projects/${projectId}/assets/${asset.id}`)}
             onDeleted={onAssetDeleted}
             onVersionUploaded={onVersionUploaded}
+            onCopied={onCopied}
+            onDuplicated={onDuplicated}
             isSelected={selectedIds?.has(asset.id)}
             onToggleSelect={onToggleSelect ? (e) => onToggleSelect(asset.id, e) : undefined}
             onDragStart={onAssetDragStart ? (e) => onAssetDragStart(asset.id, e) : undefined}

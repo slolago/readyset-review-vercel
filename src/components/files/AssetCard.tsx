@@ -2,9 +2,9 @@
 
 import Image from 'next/image';
 import { useRef, useCallback, useState } from 'react';
-import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil } from 'lucide-react';
+import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil, Copy, CopyPlus, Home, Folder as FolderIcon, X } from 'lucide-react';
 import { formatDuration, formatBytes } from '@/lib/utils';
-import type { Asset } from '@/types';
+import type { Asset, Folder } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpload } from '@/hooks/useAssets';
@@ -15,12 +15,14 @@ interface AssetCardProps {
   onClick?: () => void;
   onDeleted?: () => void;
   onVersionUploaded?: () => void;
+  onCopied?: () => void;
+  onDuplicated?: () => void;
   isSelected?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.DragEvent) => void;
 }
 
-export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSelected, onToggleSelect, onDragStart }: AssetCardProps) {
+export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopied, onDuplicated, isSelected, onToggleSelect, onDragStart }: AssetCardProps) {
   const { getIdToken } = useAuth();
   const { uploadFile } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +31,8 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const [showCopyToModal, setShowCopyToModal] = useState(false);
+  const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
 
@@ -69,6 +73,60 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
       toast.error('Rename failed');
     } finally {
       setIsRenaming(false);
+    }
+  };
+
+  const openCopyTo = async () => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/folders?projectId=${asset.projectId}&all=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAllFolders(data.folders);
+      }
+    } catch {}
+    setShowCopyToModal(true);
+  };
+
+  const handleCopyTo = async (targetFolderId: string | null) => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/assets/copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ assetId: asset.id, targetFolderId }),
+      });
+      if (res.ok) {
+        toast.success('Copied');
+        onCopied?.();
+      } else {
+        toast.error('Copy failed');
+      }
+    } catch {
+      toast.error('Copy failed');
+    } finally {
+      setShowCopyToModal(false);
+    }
+  };
+
+  const handleDuplicate = async () => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/assets/copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ assetId: asset.id }), // no targetFolderId → defaults to same folder
+      });
+      if (res.ok) {
+        toast.success('Duplicated');
+        onDuplicated?.();
+      } else {
+        toast.error('Duplicate failed');
+      }
+    } catch {
+      toast.error('Duplicate failed');
     }
   };
 
@@ -235,6 +293,16 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
                   onClick: handleRename,
                 },
                 {
+                  label: 'Copy to',
+                  icon: <Copy className="w-4 h-4" />,
+                  onClick: openCopyTo,
+                },
+                {
+                  label: 'Duplicate',
+                  icon: <CopyPlus className="w-4 h-4" />,
+                  onClick: handleDuplicate,
+                },
+                {
                   label: 'Upload new version',
                   icon: <Upload className="w-4 h-4" />,
                   onClick: handleUploadVersion,
@@ -281,6 +349,75 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
 
       </div>
     </div>
+      {showCopyToModal && (
+        <AssetFolderPickerModal
+          folders={allFolders}
+          onPick={handleCopyTo}
+          onClose={() => setShowCopyToModal(false)}
+        />
+      )}
     </>
+  );
+}
+
+// ── AssetFolderPickerModal ────────────────────────────────────────────────────
+
+function AssetFolderPickerModal({
+  folders,
+  onPick,
+  onClose,
+}: {
+  folders: Folder[];
+  onPick: (folderId: string | null) => void;
+  onClose: () => void;
+}) {
+  const buildTree = (parentId: string | null, depth: number): { folder: Folder; depth: number }[] => {
+    const children = folders.filter((f) => (f.parentId ?? null) === parentId);
+    const result: { folder: Folder; depth: number }[] = [];
+    for (const child of children) {
+      result.push({ folder: child, depth });
+      result.push(...buildTree(child.id, depth + 1));
+    }
+    return result;
+  };
+  const tree = buildTree(null, 0);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-frame-card border border-frame-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-frame-border">
+          <h3 className="text-sm font-semibold text-white">Copy to folder</h3>
+          <button onClick={onClose} className="text-frame-textMuted hover:text-white transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="max-h-72 overflow-y-auto py-2">
+          <button
+            onClick={() => onPick(null)}
+            className="w-full flex items-center gap-2 px-5 py-2.5 text-sm text-frame-textSecondary hover:text-white hover:bg-frame-border/50 transition-colors text-left"
+          >
+            <Home className="w-4 h-4 flex-shrink-0" />
+            <span>Project root</span>
+          </button>
+          {tree.map(({ folder, depth }) => (
+            <button
+              key={folder.id}
+              onClick={() => onPick(folder.id)}
+              className="w-full flex items-center gap-2 px-5 py-2.5 text-sm text-frame-textSecondary hover:text-white hover:bg-frame-border/50 transition-colors text-left"
+              style={{ paddingLeft: `${20 + depth * 16}px` }}
+            >
+              <FolderIcon className="w-4 h-4 flex-shrink-0 text-frame-accent" />
+              <span className="truncate">{folder.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
