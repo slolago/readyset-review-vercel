@@ -247,7 +247,7 @@ export function useUpload() {
   };
 
   const clearCompleted = () => {
-    setUploads([]);
+    setUploads((prev) => prev.filter((u) => u.status === 'uploading' || u.status === 'pending'));
   };
 
   return { uploads, uploadFile, clearCompleted };

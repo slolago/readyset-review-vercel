@@ -726,7 +726,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
               Uploads ({uploads.length})
             </p>
             <button onClick={clearCompleted} className="text-xs text-frame-textMuted hover:text-white transition-colors">
-              Dismiss
+              Clear completed
             </button>
           </div>
           <div className="divide-y divide-frame-border max-h-52 overflow-y-auto">
