@@ -72,7 +72,27 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const updates = await request.json();
-    await db.collection('assets').doc(params.assetId).update(updates);
+
+    // When moving (folderId changes), update ALL versions in the group atomically
+    if ('folderId' in updates) {
+      const groupId = asset.versionGroupId || params.assetId;
+      const siblingsSnap = await db.collection('assets')
+        .where('versionGroupId', '==', groupId)
+        .get();
+
+      const batch = db.batch();
+      // Always include the root asset (may lack versionGroupId field)
+      batch.update(db.collection('assets').doc(params.assetId), updates);
+      for (const sib of siblingsSnap.docs) {
+        if (sib.id !== params.assetId) {
+          batch.update(sib.ref, { folderId: updates.folderId });
+        }
+      }
+      await batch.commit();
+    } else {
+      await db.collection('assets').doc(params.assetId).update(updates);
+    }
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Failed to update asset' }, { status: 500 });
