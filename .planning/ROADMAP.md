@@ -8,7 +8,7 @@ Add 4 UX features to the readyset-review (Frame.io clone) app: breadcrumb naviga
 
 - [x] **Phase 1: breadcrumb-nav** - Add breadcrumb navigation bar showing folder path with clickable crumbs
 - [x] **Phase 2: video-thumbnails** - Generate and display video thumbnails on upload (server-side thumbnail upload via /api/upload/thumbnail)
-- [ ] **Phase 3: multi-select-drag** - Rubber-band multi-selection of assets and folders
+- [x] **Phase 3: drag-to-move** - Folder drop targets for drag-to-move with application/x-frame-move payload
 - [ ] **Phase 4: folder-drop-import** - Drag and drop OS folders preserving subfolder hierarchy
 
 ## Phase Details
@@ -42,11 +42,12 @@ Plans:
 - [x] 02-01-PLAN.md — Fix captureThumbnail seek time (25% of duration, max 5s)
 - [ ] 02-02-PLAN.md — TBD
 
-### Phase 3: multi-select-drag
-**Goal**: Allow rubber-band (click-and-drag) multi-selection of assets and folders in the file browser.
+### Phase 3: drag-to-move
+**Goal**: Add folder drop-target behavior so selected items can be dragged onto a folder card to move them.
 **Depends on**: Phase 2
 **Requirements**: REQ-06, REQ-07
 **Success Criteria** (what must be TRUE):
+<<<<<<< HEAD
   1. Clicking and dragging on empty space draws a visible selection rectangle
   2. All items whose bounding boxes intersect the rectangle become selected (highlighted)
   3. Selected items can be dragged into a folder to move them
@@ -56,6 +57,16 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — Add drag sources to AssetCard and FolderCard with application/x-frame-move payload
 - [ ] 03-02-PLAN.md — Add folder drop targets that accept x-frame-move payload and call move API
+=======
+  1. Dragging selected items onto a folder card highlights it with a ring
+  2. Dropping triggers the move API for all dragged asset/folder IDs
+  3. Self-drop prevention: can't drop a folder into itself
+  4. Uses application/x-frame-move MIME type to distinguish from OS file drops
+**Plans**: 1
+
+Plans:
+- [x] 03-02-PLAN.md — Add dragOverFolderId state, folder card drop handlers, self-drop prevention
+>>>>>>> worktree-agent-a3158d67
 
 ### Phase 4: folder-drop-import
 **Goal**: Drag and drop an entire folder from the OS into the app, preserving the folder hierarchy (subfolders and files).

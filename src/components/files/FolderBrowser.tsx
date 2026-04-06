@@ -65,9 +65,12 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   const isDraggingRef = useRef(false);
   const rubberBandRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
-  // Drag-to-drop state
+  // Drag-to-drop state (file/folder upload from OS)
   const [isDragActive, setIsDragActive] = useState(false);
   const dropDragCounter = useRef(0);
+
+  // Drag-to-move state (move selected items by dropping onto a folder card)
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -223,14 +226,6 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
     });
   }, []);
 
-  const handleItemDragStart = useCallback((itemId: string, e: React.DragEvent) => {
-    // If the dragged item is already selected, carry all selected items.
-    // Otherwise carry only this one item.
-    const ids = selectedIds.has(itemId) ? Array.from(selectedIds) : [itemId];
-    e.dataTransfer.setData('application/x-frame-move', JSON.stringify({ ids }));
-    e.dataTransfer.effectAllowed = 'move';
-  }, [selectedIds]);
-
   // ── Batch actions ────────────────────────────────────────────────────────
   const handleDeleteSelected = async () => {
     if (!confirm(`Delete ${selectedIds.size} item(s)?`)) return;
@@ -351,27 +346,22 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   };
 
   const handleDragEnter = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
     dropDragCounter.current++;
     setIsDragActive(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
     dropDragCounter.current--;
     if (dropDragCounter.current === 0) setIsDragActive(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
   };
 
   const handleDrop = async (e: React.DragEvent) => {
-    // Ignore internal item-move drags — handled by folder drop zones in Plan 03-02
-    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
     dropDragCounter.current = 0;
     setIsDragActive(false);
@@ -487,6 +477,72 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
     }
   };
 
+  // ── Drag-to-move: folder drop target handlers ────────────────────────────
+  const handleFolderDragOver = useCallback((folderId: string, e: React.DragEvent) => {
+    // Only accept our custom move payload
+    if (!e.dataTransfer.types.includes('application/x-frame-move')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolderId(folderId);
+  }, []);
+
+  const handleFolderDragLeave = useCallback((_folderId: string, _e: React.DragEvent) => {
+    setDragOverFolderId(null);
+  }, []);
+
+  const handleFolderDrop = useCallback(async (targetFolderId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverFolderId(null);
+
+    const raw = e.dataTransfer.getData('application/x-frame-move');
+    if (!raw) return;
+
+    let payload: { ids: string[] };
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const { ids } = payload;
+    if (!ids?.length) return;
+
+    // Self-drop prevention: ignore if the target folder is in the dragged set
+    if (ids.includes(targetFolderId)) return;
+
+    // Reuse existing handleMoveSelected by temporarily setting selectedIds
+    // Instead, call the move API directly to avoid coupling to selection state
+    try {
+      const token = await getIdToken();
+      const assetIds = ids.filter((id) => assets.some((a) => a.id === id));
+      const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
+
+      await Promise.all([
+        ...assetIds.map((id) =>
+          fetch(`/api/assets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ folderId: targetFolderId }),
+          })
+        ),
+        ...folderIds.map((id) =>
+          fetch(`/api/folders/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ parentId: targetFolderId }),
+          })
+        ),
+      ]);
+
+      toast.success(`Moved ${ids.length} item(s)`);
+      setSelectedIds(new Set());
+      refetchAssets();
+      fetchFolders();
+    } catch {
+      toast.error('Failed to move items');
+    }
+  }, [assets, folders, getIdToken, refetchAssets, fetchFolders]);
+
   if (projectLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -577,9 +633,12 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
                   projectId={projectId}
                   ancestorPath={childAncestorPath}
                   isSelected={selectedIds.has(folder.id)}
+                  isDropTarget={dragOverFolderId === folder.id}
                   onToggleSelect={(e) => toggleSelect(folder.id, e)}
                   onDelete={() => handleDeleteFolder(folder.id)}
-                  onDragStart={(e) => handleItemDragStart(folder.id, e)}
+                  onDragOver={(e) => handleFolderDragOver(folder.id, e)}
+                  onDragLeave={(e) => handleFolderDragLeave(folder.id, e)}
+                  onDrop={(e) => handleFolderDrop(folder.id, e)}
                 />
               ))}
             </div>
@@ -599,7 +658,6 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
             onVersionUploaded={refetchAssets}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
-            onAssetDragStart={handleItemDragStart}
           />
         )}
 
@@ -712,27 +770,33 @@ function FolderCard({
   projectId,
   ancestorPath,
   isSelected,
+  isDropTarget,
   onToggleSelect,
   onDelete,
-  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   folder: FolderType;
   projectId: string;
   ancestorPath?: string;
   isSelected?: boolean;
+  isDropTarget?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDelete: () => void;
-  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
 }) {
   const router = useRouter();
 
   return (
     <div
       data-selectable={folder.id}
-      draggable
-      onDragStart={onDragStart}
       className={`group relative bg-frame-card border rounded-xl p-3 cursor-pointer transition-all hover:bg-frame-cardHover ${
-        isSelected
+        isDropTarget
+          ? 'border-frame-accent ring-2 ring-frame-accent bg-frame-accent/10'
+          : isSelected
           ? 'border-frame-accent ring-1 ring-frame-accent'
           : 'border-frame-border hover:border-frame-borderLight'
       }`}
@@ -740,6 +804,9 @@ function FolderCard({
         const url = `/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`;
         router.push(url);
       }}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
       {/* Checkbox */}
       {onToggleSelect && (
