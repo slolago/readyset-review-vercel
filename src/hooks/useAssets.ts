@@ -211,12 +211,12 @@ export function useUpload() {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
-            console.error('GCS upload failed:', xhr.status, xhr.responseText);
+            console.error(`[upload] GCS upload failed for "${file.name}":`, xhr.status, xhr.responseText);
             reject(new Error(`GCS upload failed (${xhr.status}): ${xhr.responseText || 'No response'}`));
           }
         });
         xhr.addEventListener('error', (e) => {
-          console.error('GCS upload network error:', e);
+          console.error(`[upload] GCS network error for "${file.name}":`, e);
           reject(new Error('Network error — check CORS config on GCS bucket'));
         });
         xhr.open('PUT', signedUrl);
