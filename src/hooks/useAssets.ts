@@ -48,7 +48,7 @@ function captureThumbnail(file: File): Promise<Blob | null> {
       video.currentTime = Math.min(video.duration * 0.25, 5) || 1;
     }, { once: true });
     video.addEventListener('error', () => done(null), { once: true });
-    setTimeout(() => done(null), 15000);
+    setTimeout(() => done(null), 5000);
 
     // Set src last so events don't fire before listeners are attached
     video.src = url;
