@@ -209,8 +209,9 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   }, []);
 
   const handleContentMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault(); // prevent browser text selection on drag
+    // Allow native HTML5 drag to start on draggable items before doing anything else
     if ((e.target as HTMLElement).closest('[data-selectable]')) return;
+    e.preventDefault(); // prevent browser text selection on rubber-band drag
     if (!e.shiftKey && !e.ctrlKey && !e.metaKey) setSelectedIds(new Set());
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     isDraggingRef.current = false;
