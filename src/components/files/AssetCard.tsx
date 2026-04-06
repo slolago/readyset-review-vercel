@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useRef, useCallback } from 'react';
-import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check } from 'lucide-react';
+import { useRef, useCallback, useState } from 'react';
+import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil } from 'lucide-react';
 import { formatDuration, formatBytes } from '@/lib/utils';
 import type { Asset } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -26,6 +26,9 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const versionCount = (asset as any)._versionCount || 1;
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
 
@@ -36,6 +39,38 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
     const seekTo = Math.min((vid.duration || 0) * 0.1, 2) || 1;
     vid.currentTime = seekTo;
   }, []);
+
+  const handleRename = () => {
+    setRenameValue(asset.name);
+    setIsRenaming(true);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  };
+
+  const commitRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === asset.name) {
+      setIsRenaming(false);
+      return;
+    }
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/assets/${asset.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (res.ok) {
+        toast.success('Renamed');
+        onDeleted?.(); // reuse the refresh callback to trigger parent refetch
+      } else {
+        toast.error('Rename failed');
+      }
+    } catch {
+      toast.error('Rename failed');
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   const handleUploadVersion = () => {
     fileInputRef.current?.click();
@@ -195,6 +230,11 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
               }
               items={[
                 {
+                  label: 'Rename',
+                  icon: <Pencil className="w-4 h-4" />,
+                  onClick: handleRename,
+                },
+                {
                   label: 'Upload new version',
                   icon: <Upload className="w-4 h-4" />,
                   onClick: handleUploadVersion,
@@ -204,6 +244,7 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
                   icon: <Trash2 className="w-4 h-4" />,
                   onClick: handleDelete,
                   danger: true,
+                  divider: true,
                 },
               ]}
             />
@@ -213,9 +254,24 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
 
       {/* Info */}
       <div className="p-3">
-        <p className="text-sm font-medium text-white truncate" title={asset.name}>
-          {asset.name}
-        </p>
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            className="w-full bg-frame-bg border border-frame-accent rounded px-1.5 py-0.5 text-sm font-medium text-white outline-none focus:ring-1 focus:ring-frame-accent"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+              if (e.key === 'Escape') { setIsRenaming(false); }
+            }}
+            onBlur={commitRename}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <p className="text-sm font-medium text-white truncate" title={asset.name}>
+            {asset.name}
+          </p>
+        )}
         <div className="flex items-center justify-between mt-0.5">
           <p className="text-xs text-frame-textMuted">{formatBytes(asset.size)}</p>
           {versionCount > 1 && (
