@@ -13,7 +13,7 @@ v1.2 milestone — bug fixes + feature expansion based on Notion spec "In house 
 - [x] **Phase 5: bug-fixes** - Fix review link broken + upload stuck (completed 2026-04-06)
 - [x] **Phase 6: asset-context-menu** - Rename, Copy to, Duplicate in context menu (completed 2026-04-06)
 - [x] **Phase 7: version-management** - Version badges, manage version stack UI (completed 2026-04-06)
-- [ ] **Phase 8: project-sidebar** - Collapsible project tree sidebar
+- [x] **Phase 8: project-sidebar** - Collapsible project tree sidebar (completed 2026-04-06)
 - [ ] **Phase 9: review-link-enhancements** - Allow downloads, advanced settings, folder share links, links manager tab
 - [ ] **Phase 10: list-view** - List/grid toggle with date uploaded + uploaded by columns
 - [ ] **Phase 11: nice-to-have** - Guest name prompt for external commenters + shorter review link URLs
@@ -110,7 +110,7 @@ Plans:
 **Goal**: Add a collapsible left sidebar showing a tree of all projects and their top-level folders. Clicking a project or folder navigates to it.
 **Depends on**: Phase 7
 **Requirements**: REQ-08A, REQ-08B
-**Plans:** 1/? plans complete
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 08-01-PLAN.md — useProjectTree hook + ProjectTreeNav collapsible tree component (2026-04-06)

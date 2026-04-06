@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: Executing Phase 08
-stopped_at: Completed 08-01-PLAN.md (2026-04-06)
-last_updated: "2026-04-06T00:08:00Z"
+stopped_at: "Checkpoint:human-verify in 08-02 — awaiting visual verification of project sidebar"
+last_updated: "2026-04-06T18:45:36.196Z"
 progress:
   total_phases: 11
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # State
@@ -28,7 +28,7 @@ in_progress
 
 ## Last Session
 
-Stopped at: Completed 08-01-PLAN.md (2026-04-06)
+Stopped at: Checkpoint:human-verify in 08-02 — awaiting visual verification of project sidebar
 
 ## Decisions
 
@@ -51,6 +51,8 @@ Stopped at: Completed 08-01-PLAN.md (2026-04-06)
 - [Phase 07-01]: Delete button hidden (not disabled) when versions.length === 1 — unambiguous UX, no accidental last-version delete
 - [Phase 08-01]: Lazy folder loading on first expand to avoid N+1 fetches; error marks foldersLoaded=true to prevent infinite retries
 - [Phase 08-01]: treeNodes synced from useProjects() via Map lookup preserving expanded/foldersLoaded state across project list refreshes
+- [Phase 08-02]: AppShell localStorage: SSR-safe lazy initializer with typeof window guard + useEffect write; sidebar-open key
+- [Phase 08-02]: ProjectTreeNav mounted inside Sidebar nav below admin link, separated by h-px divider
 
 ## Blockers
 
@@ -69,3 +71,4 @@ Stopped at: Completed 08-01-PLAN.md (2026-04-06)
 | 06-asset-context-menu | 02 | 18 min | 2/2 | 5 |
 | 07-version-management | 01 | 2 min | 2/2 | 1 |
 | 08-project-sidebar | 01 | 8 min | 2/2 | 2 |
+| Phase 08-project-sidebar P02 | 2min | 2 tasks | 2 files |
