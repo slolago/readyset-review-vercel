@@ -2,25 +2,25 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: Ready to plan
-stopped_at: "Checkpoint:human-verify in 08-02 — awaiting visual verification of project sidebar"
-last_updated: "2026-04-06T19:39:12.985Z"
+status: Executing Phase 09
+stopped_at: "Completed 09-01-PLAN.md"
+last_updated: "2026-04-06T19:50:00Z"
 progress:
   total_phases: 11
   completed_phases: 7
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 14
+  completed_plans: 13
 ---
 
 # State
 
 ## Current Phase
 
-8
+9
 
 ## Current Plan
 
-Plan 01 complete — Phase 8 plan 01 done
+Plan 01 complete — Phase 9 plan 01 done
 
 ## Status
 
@@ -28,7 +28,7 @@ in_progress
 
 ## Last Session
 
-Stopped at: Checkpoint:human-verify in 08-02 — awaiting visual verification of project sidebar
+Stopped at: Completed 09-01-PLAN.md
 
 ## Decisions
 
@@ -53,6 +53,8 @@ Stopped at: Checkpoint:human-verify in 08-02 — awaiting visual verification of
 - [Phase 08-01]: treeNodes synced from useProjects() via Map lookup preserving expanded/foldersLoaded state across project list refreshes
 - [Phase 08-02]: AppShell localStorage: SSR-safe lazy initializer with typeof window guard + useEffect write; sidebar-open key
 - [Phase 08-02]: ProjectTreeNav mounted inside Sidebar nav below admin link, separated by h-px divider
+- [Phase 09-01]: Second CreateReviewLinkModal instance (folderReviewTarget state) for folder-targeted creation — avoids mutating project-level showReviewModal flow
+- [Phase 09-01]: allowDownloads/allowApprovals/showAllVersions default to false via strict === true check in API
 
 ## Blockers
 
@@ -72,3 +74,4 @@ Stopped at: Checkpoint:human-verify in 08-02 — awaiting visual verification of
 | 07-version-management | 01 | 2 min | 2/2 | 1 |
 | 08-project-sidebar | 01 | 8 min | 2/2 | 2 |
 | Phase 08-project-sidebar P02 | 2min | 2 tasks | 2 files |
+| 09-review-link-enhancements | 01 | 10 min | 3/3 | 4 |
