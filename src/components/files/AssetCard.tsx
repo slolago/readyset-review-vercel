@@ -32,6 +32,7 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [showCopyToModal, setShowCopyToModal] = useState(false);
+  const [showVersionModal, setShowVersionModal] = useState(false);
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
@@ -308,6 +309,11 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
                   onClick: handleUploadVersion,
                 },
                 {
+                  label: 'Manage version stack',
+                  icon: <Layers className="w-4 h-4" />,
+                  onClick: () => setShowVersionModal(true),
+                },
+                {
                   label: 'Delete',
                   icon: <Trash2 className="w-4 h-4" />,
                   onClick: handleDelete,
@@ -354,6 +360,14 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
           folders={allFolders}
           onPick={handleCopyTo}
           onClose={() => setShowCopyToModal(false)}
+        />
+      )}
+      {showVersionModal && (
+        <VersionStackModal
+          asset={asset}
+          onClose={() => setShowVersionModal(false)}
+          onDeleted={onDeleted}
+          getIdToken={getIdToken}
         />
       )}
     </>
