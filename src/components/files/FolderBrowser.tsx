@@ -223,6 +223,14 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
     });
   }, []);
 
+  const handleItemDragStart = useCallback((itemId: string, e: React.DragEvent) => {
+    // If the dragged item is already selected, carry all selected items.
+    // Otherwise carry only this one item.
+    const ids = selectedIds.has(itemId) ? Array.from(selectedIds) : [itemId];
+    e.dataTransfer.setData('application/x-frame-move', JSON.stringify({ ids }));
+    e.dataTransfer.effectAllowed = 'move';
+  }, [selectedIds]);
+
   // ── Batch actions ────────────────────────────────────────────────────────
   const handleDeleteSelected = async () => {
     if (!confirm(`Delete ${selectedIds.size} item(s)?`)) return;
@@ -343,22 +351,27 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   };
 
   const handleDragEnter = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
     dropDragCounter.current++;
     setIsDragActive(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
     dropDragCounter.current--;
     if (dropDragCounter.current === 0) setIsDragActive(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
   };
 
   const handleDrop = async (e: React.DragEvent) => {
+    // Ignore internal item-move drags — handled by folder drop zones in Plan 03-02
+    if (e.dataTransfer.types.includes('application/x-frame-move')) return;
     e.preventDefault();
     dropDragCounter.current = 0;
     setIsDragActive(false);
@@ -566,6 +579,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
                   isSelected={selectedIds.has(folder.id)}
                   onToggleSelect={(e) => toggleSelect(folder.id, e)}
                   onDelete={() => handleDeleteFolder(folder.id)}
+                  onDragStart={(e) => handleItemDragStart(folder.id, e)}
                 />
               ))}
             </div>
@@ -585,6 +599,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
             onVersionUploaded={refetchAssets}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
+            onAssetDragStart={handleItemDragStart}
           />
         )}
 
@@ -699,6 +714,7 @@ function FolderCard({
   isSelected,
   onToggleSelect,
   onDelete,
+  onDragStart,
 }: {
   folder: FolderType;
   projectId: string;
@@ -706,12 +722,15 @@ function FolderCard({
   isSelected?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDelete: () => void;
+  onDragStart?: (e: React.DragEvent) => void;
 }) {
   const router = useRouter();
 
   return (
     <div
       data-selectable={folder.id}
+      draggable
+      onDragStart={onDragStart}
       className={`group relative bg-frame-card border rounded-xl p-3 cursor-pointer transition-all hover:bg-frame-cardHover ${
         isSelected
           ? 'border-frame-accent ring-1 ring-frame-accent'
