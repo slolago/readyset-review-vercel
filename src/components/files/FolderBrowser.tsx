@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProject } from '@/hooks/useProject';
 import { useAssets, useUpload } from '@/hooks/useAssets';
 import { AssetGrid } from './AssetGrid';
+import { AssetListView } from './AssetListView';
 import { CreateFolderModal } from './CreateFolderModal';
 import { CollaboratorsPanel } from '@/components/projects/CollaboratorsPanel';
 import { Button } from '@/components/ui/Button';
@@ -29,6 +30,8 @@ import {
   Pencil,
   Copy,
   CopyPlus,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import { getProjectColor, formatBytes } from '@/lib/utils';
@@ -64,6 +67,23 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rubberBand, setRubberBand] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
+  // View mode: 'grid' | 'list', persisted per folder
+  const viewModeKey = `view-mode-${folderId ?? 'root'}`;
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    if (typeof window === 'undefined') return 'grid';
+    return (localStorage.getItem(viewModeKey) as 'grid' | 'list') ?? 'grid';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(viewModeKey, viewMode);
+  }, [viewModeKey, viewMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem(viewModeKey) as 'grid' | 'list' | null;
+    if (stored) setViewMode(stored);
+  }, [viewModeKey]);
 
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
@@ -589,6 +609,31 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-lg border border-frame-border overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              title="Grid view"
+              className={`p-1.5 transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-frame-accent text-white'
+                  : 'text-frame-textMuted hover:text-white hover:bg-frame-border'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              title="List view"
+              className={`p-1.5 transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-frame-accent text-white'
+                  : 'text-frame-textMuted hover:text-white hover:bg-frame-border'
+              }`}
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+          </div>
           <Button variant="ghost" size="sm" onClick={() => setShowCollaborators(true)} icon={<Users className="w-4 h-4" />}>
             Team
           </Button>
@@ -718,6 +763,18 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           <div className="flex items-center justify-center py-12">
             <Spinner />
           </div>
+        ) : viewMode === 'list' ? (
+          <AssetListView
+            assets={assets}
+            projectId={projectId}
+            onAssetDeleted={refetchAssets}
+            onVersionUploaded={refetchAssets}
+            onCopied={refetchAssets}
+            onDuplicated={refetchAssets}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onAssetDragStart={handleItemDragStart}
+          />
         ) : (
           <AssetGrid
             assets={assets}
