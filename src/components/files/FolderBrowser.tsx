@@ -773,6 +773,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
             onDuplicated={refetchAssets}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
+            onSelectAll={(ids) => setSelectedIds(new Set(ids))}
             onAssetDragStart={handleItemDragStart}
           />
         ) : (

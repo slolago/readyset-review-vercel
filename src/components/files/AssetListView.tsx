@@ -15,6 +15,7 @@ interface AssetListViewProps {
   onDuplicated?: () => void;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string, e: React.MouseEvent) => void;
+  onSelectAll?: (ids: string[]) => void;
   onAssetDragStart?: (assetId: string, e: React.DragEvent) => void;
 }
 
@@ -26,6 +27,7 @@ export function AssetListView({
   projectId,
   selectedIds,
   onToggleSelect,
+  onSelectAll,
   onAssetDragStart,
 }: AssetListViewProps) {
   const router = useRouter();
@@ -63,6 +65,16 @@ export function AssetListView({
 
   if (assets.length === 0) return null;
 
+  const allSelected = sorted.length > 0 && sorted.every(a => selectedIds?.has(a.id));
+  const someSelected = !allSelected && sorted.some(a => selectedIds?.has(a.id));
+
+  function handleSelectAllClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (onSelectAll) {
+      onSelectAll(allSelected ? [] : sorted.map(a => a.id));
+    }
+  }
+
   const headerCellClass = 'py-2 px-3 text-xs font-medium text-frame-textMuted uppercase tracking-wider';
   const sortableButtonClass = 'flex items-center gap-1 hover:text-white transition-colors';
 
@@ -74,7 +86,19 @@ export function AssetListView({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-frame-border text-left">
-            {onToggleSelect && <th className={headerCellClass} style={{ width: '2.5rem' }} />}
+            {onToggleSelect && (
+              <th className={headerCellClass} style={{ width: '2.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={el => { if (el) el.indeterminate = someSelected; }}
+                  onChange={() => {}}
+                  onClick={handleSelectAllClick}
+                  className="w-4 h-4 accent-frame-accent cursor-pointer"
+                  title={allSelected ? 'Deselect all' : 'Select all'}
+                />
+              </th>
+            )}
             <th className={`${headerCellClass} w-12`} />
             <th className={headerCellClass}>
               <button
@@ -164,16 +188,18 @@ function AssetListRow({
       }`}
     >
       {onToggleSelect && (
-        <td className="px-3 py-2">
+        <td
+          className="px-3 py-2 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect(asset.id, e);
+          }}
+        >
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => {}}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSelect(asset.id, e as unknown as React.MouseEvent);
-            }}
-            className="w-4 h-4 accent-frame-accent cursor-pointer"
+            className="w-4 h-4 accent-frame-accent pointer-events-none"
           />
         </td>
       )}
