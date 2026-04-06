@@ -26,6 +26,7 @@ import {
   Check,
   Move,
   X,
+  Pencil,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import { getProjectColor, formatBytes } from '@/lib/utils';
@@ -647,6 +648,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
                   isDropTarget={dragOverFolderId === folder.id}
                   onToggleSelect={(e) => toggleSelect(folder.id, e)}
                   onDelete={() => handleDeleteFolder(folder.id)}
+                  onRename={fetchFolders}
                   onDragStart={(e) => handleItemDragStart(folder.id, e)}
                   onDragOver={(e) => handleFolderDragOver(folder.id, e)}
                   onDragLeave={(e) => handleFolderDragLeave(folder.id, e)}
@@ -786,6 +788,7 @@ function FolderCard({
   isDropTarget,
   onToggleSelect,
   onDelete,
+  onRename,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -798,12 +801,49 @@ function FolderCard({
   isDropTarget?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDelete: () => void;
+  onRename?: () => void;
   onDragStart?: (e: React.DragEvent) => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
 }) {
   const router = useRouter();
+  const { getIdToken } = useAuth();
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRenameFolder = () => {
+    setRenameValue(folder.name);
+    setIsRenaming(true);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  };
+
+  const commitFolderRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === folder.name) {
+      setIsRenaming(false);
+      return;
+    }
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/folders/${folder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (res.ok) {
+        toast.success('Renamed');
+        onRename?.();
+      } else {
+        toast.error('Rename failed');
+      }
+    } catch {
+      toast.error('Rename failed');
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   return (
     <div
@@ -849,12 +889,28 @@ function FolderCard({
               </button>
             }
             items={[
-              { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true },
+              { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRenameFolder },
+              { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true, divider: true },
             ]}
           />
         </div>
       </div>
-      <p className="text-sm font-medium text-white truncate">{folder.name}</p>
+      {isRenaming ? (
+        <input
+          ref={renameInputRef}
+          className="w-full bg-frame-bg border border-frame-accent rounded px-1.5 py-0.5 text-sm font-medium text-white outline-none focus:ring-1 focus:ring-frame-accent"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commitFolderRename(); }
+            if (e.key === 'Escape') { setIsRenaming(false); }
+          }}
+          onBlur={commitFolderRename}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <p className="text-sm font-medium text-white truncate">{folder.name}</p>
+      )}
     </div>
   );
 }
