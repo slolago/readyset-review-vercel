@@ -2,25 +2,25 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 06-02-PLAN.md (2026-04-06)
-last_updated: "2026-04-06T16:43:55.207Z"
+status: Executing Phase 07
+stopped_at: Completed 07-01-PLAN.md (2026-04-06)
+last_updated: "2026-04-06T17:37:41Z"
 progress:
   total_phases: 11
   completed_phases: 5
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 10
+  completed_plans: 10
 ---
 
 # State
 
 ## Current Phase
 
-6
+7
 
 ## Current Plan
 
-Plan 02 complete — Phase 6 plan 02 done
+Plan 01 complete — Phase 7 plan 01 done
 
 ## Status
 
@@ -28,7 +28,7 @@ in_progress
 
 ## Last Session
 
-Stopped at: Completed 06-02-PLAN.md (2026-04-06)
+Stopped at: Completed 07-01-PLAN.md (2026-04-06)
 
 ## Decisions
 
@@ -47,6 +47,8 @@ Stopped at: Completed 06-02-PLAN.md (2026-04-06)
 - [Phase 06-02]: Shallow copy only (same gcsPath/url) — new Firestore doc, new independent versionGroupId
 - [Phase 06-02]: MoveModal reused for FolderCard copy picker via optional title prop
 - [Phase 06-02]: ensureAllFolders lazy-loads folder tree for copy modal; skips if already populated
+- [Phase 07-01]: VersionStackModal co-located in AssetCard.tsx following AssetFolderPickerModal pattern
+- [Phase 07-01]: Delete button hidden (not disabled) when versions.length === 1 — unambiguous UX, no accidental last-version delete
 
 ## Blockers
 
@@ -63,3 +65,4 @@ Stopped at: Completed 06-02-PLAN.md (2026-04-06)
 | 05-bug-fixes | 01 | 2 min | 2/2 | 2 |
 | 06-asset-context-menu | 01 | 10 min | 2/2 | 2 |
 | 06-asset-context-menu | 02 | 18 min | 2/2 | 5 |
+| 07-version-management | 01 | 2 min | 2/2 | 1 |

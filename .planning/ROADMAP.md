@@ -12,7 +12,7 @@ v1.2 milestone — bug fixes + feature expansion based on Notion spec "In house 
 - [x] **Phase 4: folder-drop-import** - OS folder drag-and-drop import
 - [x] **Phase 5: bug-fixes** - Fix review link broken + upload stuck (completed 2026-04-06)
 - [x] **Phase 6: asset-context-menu** - Rename, Copy to, Duplicate in context menu (completed 2026-04-06)
-- [ ] **Phase 7: version-management** - Version badges, manage version stack UI
+- [x] **Phase 7: version-management** - Version badges, manage version stack UI (completed 2026-04-06)
 - [ ] **Phase 8: project-sidebar** - Collapsible project tree sidebar
 - [ ] **Phase 9: review-link-enhancements** - Allow downloads, advanced settings, folder share links, links manager tab
 - [ ] **Phase 10: list-view** - List/grid toggle with date uploaded + uploaded by columns
