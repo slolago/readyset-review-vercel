@@ -43,20 +43,19 @@ Plans:
 - [ ] 02-02-PLAN.md — TBD
 
 ### Phase 3: multi-select-drag
-**Goal**: Implement drag-and-drop of selected assets/folders into a target folder. Rubber-band multi-select already works; add drag sources and folder drop zones.
+**Goal**: Allow rubber-band (click-and-drag) multi-selection of assets and folders in the file browser.
 **Depends on**: Phase 2
 **Requirements**: REQ-06, REQ-07
-**Plans:** 2 plans
-
-Plans:
-- [ ] 03-01-PLAN.md — Add drag source to AssetCard and FolderCard with payload encoding
-- [ ] 03-02-PLAN.md — Add folder drop zones with visual feedback and move logic
-
 **Success Criteria** (what must be TRUE):
   1. Clicking and dragging on empty space draws a visible selection rectangle
   2. All items whose bounding boxes intersect the rectangle become selected (highlighted)
   3. Selected items can be dragged into a folder to move them
   4. Shift+click and Ctrl+click also extend the selection
+**Plans**: 2
+
+Plans:
+- [x] 03-01-PLAN.md — Add drag sources to AssetCard and FolderCard with application/x-frame-move payload
+- [ ] 03-02-PLAN.md — Add folder drop targets that accept x-frame-move payload and call move API
 
 ### Phase 4: folder-drop-import
 **Goal**: Drag and drop an entire folder from the OS into the app, preserving the folder hierarchy (subfolders and files).

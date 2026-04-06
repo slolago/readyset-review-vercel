@@ -17,9 +17,10 @@ interface AssetCardProps {
   onVersionUploaded?: () => void;
   isSelected?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
+  onDragStart?: (e: React.DragEvent) => void;
 }
 
-export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSelected, onToggleSelect }: AssetCardProps) {
+export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSelected, onToggleSelect, onDragStart }: AssetCardProps) {
   const { getIdToken } = useAuth();
   const { uploadFile } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +76,8 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, isSele
       <input ref={fileInputRef} type="file" accept="video/*,image/*" className="hidden" onChange={handleFileSelected} />
     <div
       data-selectable={asset.id}
+      draggable={!isUploading}
+      onDragStart={isUploading ? undefined : onDragStart}
       onClick={isUploading ? undefined : onClick}
       className={`group bg-frame-card border rounded-xl overflow-hidden transition-all ${
         isUploading

@@ -11,6 +11,7 @@ interface AssetGridProps {
   onVersionUploaded?: () => void;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string, e: React.MouseEvent) => void;
+  onAssetDragStart?: (assetId: string, e: React.DragEvent) => void;
 }
 
 export function AssetGrid({
@@ -20,6 +21,7 @@ export function AssetGrid({
   onVersionUploaded,
   selectedIds,
   onToggleSelect,
+  onAssetDragStart,
 }: AssetGridProps) {
   const router = useRouter();
 
@@ -40,6 +42,7 @@ export function AssetGrid({
             onVersionUploaded={onVersionUploaded}
             isSelected={selectedIds?.has(asset.id)}
             onToggleSelect={onToggleSelect ? (e) => onToggleSelect(asset.id, e) : undefined}
+            onDragStart={onAssetDragStart ? (e) => onAssetDragStart(asset.id, e) : undefined}
           />
         ))}
       </div>
