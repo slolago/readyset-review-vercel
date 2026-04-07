@@ -321,13 +321,20 @@ Plans:
 
 ### Phase 21: admin-panel-polish — Admin sees all projects with owner info; clean up roles display
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Add a "Projects" tab to the admin panel showing all projects system-wide with owner name/email and collaborator count. Clean up roles display by removing dead `UserRoleSelect.tsx` component.
+**Requirements**: P21-01, P21-02, P21-03, P21-04, P21-05
 **Depends on:** Phase 20
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 21 to break down)
+- [ ] 21-01-PLAN.md — Admin projects API + ProjectsTable + tab navigation + delete dead UserRoleSelect
+
+**Success Criteria** (what must be TRUE):
+  1. Admin page has "Users" and "All Projects" tabs
+  2. All Projects tab shows every project with owner name/email and collaborator count
+  3. Projects ordered by creation date descending
+  4. Non-admin users get 403 from /api/admin/projects
+  5. UserRoleSelect.tsx dead code is removed
 
 ### Phase 22: asset-download-button — Download button inside the asset viewer page
 
