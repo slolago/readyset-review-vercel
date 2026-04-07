@@ -32,6 +32,7 @@ import {
   CopyPlus,
   LayoutGrid,
   LayoutList,
+  Download,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import { getProjectColor, formatBytes } from '@/lib/utils';
@@ -289,6 +290,39 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
       toast.error('Failed to delete items');
     }
   };
+
+  const handleDownloadSelected = useCallback(async () => {
+    const selectedAssets = assets.filter(a => selectedIds.has(a.id));
+    for (const asset of selectedAssets) {
+      const url = (asset as any).signedUrl as string | undefined;
+      if (!url) continue;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = asset.name;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }, [assets, selectedIds]);
+
+  const handleDownloadAll = useCallback(async () => {
+    for (const asset of assets) {
+      const url = (asset as any).signedUrl as string | undefined;
+      if (!url) continue;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = asset.name;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }, [assets]);
 
   const handleOpenMoveModal = async () => {
     const token = await getIdToken();
@@ -721,6 +755,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
               { label: 'New Folder', icon: <Plus className="w-4 h-4" />, onClick: () => setShowCreateFolder(true) },
               { label: 'Upload files', icon: <Upload className="w-4 h-4" />, onClick: () => fileInputRef.current?.click() },
               { label: 'Upload folder', icon: <FolderOpen className="w-4 h-4" />, onClick: () => folderInputRef.current?.click() },
+              { label: 'Download all', icon: <Download className="w-4 h-4" />, onClick: handleDownloadAll, dividerBefore: true, disabled: assets.length === 0 },
             ]}
           />
         )}
@@ -854,6 +889,13 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           >
             <Move className="w-3.5 h-3.5" />
             Move
+          </button>
+          <button
+            onClick={handleDownloadSelected}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-border hover:bg-frame-borderLight rounded-lg transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download
           </button>
           <button
             onClick={handleDeleteSelected}

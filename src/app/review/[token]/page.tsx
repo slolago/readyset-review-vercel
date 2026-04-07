@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Film, Lock, AlertCircle, ChevronLeft } from 'lucide-react';
+import { Film, Lock, AlertCircle, ChevronLeft, Download } from 'lucide-react';
 import type { ReviewLink, Asset, Folder, Comment } from '@/types';
 import { AssetCard } from '@/components/files/AssetCard';
 import { ReviewHeader } from '@/components/review/ReviewHeader';
@@ -338,7 +338,29 @@ export default function ReviewPage() {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {data.assets.map((asset) => (
-                  <AssetCard key={asset.id} asset={asset} onClick={() => handleSelectAsset(asset)} />
+                  <div key={asset.id} className="relative group">
+                    <AssetCard asset={asset} onClick={() => handleSelectAsset(asset)} />
+                    {data.reviewLink.allowDownloads && (asset as any).signedUrl && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = (asset as any).signedUrl as string;
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = asset.name;
+                          a.target = '_blank';
+                          a.rel = 'noopener noreferrer';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                        className="absolute bottom-14 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-frame-card/90 backdrop-blur-sm border border-frame-border rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 text-xs text-white hover:bg-frame-cardHover"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

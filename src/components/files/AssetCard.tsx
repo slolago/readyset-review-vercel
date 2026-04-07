@@ -342,6 +342,11 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
                   onClick: () => setShowVersionModal(true),
                 },
                 {
+                  label: 'Download',
+                  icon: <Download className="w-4 h-4" />,
+                  onClick: handleDownload,
+                },
+                {
                   label: 'Delete',
                   icon: <Trash2 className="w-4 h-4" />,
                   onClick: handleDelete,
