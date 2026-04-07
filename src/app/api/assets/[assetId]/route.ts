@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { deleteFile, generateReadSignedUrl } from '@/lib/gcs';
+import { deleteFile, generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
 
 interface RouteParams {
   params: { assetId: string };
@@ -21,7 +21,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (asset.gcsPath && asset.status === 'ready') {
-      asset.signedUrl = await generateReadSignedUrl(asset.gcsPath, 120);
+      const [signedUrl, downloadUrl] = await Promise.all([
+        generateReadSignedUrl(asset.gcsPath, 120),
+        generateDownloadSignedUrl(asset.gcsPath, asset.name, 120).catch(() => undefined),
+      ]);
+      asset.signedUrl = signedUrl;
+      if (downloadUrl) asset.downloadUrl = downloadUrl;
     }
 
     // Fetch all versions in the same group
@@ -45,7 +50,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const versions = await Promise.all(
       versionDocs.map(async (v) => {
         if (v.gcsPath && v.status === 'ready') {
-          try { v.signedUrl = await generateReadSignedUrl(v.gcsPath, 120); } catch {}
+          try {
+            const [signedUrl, downloadUrl] = await Promise.all([
+              generateReadSignedUrl(v.gcsPath, 120),
+              generateDownloadSignedUrl(v.gcsPath, v.name, 120).catch(() => undefined),
+            ]);
+            v.signedUrl = signedUrl;
+            if (downloadUrl) v.downloadUrl = downloadUrl;
+          } catch {}
         }
         return v;
       })
