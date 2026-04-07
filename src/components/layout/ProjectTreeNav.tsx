@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Link as LinkIcon } from 'lucide-react';
 import { useProjectTree } from '@/hooks/useProjectTree';
 import { cn } from '@/lib/utils';
 
@@ -84,6 +84,20 @@ export function ProjectTreeNav() {
                       </Link>
                     );
                   })
+                )}
+                {foldersLoaded && (
+                  <Link
+                    href={`/projects/${project.id}/review-links`}
+                    className={cn(
+                      'flex items-center gap-1.5 pl-6 py-1 px-2 text-sm rounded truncate transition-colors hover:bg-frame-accent/10',
+                      pathname.startsWith(`/projects/${project.id}/review-links`)
+                        ? 'text-frame-accent bg-frame-accent/10'
+                        : 'text-frame-textMuted'
+                    )}
+                  >
+                    <LinkIcon className="w-3 h-3 flex-shrink-0" />
+                    Review Links
+                  </Link>
                 )}
               </div>
             )}
