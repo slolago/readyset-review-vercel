@@ -17,7 +17,7 @@ v1.2 milestone — bug fixes + feature expansion based on Notion spec "In house 
 - [x] **Phase 9: review-link-enhancements** - Allow downloads, advanced settings, folder share links, links manager tab (completed 2026-04-06)
 - [x] **Phase 10: list-view** - List/grid toggle with date uploaded + uploaded by columns (completed 2026-04-06)
 - [x] **Phase 11: nice-to-have** - Guest name prompt + short review link tokens + right-click context menus on assets/folders and empty canvas (completed 2026-04-07)
-- [ ] **Phase 12: download-and-polish** - Bulk download, select-all toggle, right-click dismiss fix, checkbox styling, perf optimisations
+- [x] **Phase 12: download-and-polish** - Bulk download, select-all toggle, right-click dismiss fix, checkbox styling, perf optimisations (completed 2026-04-07)
 
 ## Phase Details
 
@@ -172,7 +172,7 @@ Plans:
 **Goal:** (a) Bulk download selected assets; (b) toggle select-all / deselect-all on the header checkbox; (c) "Download all" option in canvas right-click menu; (d) fix right-click menu dismiss on outside click; (e) better checkbox styling matching app design; (f) download from three-dot menu and review links; (g) performance optimisations.
 **Requirements**: REQ-12A, REQ-12B, REQ-12C, REQ-12D, REQ-12E, REQ-12F, REQ-12G
 **Depends on:** Phase 11
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 12-01-PLAN.md — ContextMenu dismiss fix, custom checkbox styling, select-all toggle verification
