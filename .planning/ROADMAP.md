@@ -304,13 +304,20 @@ Plans:
 
 ### Phase 20: collaborator-invite-autocomplete — Search users by name when inviting to a project instead of requiring full email
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Replace the free-text email input in the collaborator invite flow with a name/email prefix search combobox that queries registered users and lets the inviter select from matching results.
+**Requirements**: P20-01, P20-02, P20-03, P20-04, P20-05
 **Depends on:** Phase 19
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 20 to break down)
+- [ ] 20-01-PLAN.md — User search API route + UserSearchCombobox + CollaboratorsPanel wiring
+
+**Success Criteria** (what must be TRUE):
+  1. Typing 2+ characters in the invite field shows matching users in a dropdown
+  2. Selecting a user populates the invite; Add button only enabled after selection
+  3. Owner and existing collaborators excluded from results
+  4. API route requires authentication
+  5. Rapid typing does not cause stale results to overwrite newer ones
 
 ### Phase 21: admin-panel-polish — Admin sees all projects with owner info; clean up roles display
 
