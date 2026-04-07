@@ -6,7 +6,7 @@ import { AnnotationCanvas, AnnotationCanvasHandle } from './AnnotationCanvas';
 import { AnnotationToolbar } from './AnnotationToolbar';
 import { SafeZonesOverlay } from './SafeZonesOverlay';
 import { SafeZoneSelector } from './SafeZoneSelector';
-import { VUMeter, VUMeterHandle } from './VUMeter';
+import { VUMeter, type VUMeterHandle } from './VUMeter';
 import { formatDuration } from '@/lib/utils';
 import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize } from 'lucide-react';
 
@@ -147,7 +147,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           e.preventDefault();
           onUserInteraction?.();
           if (v.paused) {
-            vuMeterRef.current?.initAudio();
+            vuMeterRef.current?.warmAudio(); // keydown is a user gesture
             v.play();
             setPlaying(true);
           } else {
@@ -226,7 +226,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     if (!v) return;
     onUserInteraction?.();
     if (v.paused) {
-      vuMeterRef.current?.initAudio(); // resume AudioContext inside user-gesture context
       v.play();
       setPlaying(true);
     } else {
@@ -320,6 +319,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
+        onMouseDown={() => { if (!isAnnotationMode) vuMeterRef.current?.warmAudio(); }}
         onClick={() => { if (!isAnnotationMode) togglePlay(); }}
         style={{ cursor: isAnnotationMode ? 'default' : 'pointer' }}
       >
@@ -469,7 +469,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         {/* Controls row */}
         <div className="flex items-center gap-3">
           {/* Play/pause */}
-          <button onClick={togglePlay} className="w-8 h-8 flex items-center justify-center text-white hover:text-frame-accent transition-colors">
+          <button onMouseDown={() => vuMeterRef.current?.warmAudio()} onClick={togglePlay} className="w-8 h-8 flex items-center justify-center text-white hover:text-frame-accent transition-colors">
             {playing ? <Pause className="w-5 h-5" fill="currentColor" /> : <Play className="w-5 h-5" fill="currentColor" />}
           </button>
 
