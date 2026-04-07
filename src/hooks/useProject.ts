@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
 import { useAuth } from './useAuth';
 import type { Project, Folder } from '@/types';
 
@@ -60,87 +58,36 @@ export function useProject(projectId?: string) {
 }
 
 export function useProjects() {
-  const { user } = useAuth();
+  const { user, getIdToken } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchProjects = useCallback(async () => {
     if (!user) {
       setProjects([]);
       setLoading(false);
       return;
     }
+    try {
+      setLoading(true);
+      const token = await getIdToken();
+      const res = await fetch('/api/projects', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch projects');
+      const data = await res.json();
+      setProjects(data.projects ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, getIdToken]);
 
-    // Merge helper — deduplicates by id, preserving the latest snapshot data
-    const mergeProjects = (owned: Project[], collab: Project[]): Project[] => {
-      const map = new Map<string, Project>();
-      for (const p of owned) map.set(p.id, p);
-      for (const p of collab) map.set(p.id, p);
-      return Array.from(map.values());
-    };
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
-    let ownedList: Project[] = [];
-    let collabList: Project[] = [];
-    let ownedReady = false;
-    let collabReady = false;
-
-    const flush = () => {
-      if (ownedReady && collabReady) {
-        setProjects(mergeProjects(ownedList, collabList));
-        setLoading(false);
-      }
-    };
-
-    // Listener 1: projects owned by the current user
-    const ownedQuery = query(
-      collection(db, 'projects'),
-      where('ownerId', '==', user.id)
-    );
-    const unsubOwned = onSnapshot(
-      ownedQuery,
-      (snap) => {
-        ownedList = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Project));
-        ownedReady = true;
-        flush();
-      },
-      (err) => {
-        console.error('useProjects owned snapshot error:', err);
-        setError(err.message);
-        ownedReady = true;
-        flush();
-      }
-    );
-
-    // Listener 2: projects where the user is a collaborator
-    const collabQuery = query(
-      collection(db, 'projects'),
-      where('collaborators', 'array-contains', { userId: user.id } as any)
-    );
-    const unsubCollab = onSnapshot(
-      collabQuery,
-      (snap) => {
-        collabList = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Project));
-        collabReady = true;
-        flush();
-      },
-      (err) => {
-        // Collaborator query may fail for users with no collaborator entries — treat as empty
-        console.warn('useProjects collab snapshot error (non-fatal):', err);
-        collabReady = true;
-        flush();
-      }
-    );
-
-    return () => {
-      unsubOwned();
-      unsubCollab();
-    };
-  }, [user]);
-
-  // refetch is a no-op: the onSnapshot listeners keep data current automatically.
-  // Kept in the return value for API compatibility with existing callers.
-  const refetch = useCallback(() => {}, []);
-
-  return { projects, loading, error, refetch };
+  return { projects, loading, error, refetch: fetchProjects };
 }
