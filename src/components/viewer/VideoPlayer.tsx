@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import type { Asset, Comment, AnnotationTool, AnnotationColor } from '@/types';
 import { AnnotationCanvas, AnnotationCanvasHandle } from './AnnotationCanvas';
 import { AnnotationToolbar } from './AnnotationToolbar';
+import { SafeZonesOverlay } from './SafeZonesOverlay';
+import { SafeZoneSelector } from './SafeZoneSelector';
 import { formatDuration } from '@/lib/utils';
 import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize } from 'lucide-react';
 
@@ -58,6 +60,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const [hoveredComment, setHoveredComment] = useState<Comment | null>(null);
   const [tooltipPct, setTooltipPct] = useState(0);
   const [timecodeMode, setTimecodeMode] = useState<'mmss' | 'smpte'>('mmss');
+  const [activeSafeZone, setActiveSafeZone] = useState<string | null>(null);
 
   useImperativeHandle(ref, () => ({
     seekTo: (time: number) => {
@@ -329,6 +332,13 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           </div>
         )}
 
+        {/* Safe zones overlay */}
+        {activeSafeZone && videoRect.w > 0 && (
+          <div style={{ position: 'absolute', left: videoRect.x, top: videoRect.y, width: videoRect.w, height: videoRect.h, pointerEvents: 'none', zIndex: 5 }}>
+            <SafeZonesOverlay videoRect={videoRect} safeZone={activeSafeZone} />
+          </div>
+        )}
+
         {/* Annotation toolbar */}
         {isAnnotationMode && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-20">
@@ -462,6 +472,9 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           </button>
 
           <div className="flex-1" />
+
+          {/* Safe zones */}
+          <SafeZoneSelector selected={activeSafeZone} onSelect={setActiveSafeZone} />
 
           {/* Annotate */}
           {!isAnnotationMode && (
