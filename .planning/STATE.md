@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: Milestone complete
-stopped_at: "Completed 14-02-PLAN.md (checkpoint: human-verify)"
-last_updated: "2026-04-07T12:49:24.511Z"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-04-07T13:18:55.769Z"
 progress:
   total_phases: 15
   completed_phases: 12
-  total_plans: 24
-  completed_plans: 23
+  total_plans: 26
+  completed_plans: 24
 ---
 
 # State
@@ -28,7 +28,7 @@ in_progress
 
 ## Last Session
 
-Stopped at: Completed 14-02-PLAN.md (checkpoint: human-verify)
+Stopped at: Completed 15-01-PLAN.md
 
 ## Decisions
 
@@ -68,6 +68,8 @@ Stopped at: Completed 14-02-PLAN.md (checkpoint: human-verify)
 - [Phase 14-01]: Custom inline breadcrumb nav used in ReviewLinkFolderBrowser instead of Breadcrumb component — Breadcrumb auto-generates folder hrefs, cannot produce /review-links paths
 - [Phase 14-01]: List page defaults viewMode to 'list' (date column visible by default); token page defaults to 'grid'
 - [Phase 14-review-link-folders]: Gate Review Links sidebar entry on foldersLoaded to prevent layout jump
+- [Phase 15]: collectionGroup with 30-id chunks used for cross-project asset aggregation in /api/stats
+- [Phase 15]: StatCard value typed as string|null — null triggers animate-pulse skeleton instead of a loading prop
 
 ## Roadmap Evolution
 
@@ -102,3 +104,4 @@ Stopped at: Completed 14-02-PLAN.md (checkpoint: human-verify)
 | 13-review-polish-and-fixes | 02 | 10 min | 1/1 | 2 |
 | 14-review-link-folders | 01 | 15 min | 3/3 | 3 |
 | Phase 14-review-link-folders P02 | 5 | 1 tasks | 1 files |
+| Phase 15 P01 | 8 | 2 tasks | 2 files |

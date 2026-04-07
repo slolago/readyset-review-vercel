@@ -226,10 +226,10 @@ Plans:
 **Goal:** (a) Fix dashboard stats to show real data: project count, total assets, collaborator count, total storage used; (b) Show cumulative storage size at each folder route — sum of all file sizes in current folder including all subfolders.
 **Requirements**: REQ-15A, REQ-15B
 **Depends on:** Phase 14
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 15-01-PLAN.md — Dashboard real stats (GET /api/stats + dashboard page update)
+- [x] 15-01-PLAN.md — Dashboard real stats (GET /api/stats + dashboard page update)
 - [ ] 15-02-PLAN.md — Folder size badge in FolderBrowser (GET /api/assets/size + header badge)
 
 **Success Criteria** (what must be TRUE):
