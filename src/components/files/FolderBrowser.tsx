@@ -957,6 +957,7 @@ function FolderCard({
   onDragLeave,
   onDrop,
   onCreateReviewLink,
+  onRequestMove,
 }: {
   folder: FolderType;
   projectId: string;
