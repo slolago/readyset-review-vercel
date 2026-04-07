@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       assetsQuery = assetsQuery.where('folderId', '==', link.folderId) as any;
     }
     const assetsSnap = await assetsQuery.get();
-    const assets = await Promise.all(
+    const assetsWithUrls = await Promise.all(
       assetsSnap.docs.map(async (d) => {
         const asset = { id: d.id, ...d.data() } as any;
         if (asset.gcsPath) {
@@ -60,6 +60,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         return asset;
       })
     );
+
+    // Group by versionGroupId — keep only latest version
+    const groups = new Map<string, any[]>();
+    for (const asset of assetsWithUrls) {
+      const groupId = asset.versionGroupId || asset.id;
+      if (!groups.has(groupId)) groups.set(groupId, []);
+      groups.get(groupId)!.push(asset);
+    }
+    const assets = Array.from(groups.values()).map((group) => {
+      const sorted = group.sort((a, b) => (b.version || 1) - (a.version || 1));
+      return { ...sorted[0], _versionCount: group.length };
+    });
 
     // Get folders
     let foldersQuery = db.collection('folders').where('projectId', '==', link.projectId);

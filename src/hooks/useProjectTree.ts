@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase-client';
 import { useProjects } from './useProject';
-import { useAuth } from './useAuth';
 import type { Project, Folder } from '@/types';
 
 export interface ProjectTreeNode {
@@ -14,8 +15,9 @@ export interface ProjectTreeNode {
 
 export function useProjectTree() {
   const { projects, loading } = useProjects();
-  const { getIdToken } = useAuth();
   const [treeNodes, setTreeNodes] = useState<ProjectTreeNode[]>([]);
+  // Map of projectId -> Firestore unsubscribe function for folder listeners
+  const folderUnsubs = useRef<Map<string, () => void>>(new Map());
 
   // Sync treeNodes when projects list changes — add new, preserve existing state
   useEffect(() => {
@@ -32,8 +34,17 @@ export function useProjectTree() {
     });
   }, [projects]);
 
+  // Clean up all folder listeners when the hook unmounts
+  useEffect(() => {
+    const unsubs = folderUnsubs.current;
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      unsubs.clear();
+    };
+  }, []);
+
   const toggleProject = useCallback(
-    async (projectId: string) => {
+    (projectId: string) => {
       setTreeNodes((prev) =>
         prev.map((node) => {
           if (node.project.id !== projectId) return node;
@@ -41,39 +52,46 @@ export function useProjectTree() {
         })
       );
 
-      // Check if we need to load folders (find current state before toggle)
+      // Check if we need to subscribe to folders (find current state before toggle)
       const node = treeNodes.find((n) => n.project.id === projectId);
       if (!node) return;
 
-      // If currently collapsed (about to expand) and folders not yet loaded
+      // If currently collapsed (about to expand) and folders not yet subscribed
       if (!node.expanded && !node.foldersLoaded) {
-        try {
-          const token = await getIdToken();
-          const params = new URLSearchParams({ projectId });
-          const res = await fetch(`/api/folders?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) throw new Error('Failed to fetch folders');
-          const data = await res.json();
-          setTreeNodes((prev) =>
-            prev.map((n) => {
-              if (n.project.id !== projectId) return n;
-              return { ...n, folders: data.folders, foldersLoaded: true };
-            })
-          );
-        } catch (err) {
-          console.error('Failed to fetch folders for project', projectId, err);
-          // Mark as loaded even on error to avoid infinite retries
-          setTreeNodes((prev) =>
-            prev.map((n) => {
-              if (n.project.id !== projectId) return n;
-              return { ...n, foldersLoaded: true };
-            })
-          );
-        }
+        // Avoid double-subscribing if a listener is already registered
+        if (folderUnsubs.current.has(projectId)) return;
+
+        const foldersQuery = query(
+          collection(db, 'folders'),
+          where('projectId', '==', projectId),
+          where('parentId', '==', null)
+        );
+        const unsub = onSnapshot(
+          foldersQuery,
+          (snap) => {
+            const folders = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Folder));
+            setTreeNodes((prev) =>
+              prev.map((n) => {
+                if (n.project.id !== projectId) return n;
+                return { ...n, folders, foldersLoaded: true };
+              })
+            );
+          },
+          (err) => {
+            console.error('Failed to subscribe to folders for project', projectId, err);
+            // Mark as loaded even on error to avoid infinite retries
+            setTreeNodes((prev) =>
+              prev.map((n) => {
+                if (n.project.id !== projectId) return n;
+                return { ...n, foldersLoaded: true };
+              })
+            );
+          }
+        );
+        folderUnsubs.current.set(projectId, unsub);
       }
     },
-    [treeNodes, getIdToken]
+    [treeNodes]
   );
 
   return { treeNodes, loading, toggleProject };
