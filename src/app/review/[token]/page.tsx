@@ -339,7 +339,7 @@ export default function ReviewPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {data.assets.map((asset) => (
                   <div key={asset.id} className="relative group">
-                    <AssetCard asset={asset} onClick={() => handleSelectAsset(asset)} />
+                    <AssetCard asset={asset} onClick={() => handleSelectAsset(asset)} hideActions />
                     {data.reviewLink.allowDownloads && ((asset as any).downloadUrl ?? (asset as any).signedUrl) && (
                       <button
                         onClick={(e) => {

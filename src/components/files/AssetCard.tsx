@@ -23,9 +23,10 @@ interface AssetCardProps {
   isSelected?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.DragEvent) => void;
+  hideActions?: boolean;
 }
 
-export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopied, onDuplicated, onRequestMove, isSelected, onToggleSelect, onDragStart }: AssetCardProps) {
+export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopied, onDuplicated, onRequestMove, isSelected, onToggleSelect, onDragStart, hideActions }: AssetCardProps) {
   const { getIdToken } = useAuth();
   const { uploadFile } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -197,8 +198,7 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
       draggable={!isUploading}
       onDragStart={isUploading ? undefined : onDragStart}
       onClick={isUploading ? undefined : onClick}
-      onContextMenu={(e) => {
-        if (isUploading) return;
+      onContextMenu={isUploading || hideActions ? undefined : (e) => {
         e.preventDefault();
         e.stopPropagation();
         setContextMenu({ x: e.clientX, y: e.clientY });
@@ -306,7 +306,7 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
         )}
 
         {/* Actions */}
-        {!isUploading && (
+        {!isUploading && !hideActions && (
           <div
             className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
