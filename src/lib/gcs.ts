@@ -53,6 +53,26 @@ export async function generateReadSignedUrl(
   return url;
 }
 
+export async function generateDownloadSignedUrl(
+  gcsPath: string,
+  filename: string,
+  expiresInMinutes: number = 720
+): Promise<string> {
+  const storage = getStorage();
+  const bucket = storage.bucket(BUCKET_NAME);
+  const file = bucket.file(gcsPath);
+
+  const safeName = filename.replace(/"/g, '\\"');
+  const [url] = await file.getSignedUrl({
+    version: 'v4',
+    action: 'read',
+    expires: Date.now() + expiresInMinutes * 60 * 1000,
+    responseDisposition: `attachment; filename="${safeName}"`,
+  });
+
+  return url;
+}
+
 export function getPublicUrl(gcsPath: string): string {
   return `https://storage.googleapis.com/${BUCKET_NAME}/${gcsPath}`;
 }

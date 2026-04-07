@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
-import { generateReadSignedUrl } from '@/lib/gcs';
+import { generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
 
 interface RouteParams {
   params: { token: string };
@@ -53,6 +53,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         }
         if (asset.thumbnailPath) {
           try { asset.thumbnailSignedUrl = await generateReadSignedUrl(asset.thumbnailPath); } catch {}
+        }
+        if (asset.gcsPath && link.allowDownloads) {
+          try { asset.downloadUrl = await generateDownloadSignedUrl(asset.gcsPath, asset.name); } catch {}
         }
         return asset;
       })
