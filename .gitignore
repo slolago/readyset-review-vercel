@@ -48,3 +48,4 @@ frame-clone-*.json
 scripts/set-cors.js
 scripts/set-cors.mjs
 scripts/test-gcs.mjs
+.claude/worktrees/
