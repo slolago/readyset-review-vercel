@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-04-07T01:34:30.068Z"
+status: Executing Phase 12
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-04-07T02:30:49.079Z"
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 9
-  total_plans: 17
-  completed_plans: 16
+  total_plans: 19
+  completed_plans: 17
 ---
 
 # State
@@ -28,7 +28,7 @@ in_progress
 
 ## Last Session
 
-Stopped at: Completed 11-02-PLAN.md
+Stopped at: Completed 12-01-PLAN.md
 
 ## Decisions
 
@@ -60,6 +60,8 @@ Stopped at: Completed 11-02-PLAN.md
 - [Phase 09-review-link-enhancements]: [Phase 09-02]: Tab bar uses -mb-px on active tab border to overlap container border-b for connected underline effect
 - [Phase 11-nice-to-have]: MenuItem type import used as documentation even though items inlined as object literals
 - [Phase 11-nice-to-have]: Copy to excluded from AssetListView rows: AssetListRow does not own CopyModal state
+- [Phase 12-download-and-polish]: setTimeout(0) wraps addEventListener in ContextMenu to prevent opening mousedown from firing onClose
+- [Phase 12-download-and-polish]: List view checkboxes use div+Check pattern (not native input) to match AssetCard grid style; row variant uses pointer-events-none
 
 ## Roadmap Evolution
 
@@ -86,3 +88,4 @@ Stopped at: Completed 11-02-PLAN.md
 | 09-review-link-enhancements | 01 | 10 min | 3/3 | 4 |
 | Phase 09-review-link-enhancements P02 | 15min | 3 tasks | 3 files |
 | Phase 11-nice-to-have P02 | 15min | 4 tasks | 5 files |
+| Phase 12-download-and-polish P01 | 8min | 1 tasks | 2 files |

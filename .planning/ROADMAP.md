@@ -172,10 +172,10 @@ Plans:
 **Goal:** (a) Bulk download selected assets; (b) toggle select-all / deselect-all on the header checkbox; (c) "Download all" option in canvas right-click menu; (d) fix right-click menu dismiss on outside click; (e) better checkbox styling matching app design; (f) download from three-dot menu and review links; (g) performance optimisations.
 **Requirements**: REQ-12A, REQ-12B, REQ-12C, REQ-12D, REQ-12E, REQ-12F, REQ-12G
 **Depends on:** Phase 11
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 12-01-PLAN.md — ContextMenu dismiss fix, custom checkbox styling, select-all toggle verification
+- [x] 12-01-PLAN.md — ContextMenu dismiss fix, custom checkbox styling, select-all toggle verification
 - [ ] 12-02-PLAN.md — Download from action bar, canvas menu, three-dot menu, review page + React.memo performance
 
 **Success Criteria** (what must be TRUE):
