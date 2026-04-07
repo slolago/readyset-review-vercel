@@ -186,3 +186,51 @@ Plans:
   5. Checkboxes use a styled design consistent with the app's dark theme (frame-accent border, filled on check)
   6. Download is available via the three-dot (MoreHorizontal) menu on every asset card and in review links
   7. Page load, folder navigation, and asset list render are noticeably faster (lazy loading, memoization, no redundant fetches)
+
+### Phase 13: review-polish-and-fixes
+
+**Goal:** (a) Fix file downloads to force-download to disk instead of opening in browser — add responseDisposition to GCS signed URLs; (b) Fix three-dot menu appearance on the review link page; (c) Enforce guest read-only — guests on review links can only leave comments and download assets, no editing actions.
+**Requirements**: REQ-13A, REQ-13B, REQ-13C
+**Depends on:** Phase 12
+**Plans:** 3 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Download fix: generateDownloadSignedUrl with responseDisposition, update review-link API + download consumers
+- [ ] 13-02-PLAN.md — Dropdown portal fix: rewrite Dropdown.tsx to use createPortal with fixed positioning
+- [ ] 13-03-PLAN.md — Guest read-only: add hideActions prop to AssetCard, pass from review page
+
+**Success Criteria** (what must be TRUE):
+  1. Clicking Download on any asset triggers a browser file download to disk (not opens in new tab)
+  2. Three-dot menu on review page renders correctly with proper styling
+  3. Guest users on review links cannot trigger any editing actions (rename, delete, move, duplicate, copy)
+
+### Phase 14: review-link-folders
+
+**Goal:** Add a "Review Links" virtual folder section in each project. Each review link appears as a navigable folder containing the linked assets with their comments. In list view, show creation date. Accessible from the sidebar/project navigation.
+**Requirements**: REQ-14A, REQ-14B, REQ-14C
+**Depends on:** Phase 13
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 14 to break down)
+
+**Success Criteria** (what must be TRUE):
+  1. Each project has a "Review Links" section/folder in the navigation
+  2. Clicking it shows all review links for that project as folders
+  3. Clicking a review link folder shows its assets with their comments
+  4. List view shows creation date for review link folders
+
+### Phase 15: dashboard-and-storage
+
+**Goal:** (a) Fix dashboard stats to show real data: project count, total assets, collaborator count, total storage used; (b) Show cumulative storage size at each folder route — sum of all file sizes in current folder including all subfolders.
+**Requirements**: REQ-15A, REQ-15B
+**Depends on:** Phase 14
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 15 to break down)
+
+**Success Criteria** (what must be TRUE):
+  1. Dashboard shows real counts: projects, total assets across all projects, collaborators, total storage in human-readable format
+  2. FolderBrowser shows total storage size for current location (sum of all assets in folder + subfolders)
+  3. Storage size updates when navigating to different folders
