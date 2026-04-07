@@ -22,67 +22,91 @@ function getSegmentColor(i: number): string {
   return '#ef4444';
 }
 
+// ── Module-level singletons ──────────────────────────────────────────────────
+// The AudioContext and MediaElementSource connections must survive component
+// remounts. createMediaElementSource can only be called once per video element;
+// closing and recreating the AudioContext (as cleanup used to do) left the
+// element permanently silent. A module-level WeakMap tracks which elements
+// are already wired so we never call createMediaElementSource twice.
+let _audioCtx: AudioContext | null = null;
+
+interface ConnectedEntry {
+  analyserL: AnalyserNode;
+  analyserR: AnalyserNode;
+}
+const _connected = new WeakMap<HTMLVideoElement, ConnectedEntry>();
+
+function getOrCreateCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (_audioCtx && _audioCtx.state !== 'closed') return _audioCtx;
+  const Ctor =
+    window.AudioContext ||
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctor) return null;
+  _audioCtx = new Ctor();
+  return _audioCtx;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter({ videoRef, isPlaying }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserLRef = useRef<AnalyserNode | null>(null);
   const analyserRRef = useRef<AnalyserNode | null>(null);
-  const connectedRef = useRef(false);
   const rafRef = useRef<number>(0);
   const peaksRef = useRef<[number, number]>([0, 0]);
   const peakTimesRef = useRef<[number, number]>([0, 0]);
   const peakDisplayRef = useRef<[number, number]>([0, 0]);
 
-  // Connect via createMediaElementSource.
-  // This hijacks the native audio output, so we MUST also connect to ctx.destination.
-  // The video element's .volume and .muted properties still control the source level.
-  const connectAnalysers = useCallback(() => {
-    const video = videoRef.current;
-    const ctx = audioCtxRef.current;
-    if (!video || !ctx || connectedRef.current) return;
+  const initAudio = useCallback(() => {
+    const ctx = getOrCreateCtx();
+    if (!ctx) return;
 
+    // Always resume inside the user gesture
+    if (ctx.state !== 'running') {
+      ctx.resume().catch(() => {});
+    }
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Reuse existing connection if the element was already wired
+    const existing = _connected.get(video);
+    if (existing) {
+      analyserLRef.current = existing.analyserL;
+      analyserRRef.current = existing.analyserR;
+      return;
+    }
+
+    // First time for this video element — create the Web Audio graph
     try {
       const source = ctx.createMediaElementSource(video);
-      connectedRef.current = true;
 
       const analyserL = ctx.createAnalyser();
       analyserL.fftSize = 256;
       analyserL.smoothingTimeConstant = 0.8;
-      analyserLRef.current = analyserL;
 
       const analyserR = ctx.createAnalyser();
       analyserR.fftSize = 256;
       analyserR.smoothingTimeConstant = 0.8;
-      analyserRRef.current = analyserR;
 
       const splitter = ctx.createChannelSplitter(2);
 
-      // Playback path: source → destination (restores audio hijacked by createMediaElementSource)
+      // Playback: restore the audio path hijacked by createMediaElementSource
       source.connect(ctx.destination);
 
-      // Analysis path: source → splitter → L/R analysers (dead-end, read-only)
+      // Analysis: split into L/R for the meter (dead-end, no destination)
       source.connect(splitter);
       splitter.connect(analyserL, 0);
       splitter.connect(analyserR, 1);
+
+      _connected.set(video, { analyserL, analyserR });
+      analyserLRef.current = analyserL;
+      analyserRRef.current = analyserR;
     } catch {
-      // Already captured or security restriction — audio still plays via destination
+      // Security restriction or element already captured by a closed context —
+      // audio still plays natively; meter just won't animate.
     }
   }, [videoRef]);
-
-  // Create + resume AudioContext inside the user gesture, then connect
-  const initAudio = useCallback(() => {
-    if (!audioCtxRef.current) {
-      const Ctor =
-        window.AudioContext ||
-        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Ctor) return;
-      audioCtxRef.current = new Ctor();
-    }
-    if (audioCtxRef.current.state !== 'running') {
-      audioCtxRef.current.resume().catch(() => {});
-    }
-    connectAnalysers();
-  }, [connectAnalysers]);
 
   useImperativeHandle(ref, () => ({ initAudio }));
 
@@ -93,8 +117,8 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
 
     const draw = () => {
       rafRef.current = requestAnimationFrame(draw);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      const ctx2d = canvas.getContext('2d');
+      if (!ctx2d) return;
 
       const analyserL = analyserLRef.current;
       const analyserR = analyserRRef.current;
@@ -128,7 +152,7 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
 
       const w = canvas.width;
       const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
+      ctx2d.clearRect(0, 0, w, h);
 
       const drawChan = (level: number, peak: number, ox: number, cw: number) => {
         const segH = Math.floor((h - (SEGMENT_COUNT - 1) * 2) / SEGMENT_COUNT);
@@ -137,16 +161,16 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
         const peakSeg = Math.round(peak * SEGMENT_COUNT);
         for (let i = 0; i < SEGMENT_COUNT; i++) {
           const y = h - (i + 1) * segStep + 2;
-          ctx.globalAlpha = i < active ? 1 : 0.2;
-          ctx.fillStyle = getSegmentColor(i);
-          ctx.fillRect(ox, y, cw, segH);
+          ctx2d.globalAlpha = i < active ? 1 : 0.2;
+          ctx2d.fillStyle = getSegmentColor(i);
+          ctx2d.fillRect(ox, y, cw, segH);
           if (i === peakSeg && peakSeg > 0) {
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(ox, y, cw, 2);
+            ctx2d.globalAlpha = 1;
+            ctx2d.fillStyle = '#ffffff';
+            ctx2d.fillRect(ox, y, cw, 2);
           }
         }
-        ctx.globalAlpha = 1;
+        ctx2d.globalAlpha = 1;
       };
 
       const cw = Math.floor((w - 2) / 2);
@@ -158,17 +182,14 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
     return () => cancelAnimationFrame(rafRef.current);
   }, [isPlaying]);
 
-  // Cleanup
+  // On unmount: cancel RAF and detach local analyser refs.
+  // Do NOT close the AudioContext or disconnect nodes — the video element may
+  // be reused and createMediaElementSource cannot be called twice on the same element.
   useEffect(() => {
     return () => {
       cancelAnimationFrame(rafRef.current);
-      try {
-        analyserLRef.current?.disconnect();
-        analyserRRef.current?.disconnect();
-        audioCtxRef.current?.close();
-      } catch { /* ignore */ }
-      connectedRef.current = false;
-      audioCtxRef.current = null;
+      analyserLRef.current = null;
+      analyserRRef.current = null;
     };
   }, []);
 
