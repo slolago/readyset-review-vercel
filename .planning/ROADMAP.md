@@ -341,10 +341,10 @@ Plans:
 **Goal:** Add a Download button to the asset viewer header that triggers a forced-to-disk download of the currently displayed asset (or active version). Wire downloadUrl generation into the single-asset API endpoint.
 **Requirements**: P22-01, P22-02, P22-03, P22-04
 **Depends on:** Phase 21
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 22-01-PLAN.md — Add downloadUrl to single-asset API + Download button in viewer header
+- [x] 22-01-PLAN.md — Add downloadUrl to single-asset API + Download button in viewer header
 
 **Success Criteria** (what must be TRUE):
   1. Download button visible in asset viewer header for ready assets
