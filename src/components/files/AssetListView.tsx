@@ -207,6 +207,7 @@ function AssetListRow({
   const isUploading = asset.status === 'uploading';
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailSignedUrl = (asset as any).thumbnailSignedUrl as string | undefined;
+  const downloadUrl = (asset as any).downloadUrl as string | undefined;
 
   const handleRename = async () => {
     const name = window.prompt('Rename asset:', asset.name);
@@ -249,7 +250,7 @@ function AssetListRow({
   };
 
   const handleDownload = () => {
-    const url = signedUrl || thumbnailSignedUrl;
+    const url = downloadUrl ?? signedUrl ?? thumbnailSignedUrl;
     if (!url) return;
     const a = document.createElement('a');
     a.href = url;

@@ -39,6 +39,7 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
+  const downloadUrl = (asset as any).downloadUrl as string | undefined;
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // When a video element loads its metadata, seek to a non-black frame
@@ -168,9 +169,10 @@ export function AssetCard({ asset, onClick, onDeleted, onVersionUploaded, onCopi
   };
 
   const handleDownload = () => {
-    if (!signedUrl) return;
+    const url = downloadUrl ?? signedUrl;
+    if (!url) return;
     const a = document.createElement('a');
-    a.href = signedUrl;
+    a.href = url;
     a.download = asset.name;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';

@@ -340,11 +340,11 @@ export default function ReviewPage() {
                 {data.assets.map((asset) => (
                   <div key={asset.id} className="relative group">
                     <AssetCard asset={asset} onClick={() => handleSelectAsset(asset)} />
-                    {data.reviewLink.allowDownloads && (asset as any).signedUrl && (
+                    {data.reviewLink.allowDownloads && ((asset as any).downloadUrl ?? (asset as any).signedUrl) && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const url = (asset as any).signedUrl as string;
+                          const url = ((asset as any).downloadUrl ?? (asset as any).signedUrl) as string;
                           const a = document.createElement('a');
                           a.href = url;
                           a.download = asset.name;
