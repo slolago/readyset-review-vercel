@@ -6,7 +6,7 @@ import { AnnotationCanvas, AnnotationCanvasHandle } from './AnnotationCanvas';
 import { AnnotationToolbar } from './AnnotationToolbar';
 import { SafeZonesOverlay } from './SafeZonesOverlay';
 import { SafeZoneSelector } from './SafeZoneSelector';
-import { VUMeter } from './VUMeter';
+import { VUMeter, type VUMeterHandle } from './VUMeter';
 import { formatDuration } from '@/lib/utils';
 import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize } from 'lucide-react';
 
@@ -45,8 +45,9 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<AnnotationCanvasHandle>(null);
-  const animRef = useRef<number>(0);
+  const canvasRef  = useRef<AnnotationCanvasHandle>(null);
+  const vuMeterRef = useRef<VUMeterHandle>(null);
+  const animRef    = useRef<number>(0);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -146,9 +147,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           e.preventDefault();
           onUserInteraction?.();
           if (v.paused) {
+            vuMeterRef.current?.start();
             v.play().catch(() => {});
             setPlaying(true);
           } else {
+            vuMeterRef.current?.stop();
             v.pause();
             setPlaying(false);
           }
@@ -224,9 +227,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     if (!v) return;
     onUserInteraction?.();
     if (v.paused) {
+      vuMeterRef.current?.start(); // inside user gesture → audio.play() + ctx.resume() work
       v.play().catch(() => {});
       setPlaying(true);
     } else {
+      vuMeterRef.current?.stop();
       v.pause();
       setPlaying(false);
     }
@@ -382,7 +387,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 
       {/* VU Meter — right side strip */}
       <div className="flex-shrink-0 w-7 flex flex-col bg-[#0a0a0a] border-l border-white/5">
-        <VUMeter src={(asset as any).signedUrl as string | undefined} isPlaying={playing} />
+        <VUMeter ref={vuMeterRef} src={(asset as any).signedUrl as string | undefined} isPlaying={playing} />
       </div>
 
       </div>{/* end flex-row */}
