@@ -17,6 +17,7 @@ v1.2 milestone — bug fixes + feature expansion based on Notion spec "In house 
 - [x] **Phase 9: review-link-enhancements** - Allow downloads, advanced settings, folder share links, links manager tab (completed 2026-04-06)
 - [x] **Phase 10: list-view** - List/grid toggle with date uploaded + uploaded by columns (completed 2026-04-06)
 - [x] **Phase 11: nice-to-have** - Guest name prompt + short review link tokens + right-click context menus on assets/folders and empty canvas (completed 2026-04-07)
+- [ ] **Phase 12: download-and-polish** - Bulk download, select-all toggle, right-click dismiss fix, checkbox styling, perf optimisations
 
 ## Phase Details
 
@@ -165,3 +166,23 @@ Plans:
   5. Right-clicking an asset or folder card shows a context menu with: Open, Rename, Duplicate, Copy to, Move to, Download, Get link, Delete
   6. Right-clicking empty space in the file browser shows: New Folder, Upload files, Upload folder
   7. Context menus dismiss on outside click or Escape key
+
+### Phase 12: download-and-polish
+
+**Goal:** (a) Bulk download selected assets; (b) toggle select-all / deselect-all on the header checkbox; (c) "Download all" option in canvas right-click menu; (d) fix right-click menu dismiss on outside click; (e) better checkbox styling matching app design; (f) download from three-dot menu and review links; (g) performance optimisations.
+**Requirements**: REQ-12A, REQ-12B, REQ-12C, REQ-12D, REQ-12E, REQ-12F, REQ-12G
+**Depends on:** Phase 11
+**Plans:** 2 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — ContextMenu dismiss fix, custom checkbox styling, select-all toggle verification
+- [ ] 12-02-PLAN.md — Download from action bar, canvas menu, three-dot menu, review page + React.memo performance
+
+**Success Criteria** (what must be TRUE):
+  1. Selecting one or more assets shows a "Download" action bar button; clicking it downloads all selected files
+  2. Header checkbox toggles between select-all and deselect-all (second click clears selection)
+  3. Right-click on empty canvas includes "Download all" option that downloads every asset in the current folder
+  4. Right-click menu closes immediately on any click outside the menu or on Escape
+  5. Checkboxes use a styled design consistent with the app's dark theme (frame-accent border, filled on check)
+  6. Download is available via the three-dot (MoreHorizontal) menu on every asset card and in review links
+  7. Page load, folder navigation, and asset list render are noticeably faster (lazy loading, memoization, no redundant fetches)
