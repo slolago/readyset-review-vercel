@@ -1,15 +1,38 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProject';
-import { Film, FolderOpen, Upload, Users, Clock, ArrowRight, Sparkles } from 'lucide-react';
-import { formatRelativeTime, getProjectColor } from '@/lib/utils';
+import { Film, FolderOpen, HardDrive, Upload, Users, Clock, ArrowRight, Sparkles } from 'lucide-react';
+import { formatRelativeTime, getProjectColor, formatBytes } from '@/lib/utils';
 import type { Project } from '@/types';
 
+interface DashboardStats {
+  projectCount: number;
+  assetCount: number;
+  collaboratorCount: number;
+  storageBytes: number;
+}
+
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, getIdToken } = useAuth();
   const { projects, loading } = useProjects();
+
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    getIdToken().then((token) =>
+      fetch('/api/stats', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((data) => {
+          setStats(data);
+          setStatsLoading(false);
+        })
+        .catch(() => setStatsLoading(false))
+    );
+  }, []);
 
   const recentProjects = projects.slice(0, 4);
 
@@ -39,25 +62,25 @@ export default function DashboardPage() {
           <StatCard
             icon={<FolderOpen className="w-5 h-5" />}
             label="Projects"
-            value={projects.length.toString()}
+            value={loading ? null : projects.length.toString()}
             color="purple"
           />
           <StatCard
             icon={<Film className="w-5 h-5" />}
             label="Assets"
-            value="—"
+            value={statsLoading ? null : (stats?.assetCount.toString() ?? '—')}
             color="blue"
           />
           <StatCard
             icon={<Users className="w-5 h-5" />}
             label="Collaborators"
-            value="—"
+            value={statsLoading ? null : (stats?.collaboratorCount.toString() ?? '—')}
             color="green"
           />
           <StatCard
-            icon={<Upload className="w-5 h-5" />}
-            label="Uploads"
-            value="—"
+            icon={<HardDrive className="w-5 h-5" />}
+            label="Storage"
+            value={statsLoading ? null : (stats ? formatBytes(stats.storageBytes) : '—')}
             color="orange"
           />
         </div>
@@ -148,7 +171,7 @@ function StatCard({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: string | null;
   color: string;
 }) {
   const colorMap: Record<string, { icon: string; glow: string }> = {
@@ -163,7 +186,11 @@ function StatCard({
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${c.icon}`}>
         {icon}
       </div>
-      <div className="text-2xl font-bold text-white tracking-tight">{value}</div>
+      {value === null ? (
+        <div className="h-8 w-16 bg-frame-border rounded animate-pulse mb-1" />
+      ) : (
+        <div className="text-2xl font-bold text-white tracking-tight">{value}</div>
+      )}
       <div className="text-frame-textSecondary text-xs font-medium mt-1">{label}</div>
     </div>
   );
