@@ -3,24 +3,24 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: Milestone complete
-stopped_at: Completed 13-03-PLAN.md
-last_updated: "2026-04-07T12:12:01.347Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-04-07T14:00:00.000Z"
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 22
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # State
 
 ## Current Phase
 
-13
+14
 
 ## Current Plan
 
-Plan 02 complete — Phase 13 plan 02 done
+Plan 01 complete — Phase 14 plan 01 done
 
 ## Status
 
@@ -28,7 +28,7 @@ in_progress
 
 ## Last Session
 
-Stopped at: Completed 13-03-PLAN.md
+Stopped at: Completed 14-01-PLAN.md
 
 ## Decisions
 
@@ -65,6 +65,8 @@ Stopped at: Completed 13-03-PLAN.md
 - [Phase 13-01]: Dual signed URL strategy — signedUrl (no disposition) for inline playback, downloadUrl (attachment disposition) for forced download; downloadUrl only generated when allowDownloads is true
 - [Phase 13-02]: createPortal to document.body with position:fixed from getBoundingClientRect() — canonical escape from overflow-hidden ancestors; dual-ref outside-click checks triggerRef AND panelRef
 - [Phase 13]: hideActions prop on AssetCard to suppress Dropdown and ContextMenu for guests; review page always passes hideActions
+- [Phase 14-01]: Custom inline breadcrumb nav used in ReviewLinkFolderBrowser instead of Breadcrumb component — Breadcrumb auto-generates folder hrefs, cannot produce /review-links paths
+- [Phase 14-01]: List page defaults viewMode to 'list' (date column visible by default); token page defaults to 'grid'
 
 ## Roadmap Evolution
 
@@ -97,3 +99,4 @@ Stopped at: Completed 13-03-PLAN.md
 | Phase 12-download-and-polish P01 | 8min | 1 tasks | 2 files |
 | 13-review-polish-and-fixes | 01 | 10 min | 2/2 | 5 |
 | 13-review-polish-and-fixes | 02 | 10 min | 1/1 | 2 |
+| 14-review-link-folders | 01 | 15 min | 3/3 | 3 |
