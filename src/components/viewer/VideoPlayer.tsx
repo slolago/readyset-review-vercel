@@ -6,7 +6,7 @@ import { AnnotationCanvas, AnnotationCanvasHandle } from './AnnotationCanvas';
 import { AnnotationToolbar } from './AnnotationToolbar';
 import { SafeZonesOverlay } from './SafeZonesOverlay';
 import { SafeZoneSelector } from './SafeZoneSelector';
-import { VUMeter, type VUMeterHandle } from './VUMeter';
+import { VUMeter } from './VUMeter';
 import { formatDuration } from '@/lib/utils';
 import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize } from 'lucide-react';
 
@@ -46,7 +46,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<AnnotationCanvasHandle>(null);
-  const vuMeterRef = useRef<VUMeterHandle>(null);
   const animRef = useRef<number>(0);
 
   const [playing, setPlaying] = useState(false);
@@ -147,7 +146,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           e.preventDefault();
           onUserInteraction?.();
           if (v.paused) {
-            vuMeterRef.current?.warmAudio(); // keydown is a user gesture
             v.play().catch(() => {});
             setPlaying(true);
           } else {
@@ -319,7 +317,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
-        onMouseDown={() => { try { if (!isAnnotationMode) vuMeterRef.current?.warmAudio(); } catch {} }}
         onClick={() => { if (!isAnnotationMode) togglePlay(); }}
         style={{ cursor: isAnnotationMode ? 'default' : 'pointer' }}
       >
@@ -385,7 +382,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 
       {/* VU Meter — right side strip */}
       <div className="flex-shrink-0 w-7 flex flex-col bg-[#0a0a0a] border-l border-white/5">
-        <VUMeter ref={vuMeterRef} videoRef={videoRef} isPlaying={playing} />
+        <VUMeter src={(asset as any).signedUrl as string | undefined} isPlaying={playing} currentTime={currentTime} />
       </div>
 
       </div>{/* end flex-row */}
@@ -469,7 +466,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         {/* Controls row */}
         <div className="flex items-center gap-3">
           {/* Play/pause */}
-          <button onMouseDown={() => { try { vuMeterRef.current?.warmAudio(); } catch {} }} onClick={togglePlay} className="w-8 h-8 flex items-center justify-center text-white hover:text-frame-accent transition-colors">
+          <button onClick={togglePlay} className="w-8 h-8 flex items-center justify-center text-white hover:text-frame-accent transition-colors">
             {playing ? <Pause className="w-5 h-5" fill="currentColor" /> : <Play className="w-5 h-5" fill="currentColor" />}
           </button>
 

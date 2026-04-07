@@ -1,20 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-
-export interface VUMeterHandle {
-  /**
-   * Call on mousedown of any play-triggering element (button or video area).
-   * This is the only place that needs to be inside a user gesture — it creates
-   * and resumes the AudioContext. Graph wiring happens later, on the 'playing'
-   * event, so it never touches the v.play() call path.
-   */
-  warmAudio: () => void;
-}
+import { useEffect, useRef } from 'react';
 
 interface VUMeterProps {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  /** The same signed URL the video player uses. We load it in a hidden Audio
+   *  element that is solely for analysis — the video element is never touched. */
+  src: string | undefined;
   isPlaying: boolean;
+  /** Current playback time from the video element (seconds). We keep the
+   *  hidden audio in sync by seeking whenever the delta exceeds 0.3 s. */
+  currentTime: number;
 }
 
 const SEGMENT_COUNT = 20;
@@ -27,113 +22,139 @@ function getSegmentColor(i: number): string {
   return '#ef4444';
 }
 
-// ── Module-level singletons ──────────────────────────────────────────────────
-// AudioContext and MediaElementSource connections must survive component
-// remounts. createMediaElementSource can only be called once per video element.
-let _audioCtx: AudioContext | null = null;
-
-interface ConnectedEntry { analyserL: AnalyserNode; analyserR: AnalyserNode }
-const _connected = new WeakMap<HTMLVideoElement, ConnectedEntry>();
-
-function getOrCreateCtx(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  if (_audioCtx && _audioCtx.state !== 'closed') return _audioCtx;
-  try {
-    const Ctor =
-      window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return null;
-    _audioCtx = new Ctor();
-    return _audioCtx;
-  } catch {
-    return null;
-  }
-}
-
-/** Wire the Web Audio graph for a specific video element + running context. */
-function wireGraph(ctx: AudioContext, video: HTMLVideoElement,
-  setL: (a: AnalyserNode) => void, setR: (a: AnalyserNode) => void) {
-
-  const existing = _connected.get(video);
-  if (existing) {
-    setL(existing.analyserL);
-    setR(existing.analyserR);
-    return;
-  }
-
-  try {
-    const source = ctx.createMediaElementSource(video);
-    const analyserL = ctx.createAnalyser(); analyserL.fftSize = 256; analyserL.smoothingTimeConstant = 0.8;
-    const analyserR = ctx.createAnalyser(); analyserR.fftSize = 256; analyserR.smoothingTimeConstant = 0.8;
-    const splitter = ctx.createChannelSplitter(2);
-
-    source.connect(ctx.destination);   // restore hijacked native audio
-    source.connect(splitter);
-    splitter.connect(analyserL, 0);
-    splitter.connect(analyserR, 1);
-
-    _connected.set(video, { analyserL, analyserR });
-    setL(analyserL);
-    setR(analyserR);
-  } catch {
-    // Cross-origin restriction or element already captured — audio still plays
-  }
-}
-// ────────────────────────────────────────────────────────────────────────────
-
-export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter({ videoRef, isPlaying }, ref) {
+export function VUMeter({ src, isPlaying, currentTime }: VUMeterProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserLRef = useRef<AnalyserNode | null>(null);
   const analyserRRef = useRef<AnalyserNode | null>(null);
+  const connectedRef = useRef(false);
   const rafRef = useRef<number>(0);
   const peaksRef = useRef<[number, number]>([0, 0]);
   const peakTimesRef = useRef<[number, number]>([0, 0]);
   const peakDisplayRef = useRef<[number, number]>([0, 0]);
 
-  // Called on mousedown of any play-triggering element — must be in gesture context.
-  // ONLY resumes the AudioContext. Does NOT touch the video element.
-  const warmAudio = useCallback(() => {
-    const ctx = getOrCreateCtx();
-    if (!ctx) return;
-    if (ctx.state !== 'running') {
-      ctx.resume().catch(() => {});
-    }
-  }, []);
-
-  useImperativeHandle(ref, () => ({ warmAudio }));
-
-  // Wire the graph once the video is confirmed playing.
-  // By then warmAudio() has already been called (mousedown → click → play → 'playing'),
-  // so the AudioContext should be running. This never interferes with v.play().
+  // ── Setup: create hidden Audio element + Web Audio graph ────────────────
+  // This effect runs whenever src changes (new asset).
+  // The <video> element is NEVER referenced here.
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    if (!src || typeof window === 'undefined') return;
 
-    const onPlaying = () => {
-      const ctx = _audioCtx;
-      if (!ctx) return;
-      const wire = () => wireGraph(ctx, video,
-        (a) => { analyserLRef.current = a; },
-        (a) => { analyserRRef.current = a; },
-      );
-      if (ctx.state === 'running') {
-        wire();
-      } else {
-        // ctx.resume() was called in warmAudio; retry when it finishes
-        ctx.addEventListener('statechange', function handler() {
-          if (ctx.state === 'running') {
-            ctx.removeEventListener('statechange', handler);
-            wire();
-          }
-        });
+    // Tear down previous audio element / context
+    if (audioElRef.current) {
+      audioElRef.current.pause();
+      audioElRef.current.src = '';
+      audioElRef.current = null;
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    analyserLRef.current = null;
+    analyserRRef.current = null;
+    connectedRef.current = false;
+
+    // Create hidden audio element — muted via Web Audio (no double output)
+    const audio = new Audio();
+    audio.src = src;
+    audio.preload = 'auto';
+    // We will NOT connect to ctx.destination, so no sound from this element.
+    // The video element handles all audible playback independently.
+    audioElRef.current = audio;
+
+    // Build Web Audio graph lazily on first play gesture
+    const buildGraph = () => {
+      if (connectedRef.current) return;
+      try {
+        const Ctor =
+          window.AudioContext ||
+          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Ctor) return;
+        const ctx = new Ctor();
+        audioCtxRef.current = ctx;
+
+        const source = ctx.createMediaElementSource(audio);
+
+        const analyserL = ctx.createAnalyser();
+        analyserL.fftSize = 256;
+        analyserL.smoothingTimeConstant = 0.8;
+        analyserLRef.current = analyserL;
+
+        const analyserR = ctx.createAnalyser();
+        analyserR.fftSize = 256;
+        analyserR.smoothingTimeConstant = 0.8;
+        analyserRRef.current = analyserR;
+
+        const splitter = ctx.createChannelSplitter(2);
+        source.connect(splitter);
+        splitter.connect(analyserL, 0);
+        splitter.connect(analyserR, 1);
+        // No connection to ctx.destination — this audio element is silent.
+        // Audible playback comes entirely from the video element.
+
+        connectedRef.current = true;
+
+        // Resume context if suspended (we do this on the first 'play' call,
+        // which is triggered by the user gesture → isPlaying flip → this effect)
+        if (ctx.state !== 'running') ctx.resume().catch(() => {});
+      } catch {
+        // Security restriction or unsupported — meter stays dark, player unaffected
       }
     };
 
-    video.addEventListener('playing', onPlaying);
-    return () => video.removeEventListener('playing', onPlaying);
-  }, [videoRef]);
+    audio.addEventListener('playing', buildGraph, { once: true });
 
-  // rAF draw loop
+    return () => {
+      audio.removeEventListener('playing', buildGraph);
+    };
+  }, [src]);
+
+  // ── Sync play / pause with the video ────────────────────────────────────
+  useEffect(() => {
+    const audio = audioElRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      // Resume AudioContext if graph is built
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'running') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  }, [isPlaying]);
+
+  // ── Sync seek position ───────────────────────────────────────────────────
+  useEffect(() => {
+    const audio = audioElRef.current;
+    if (!audio) return;
+    // Only seek if drift > 0.3 s to avoid constant micro-seeks
+    if (Math.abs(audio.currentTime - currentTime) > 0.3) {
+      audio.currentTime = currentTime;
+    }
+  }, [currentTime]);
+
+  // ── Cleanup on unmount ───────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      if (audioElRef.current) {
+        audioElRef.current.pause();
+        audioElRef.current.src = '';
+      }
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close().catch(() => {});
+      }
+      audioElRef.current = null;
+      audioCtxRef.current = null;
+      analyserLRef.current = null;
+      analyserRRef.current = null;
+      connectedRef.current = false;
+    };
+  }, []);
+
+  // ── rAF draw loop ────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -144,6 +165,7 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
       if (!ctx2d) return;
 
       const now = performance.now();
+
       const getLevel = (a: AnalyserNode | null): number => {
         if (!a) return 0;
         const buf = new Uint8Array(a.frequencyBinCount);
@@ -198,22 +220,12 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
     return () => cancelAnimationFrame(rafRef.current);
   }, [isPlaying]);
 
-  // On unmount: cancel RAF, clear local refs.
-  // Never close AudioContext or disconnect nodes — WeakMap keeps graph alive.
-  useEffect(() => {
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      analyserLRef.current = null;
-      analyserRRef.current = null;
-    };
-  }, []);
-
   return (
     <div className="flex-1 flex items-stretch px-1 py-2">
       <canvas ref={canvasRef} width={20} height={300}
         style={{ width: '100%', height: '100%', display: 'block' }} />
     </div>
   );
-});
+}
 
 VUMeter.displayName = 'VUMeter';
