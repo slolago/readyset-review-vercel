@@ -33,24 +33,16 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
   const peakTimesRef = useRef<[number, number]>([0, 0]);
   const peakDisplayRef = useRef<[number, number]>([0, 0]);
 
-  // Connect analysers via captureStream — does NOT hijack native audio output.
-  // The video element continues to play sound through its own path.
+  // Connect via createMediaElementSource.
+  // This hijacks the native audio output, so we MUST also connect to ctx.destination.
+  // The video element's .volume and .muted properties still control the source level.
   const connectAnalysers = useCallback(() => {
     const video = videoRef.current;
     const ctx = audioCtxRef.current;
     if (!video || !ctx || connectedRef.current) return;
 
     try {
-      const captureStream =
-        (video as any).captureStream?.bind(video) ||
-        (video as any).mozCaptureStream?.bind(video);
-      if (!captureStream) return;
-
-      const stream: MediaStream = captureStream();
-      if (!stream || stream.getAudioTracks().length === 0) return;
-
-      // createMediaStreamSource reads from the stream — native audio is unaffected
-      const source = ctx.createMediaStreamSource(stream);
+      const source = ctx.createMediaElementSource(video);
       connectedRef.current = true;
 
       const analyserL = ctx.createAnalyser();
@@ -64,13 +56,16 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
       analyserRRef.current = analyserR;
 
       const splitter = ctx.createChannelSplitter(2);
+
+      // Playback path: source → destination (restores audio hijacked by createMediaElementSource)
+      source.connect(ctx.destination);
+
+      // Analysis path: source → splitter → L/R analysers (dead-end, read-only)
       source.connect(splitter);
       splitter.connect(analyserL, 0);
       splitter.connect(analyserR, 1);
-      // Intentionally NOT connecting to ctx.destination —
-      // audio plays natively through the <video> element
     } catch {
-      // captureStream not available or security restriction
+      // Already captured or security restriction — audio still plays via destination
     }
   }, [videoRef]);
 
@@ -90,15 +85,6 @@ export const VUMeter = forwardRef<VUMeterHandle, VUMeterProps>(function VUMeter(
   }, [connectAnalysers]);
 
   useImperativeHandle(ref, () => ({ initAudio }));
-
-  // Also try to connect once video has data (handles autoplay / programmatic play)
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const tryConnect = () => connectAnalysers();
-    video.addEventListener('playing', tryConnect);
-    return () => video.removeEventListener('playing', tryConnect);
-  }, [videoRef, connectAnalysers]);
 
   // rAF draw loop
   useEffect(() => {
