@@ -9,7 +9,8 @@ import { CommentSidebar } from '@/components/viewer/CommentSidebar';
 import { Spinner } from '@/components/ui/Spinner';
 import { useProject } from '@/hooks/useProject';
 import Link from 'next/link';
-import { ChevronLeft, Share2 } from 'lucide-react';
+import { ChevronLeft, Share2, Download } from 'lucide-react';
+import { forceDownload } from '@/lib/utils';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { CreateReviewLinkModal } from '@/components/review/CreateReviewLinkModal';
 import { VersionSwitcher } from '@/components/viewer/VersionSwitcher';
@@ -176,6 +177,19 @@ export default function AssetViewerPage() {
               compareMode={compareMode}
               onToggleCompare={() => setCompareMode((v) => !v)}
             />
+          )}
+          {displayAsset?.status === 'ready' && (
+            <button
+              onClick={() => {
+                const url = (displayAsset as any).downloadUrl ?? (displayAsset as any).signedUrl;
+                if (url) forceDownload(url, displayAsset.name);
+              }}
+              className="flex items-center gap-1.5 text-frame-textSecondary hover:text-white transition-colors flex-shrink-0 text-xs font-medium px-2 py-1.5 rounded-lg hover:bg-frame-cardHover"
+              title="Download"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download
+            </button>
           )}
           <button
             onClick={() => setShowReviewModal(true)}
