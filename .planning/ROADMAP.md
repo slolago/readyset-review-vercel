@@ -45,10 +45,10 @@ Plans:
 **Goal:** Show comment count badge on AssetCard in grid view, matching the existing list view badge.
 **Depends on:** Phase 24
 **Requirements:** P25-01, P25-02, P25-03, P25-04, P25-05
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 25-01-PLAN.md — Add `_commentCount` badge to AssetCard info section
+- [x] 25-01-PLAN.md — Add `_commentCount` badge to AssetCard info section
 
 **Success Criteria:**
 1. Grid cards show a comment badge (icon + number) when count > 0 ✓
