@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
 status: Milestone complete
-stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-04-07T13:24:02.312Z"
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-04-08T00:08:14.669Z"
 progress:
-  total_phases: 15
+  total_phases: 18
   completed_phases: 13
   total_plans: 26
   completed_plans: 25
@@ -28,7 +28,7 @@ in_progress
 
 ## Last Session
 
-Stopped at: Completed 15-02-PLAN.md
+Stopped at: Completed 23-01-PLAN.md
 
 ## Decisions
 
@@ -71,6 +71,7 @@ Stopped at: Completed 15-02-PLAN.md
 - [Phase 15]: collectionGroup with 30-id chunks used for cross-project asset aggregation in /api/stats
 - [Phase 15]: StatCard value typed as string|null — null triggers animate-pulse skeleton instead of a loading prop
 - [Phase 15]: Root-level assets excluded from folder-scoped size query; BFS used for recursive descendant traversal
+- [Phase 23-timecode-frame-fix]: Add setCurrentTime + onTimeUpdate directly after v.currentTime assignment in stepFrame and arrow key handlers — bypasses 0.25s rAF threshold without altering it
 
 ## Roadmap Evolution
 
@@ -107,3 +108,4 @@ Stopped at: Completed 15-02-PLAN.md
 | Phase 14-review-link-folders P02 | 5 | 1 tasks | 1 files |
 | Phase 15 P01 | 8 | 2 tasks | 2 files |
 | Phase 15 P02 | 8 | 2 tasks | 2 files |
+| Phase 23-timecode-frame-fix P01 | 1 | 1 tasks | 1 files |
