@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { CommentItem } from './CommentItem';
 import type { Asset, Comment } from '@/types';
-import { MessageSquare, Send, Clock, Pencil, X, Filter, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Send, Clock, Pencil, X, Filter, CheckCircle2, Info } from 'lucide-react';
+import { FileInfoPanel } from './FileInfoPanel';
 import { formatTimestamp } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import toast from 'react-hot-toast';
@@ -57,6 +58,7 @@ export function CommentSidebar({
   const [includeTimestamp, setIncludeTimestamp] = useState(asset.type === 'video');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [showResolved, setShowResolved] = useState(false);
+  const [activeTab, setActiveTab] = useState<'comments' | 'info'>('comments');
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -142,30 +144,51 @@ export function CommentSidebar({
 
   return (
     <div className="w-80 flex-shrink-0 bg-frame-sidebar border-l border-frame-border flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-frame-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-frame-accent" />
-          <span className="text-sm font-semibold text-white">
-            Comments
-            {comments.length > 0 && (
-              <span className="ml-1.5 text-xs bg-frame-accent/20 text-frame-accent px-1.5 py-0.5 rounded-full">
-                {comments.length}
-              </span>
-            )}
-          </span>
-        </div>
+      {/* Tab bar */}
+      <div className="flex border-b border-frame-border flex-shrink-0">
         <button
-          onClick={() => setShowResolved((v) => !v)}
-          className={`p-1.5 rounded-lg transition-colors ${showResolved ? 'bg-frame-accent/15 text-frame-accent' : 'text-frame-textMuted hover:text-white'}`}
-          title="Toggle resolved"
+          onClick={() => setActiveTab('comments')}
+          className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors flex-1 justify-center border-b-2 ${
+            activeTab === 'comments'
+              ? 'border-frame-accent text-white'
+              : 'border-transparent text-frame-textMuted hover:text-white'
+          }`}
         >
-          <Filter className="w-3.5 h-3.5" />
+          <MessageSquare className="w-3.5 h-3.5" />
+          Comments
+          {comments.length > 0 && activeTab === 'comments' && (
+            <span className="ml-0.5 text-xs bg-frame-accent/20 text-frame-accent px-1.5 py-0.5 rounded-full">
+              {comments.length}
+            </span>
+          )}
         </button>
+        <button
+          onClick={() => setActiveTab('info')}
+          className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors flex-1 justify-center border-b-2 ${
+            activeTab === 'info'
+              ? 'border-frame-accent text-white'
+              : 'border-transparent text-frame-textMuted hover:text-white'
+          }`}
+        >
+          <Info className="w-3.5 h-3.5" />
+          Info
+        </button>
+        {activeTab === 'comments' && (
+          <button
+            onClick={() => setShowResolved((v) => !v)}
+            className={`p-3 transition-colors ${showResolved ? 'text-frame-accent' : 'text-frame-textMuted hover:text-white'}`}
+            title="Toggle resolved"
+          >
+            <Filter className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
+      {/* Info tab panel */}
+      {activeTab === 'info' && <FileInfoPanel asset={asset} />}
+
       {/* Comments list */}
-      <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-1">
+      {activeTab === 'comments' && <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-1">
         {topLevel.length === 0 ? (
           <div className="text-center py-8">
             <MessageSquare className="w-8 h-8 text-frame-textMuted mx-auto mb-2" />
@@ -196,10 +219,10 @@ export function CommentSidebar({
             </div>
           ))
         )}
-      </div>
+      </div>}
 
       {/* Input */}
-      {!readOnly && (
+      {activeTab === 'comments' && !readOnly && (
         <div className="border-t border-frame-border p-4 space-y-2">
           {replyTo && (
             <div className="flex items-center justify-between px-2 py-1.5 bg-frame-accent/10 rounded-lg">

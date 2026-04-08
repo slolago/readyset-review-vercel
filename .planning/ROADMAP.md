@@ -62,10 +62,10 @@ Plans:
 **Goal:** Add an "Info" tab to the asset viewer sidebar showing technical metadata (resolution, duration, size, MIME type, etc.).
 **Depends on:** Phase 25
 **Requirements:** P26-01, P26-02, P26-03, P26-04, P26-05, P26-06
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 26-01-PLAN.md — Tab bar in asset viewer sidebar + new FileInfoPanel component
+- [x] 26-01-PLAN.md — Tab bar in asset viewer sidebar + new FileInfoPanel component
 
 **Success Criteria:**
 1. Asset viewer sidebar has Comments / Info tab bar ✓
