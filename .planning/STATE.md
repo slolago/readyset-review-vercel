@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: — Video Review Polish
 status: Executing Phase 26
-stopped_at: ROADMAP.md + REQUIREMENTS.md created for v1.3
-last_updated: "2026-04-08T00:47:00.621Z"
+stopped_at: Completed 26-file-info-tab 26-02-PLAN.md
+last_updated: "2026-04-08T00:58:40.452Z"
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 4
-  completed_plans: 3
+  completed_phases: 4
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # State
@@ -28,7 +28,7 @@ Planned — Milestone v1.3 roadmap complete (phases 23–28). Ready to plan Phas
 
 ## Last Session
 
-Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
+Stopped at: Completed 26-file-info-tab 26-02-PLAN.md
 
 ## Decisions
 
@@ -74,6 +74,7 @@ Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
 - [Phase 20-01]: UserSearchCombobox passes selectedUser.email to existing collaborators POST API — no API contract change needed
 - [Phase 20-01]: Firestore prefix search requires 2+ characters; name query is case-sensitive (v1 limitation, nameLower field can be added later)
 - [Phase 21-admin-panel-polish]: Delete UserRoleSelect.tsx (dead code, stale 'admin'|'user' two-value type) rather than fix it
+- [Phase 26-file-info-tab]: frameRate stored as optional number on Asset interface — absent for legacy assets; FPS row shows dash when not present
 
 ## Roadmap Evolution
 
@@ -118,3 +119,4 @@ Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
 | Phase 20-collaborator-invite-autocomplete P01 | 2min | 2 tasks | 3 files |
 | Phase 21-admin-panel-polish P01 | 2min | 2 tasks | 4 files |
 | Phase 22-asset-download-button P01 | 1min | 2 tasks | 2 files |
+| Phase 26-file-info-tab P02 | 3min | 1 tasks | 2 files |

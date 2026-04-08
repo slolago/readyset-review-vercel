@@ -62,11 +62,11 @@ Plans:
 **Goal:** Add an "Info" tab to the asset viewer sidebar showing technical metadata (resolution, duration, size, MIME type, etc.).
 **Depends on:** Phase 25
 **Requirements:** P26-01, P26-02, P26-03, P26-04, P26-05, P26-06
-**Plans:** 2 plans (1 complete, 1 gap closure)
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 26-01-PLAN.md — Tab bar in asset viewer sidebar + new FileInfoPanel component
-- [ ] 26-02-PLAN.md — Gap closure: add `frameRate?: number` to Asset interface; remove `(asset as any).fps` cast in FileInfoPanel
+- [x] 26-02-PLAN.md — Gap closure: add `frameRate?: number` to Asset interface; remove `(asset as any).fps` cast in FileInfoPanel
 
 **Success Criteria:**
 1. Asset viewer sidebar has Comments / Info tab bar ✓
