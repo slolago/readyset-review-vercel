@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useRef, useCallback, useState, useEffect, memo } from 'react';
-import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil, Copy, CopyPlus, Home, Folder as FolderIcon, X, ExternalLink, Move as MoveIcon, Download, Link as LinkIcon } from 'lucide-react';
+import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil, Copy, CopyPlus, Home, Folder as FolderIcon, X, ExternalLink, Move as MoveIcon, Download, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import { formatDuration, formatBytes, forceDownload } from '@/lib/utils';
 import type { Asset, Folder } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -32,6 +32,7 @@ export const AssetCard = memo(function AssetCard({ asset, onClick, onDeleted, on
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const versionCount = (asset as any)._versionCount || 1;
+  const commentCount = ((asset as any)._commentCount as number | undefined) ?? 0;
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -376,9 +377,17 @@ export const AssetCard = memo(function AssetCard({ asset, onClick, onDeleted, on
         )}
         <div className="flex items-center justify-between mt-0.5">
           <p className="text-xs text-frame-textMuted">{formatBytes(asset.size)}</p>
-          {versionCount > 1 && (
-            <p className="text-xs text-frame-accent font-medium">{versionCount} versions</p>
-          )}
+          <div className="flex items-center gap-2">
+            {commentCount > 0 && (
+              <span className="flex items-center gap-0.5 text-xs text-frame-textMuted">
+                <MessageSquare className="w-3 h-3" />
+                {commentCount > 99 ? '99+' : commentCount}
+              </span>
+            )}
+            {versionCount > 1 && (
+              <p className="text-xs text-frame-accent font-medium">{versionCount} versions</p>
+            )}
+          </div>
         </div>
 
       </div>
