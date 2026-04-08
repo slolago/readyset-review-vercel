@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-04-08T00:08:14.669Z"
+milestone: v1.3
+milestone_name: — Video Review Polish
+status: Executing Phase 23
+stopped_at: ROADMAP.md + REQUIREMENTS.md created for v1.3
+last_updated: "2026-04-08T00:05:58.558Z"
 progress:
-  total_phases: 18
-  completed_phases: 13
-  total_plans: 26
-  completed_plans: 25
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 1
+  completed_plans: 0
 ---
 
 # State
 
 ## Current Phase
 
-14
+Phase 23: timecode-frame-fix (next to plan)
 
 ## Current Plan
 
-Plan 01 complete — Phase 14 plan 01 done
+—
 
 ## Status
 
-in_progress
+Planned — Milestone v1.3 roadmap complete (phases 23–28). Ready to plan Phase 23.
 
 ## Last Session
 
-Stopped at: Completed 23-01-PLAN.md
+Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
 
 ## Decisions
 
@@ -71,7 +71,9 @@ Stopped at: Completed 23-01-PLAN.md
 - [Phase 15]: collectionGroup with 30-id chunks used for cross-project asset aggregation in /api/stats
 - [Phase 15]: StatCard value typed as string|null — null triggers animate-pulse skeleton instead of a loading prop
 - [Phase 15]: Root-level assets excluded from folder-scoped size query; BFS used for recursive descendant traversal
-- [Phase 23-timecode-frame-fix]: Add setCurrentTime + onTimeUpdate directly after v.currentTime assignment in stepFrame and arrow key handlers — bypasses 0.25s rAF threshold without altering it
+- [Phase 20-01]: UserSearchCombobox passes selectedUser.email to existing collaborators POST API — no API contract change needed
+- [Phase 20-01]: Firestore prefix search requires 2+ characters; name query is case-sensitive (v1 limitation, nameLower field can be added later)
+- [Phase 21-admin-panel-polish]: Delete UserRoleSelect.tsx (dead code, stale 'admin'|'user' two-value type) rather than fix it
 
 ## Roadmap Evolution
 
@@ -79,6 +81,10 @@ Stopped at: Completed 23-01-PLAN.md
 - Phase 13 added: review-polish-and-fixes — force-download to disk, three-dot menu fix on review page, guest read-only enforcement
 - Phase 14 added: review-link-folders — virtual folder structure per review link inside projects, navigable from sidebar
 - Phase 15 added: dashboard-and-storage — real dashboard stats (projects/assets/collaborators/storage) + folder size at each route
+- Phase 19 added: review-link-auth-skip — skip guest name prompt on review links when viewer is already logged in
+- Phase 20 added: collaborator-invite-autocomplete — search users by name when inviting, no need to type full email
+- Phase 21 added: admin-panel-polish — admin sees all projects with owner info; clean up roles display
+- Phase 22 added: asset-download-button — download button inside the asset viewer page
 
 ## Blockers
 
@@ -108,4 +114,7 @@ Stopped at: Completed 23-01-PLAN.md
 | Phase 14-review-link-folders P02 | 5 | 1 tasks | 1 files |
 | Phase 15 P01 | 8 | 2 tasks | 2 files |
 | Phase 15 P02 | 8 | 2 tasks | 2 files |
-| Phase 23-timecode-frame-fix P01 | 1 | 1 tasks | 1 files |
+| Phase 19-review-link-auth-skip P01 | 1min | 1 tasks | 1 files |
+| Phase 20-collaborator-invite-autocomplete P01 | 2min | 2 tasks | 3 files |
+| Phase 21-admin-panel-polish P01 | 2min | 2 tasks | 4 files |
+| Phase 22-asset-download-button P01 | 1min | 2 tasks | 2 files |
