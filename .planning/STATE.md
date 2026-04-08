@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: — Video Review Polish
-status: Ready to plan
-stopped_at: Completed 27-asset-comparison 27-01-PLAN.md
-last_updated: "2026-04-08T12:20:36.517Z"
+status: Executing Phase 27
+stopped_at: Completed 26-file-info-tab 26-02-PLAN.md
+last_updated: "2026-04-08T12:15:24.658Z"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 4
   total_plans: 6
-  completed_plans: 6
+  completed_plans: 5
 ---
 
 # State
@@ -28,7 +28,7 @@ Planned — Milestone v1.3 roadmap complete (phases 23–28). Ready to plan Phas
 
 ## Last Session
 
-Stopped at: Completed 27-asset-comparison 27-01-PLAN.md
+Stopped at: Completed 26-file-info-tab 26-02-PLAN.md
 
 ## Decisions
 
@@ -75,8 +75,6 @@ Stopped at: Completed 27-asset-comparison 27-01-PLAN.md
 - [Phase 20-01]: Firestore prefix search requires 2+ characters; name query is case-sensitive (v1 limitation, nameLower field can be added later)
 - [Phase 21-admin-panel-polish]: Delete UserRoleSelect.tsx (dead code, stale 'admin'|'user' two-value type) rather than fix it
 - [Phase 26-file-info-tab]: frameRate stored as optional number on Asset interface — absent for legacy assets; FPS row shows dash when not present
-- [Phase 27-asset-comparison]: IIFE pattern in JSX to derive selectedAssets/canCompare inline in FolderBrowser action bar
-- [Phase 27-asset-comparison]: audioSide defaults to 'A' — left panel has audio; selectedIds not cleared on modal close
 
 ## Roadmap Evolution
 
@@ -122,4 +120,3 @@ Stopped at: Completed 27-asset-comparison 27-01-PLAN.md
 | Phase 21-admin-panel-polish P01 | 2min | 2 tasks | 4 files |
 | Phase 22-asset-download-button P01 | 1min | 2 tasks | 2 files |
 | Phase 26-file-info-tab P02 | 3min | 1 tasks | 2 files |
-| Phase 27-asset-comparison P01 | 3 | 2 tasks | 3 files |
