@@ -1,167 +1,169 @@
-# Technology Stack — v1.3 Video Review Polish
+# Technology Stack — v1.4 Review & Version Workflow
 
 **Project:** readyset-review
-**Researched:** 2026-04-07
-**Scope:** Stack additions for 6 v1.3 features only. Existing stack (Next.js 14, Firebase, GCS, Video.js, Fabric.js, Tailwind, Radix UI, Zustand, Lucide) is NOT re-evaluated.
+**Researched:** 2026-04-08
+**Scope:** Additive changes only. Existing stack (Next.js 14, Firebase, GCS, Tailwind, Video.js, Fabric.js, Radix UI, Zustand, Lucide) is validated and not re-examined here.
 
 ---
 
-## Summary: No New npm Dependencies Required
+## Verdict: No New npm Packages Required
 
-All 6 features can be implemented entirely with browser APIs and code already in the repo. Zero new packages need to be installed.
+Every v1.4 feature can be built with what is already installed. The analysis below justifies this for each feature and identifies the exact code surfaces that need to change.
 
 ---
 
 ## Feature-by-Feature Stack Analysis
 
-### Feature 1: Version Stacking via Drag & Drop
+### VSTK-01: Version stack unstack + reorder
 
-**What's needed:** Detect when one asset card is dropped onto another asset card, then call the existing Firestore versionGroupId merge logic.
+**What it needs:** A UI listing the versions in a stack with drag-to-reorder and an "Unstack" action per version, plus API routes to commit the changes.
 
-**Stack decision: Native HTML5 drag-and-drop only — no new library.**
+**Stack decision: Native HTML5 drag-and-drop + new API route. No new library.**
 
-The project already uses `application/x-frame-move` MIME type with `dataTransfer` for asset-to-folder drag. The same pattern extends to asset-to-asset drop:
-- `AssetCard` already receives `onDragStart` and renders `draggable`.
-- `AssetGrid` already passes `onAssetDragStart` through from `FolderBrowser`.
-- `FolderBrowser` already manages `dragOverFolderId` state and a `handleFolderDrop` handler.
+The project already uses HTML5 drag-and-drop for asset-to-folder moves (`AssetListView.tsx`) and asset-to-asset version merging (`merge-version/route.ts`). A vertical sortable list inside the existing `Modal` component uses the identical `onDragStart`/`onDrop`/`onDragOver` primitives with no new dependencies.
 
-What does NOT exist yet:
-- `dragOverAssetId` state in `FolderBrowser` (parallel to `dragOverFolderId`).
-- A `handleAssetDrop` callback that calls a new `/api/assets/merge-version` (or extends `/api/assets/[assetId]` PUT) to reassign `versionGroupId`.
-- Visual drop-target highlight on `AssetCard` when another asset is dragged over it.
+The Firestore data model (`versionGroupId` + integer `version`) already carries everything needed:
+- **Reorder:** Batch write assigning new sequential `version` values to all docs in the group.
+- **Unstack (extract one):** Batch write setting the extracted asset's `versionGroupId` to its own document ID and renumbering the remaining group members.
 
-**No library needed.** `onDragOver`, `onDragEnter`, `onDragLeave`, `onDrop` on the card `<div>` are sufficient.
+**New API route needed:** `POST /api/assets/unstack` — receives `{ assetId, versionGroupId }`, runs the extract-and-renumber batch. (Reorder can go through the same route as a `positions` array, or be a separate `POST /api/assets/reorder-versions`.)
 
-**API needed:** One new API route or extension — `PUT /api/assets/[assetId]` with body `{ versionGroupId: string }` — to merge two assets into the same version group. The Firestore versionGroupId pattern is already established.
+**New component:** `VersionStackModal` — renders version list with drag handles using existing `Modal` wrapper.
+
+**Rejected alternative:** `@dnd-kit/sortable` or `react-beautiful-dnd` — overkill for a bounded list (max ~15 items) inside a modal with no scroll-conflict edge cases. The existing drag model is already understood project-wide.
 
 ---
 
-### Feature 2: Asset Comparison — Side-by-Side Player
+### STATUS-01: Asset status labels (APPROVED / PENDING / NEEDS_CHANGES)
 
-**What's needed:** Select 2 arbitrary assets (not just consecutive versions of the same stack) and open a side-by-side comparison view.
+**What it needs:** A new optional field on `Asset`, UI to display the label on asset cards, and the ability to set it from the context menu or viewer.
 
-**Stack decision: Extend existing `VersionComparison` component — no new library.**
+**Stack decision: Type extension + existing `updateAsset` helper. No new library.**
 
-`VersionComparison` already implements:
-- Clip-path wipe divider with drag handle.
-- Synchronized dual `<video>` playback with play/pause, seek, mute controls.
-- Image fallback side-by-side.
+Add `reviewStatus?: 'approved' | 'pending' | 'needs_changes' | 'none'` to the `Asset` type in `src/types/index.ts`. The existing `PUT /api/assets/[assetId]` route accepts `Partial<Asset>`, so no new route is needed to write the value.
 
-What does NOT exist yet:
-- An entry point for comparing 2 arbitrary selected assets (currently the component only receives `assetA` / `assetB` from the version stack on the single-asset viewer page).
-- A selection mechanic in `FolderBrowser` / `AssetGrid` that enables "Compare selected" when exactly 2 assets are checked.
-- A comparison route or modal that renders `VersionComparison` with the two selected assets.
+The existing `Badge` UI component (`src/components/ui/Badge.tsx`) handles status chips with color variants — extend its color props if needed rather than creating a new component.
 
-**No library needed.** The comparison renderer already exists. Only a new page/modal + selection-aware toolbar button are needed.
+Note: `allowApprovals` on `ReviewLink` is a separate concept (enables guest-facing approve/reject actions). STATUS-01 is the internal QC label visible to collaborators at all times. Both can coexist on the same asset: the review link approval action can write to `reviewStatus` when a guest approves/rejects, closing the loop.
 
-**Note on signed URLs:** The comparison view needs signed URLs for both assets. These are already present on asset objects fetched via `GET /api/assets` (the `signedUrl` field). The viewer page fetches its asset via `GET /api/assets/[assetId]`, which also returns `signedUrl`. A dedicated comparison page can reuse either endpoint.
+**No new Firestore collection.** A field on the existing `assets` document is sufficient. `reviewStatus` will not be filtered at collection-query level in v1.4 (displayed per-asset only), so no new composite index is needed.
 
 ---
 
-### Feature 3: File Information Tab (fps, resolution, filesize, codec, duration)
+### REVIEW-01: Smart copy — latest version only
 
-**What's needed:** A new "Info" tab next to the comments sidebar in the asset viewer, displaying technical metadata.
+**What it needs:** When copying a version stack to a folder (e.g., "Client Facing"), copy only the highest-version asset rather than the entire stack.
 
-**Stack decision: HTMLVideoElement / HTMLImageElement browser APIs for client-side extraction; store fps/codec in Firestore at upload time via an API route that reads GCS metadata — no new library.**
+**Stack decision: One new parameter on existing `/api/assets/copy` route. No new library.**
 
-**Data sources, per field:**
+The current `copy/route.ts` already fetches all group members and batch-creates them. Adding `latestOnly?: boolean` to the request body requires: query group members, sort by `version` descending, take `[0]`, create a single-asset group. This is ~10 lines of conditional logic inside the existing route.
 
-| Field | Where It Comes From | Method |
-|-------|---------------------|--------|
-| Resolution (width × height) | Already in `Asset` Firestore doc (`width`, `height` fields populated at upload) | Read from Firestore, display directly |
-| File size | Already in `Asset.size` (bytes) | Read from Firestore, `formatBytes()` already exists in `@/lib/utils` |
-| Duration | Already in `Asset.duration` (seconds) | Read from Firestore, `formatDuration()` already exists in `@/lib/utils` |
-| FPS (frame rate) | **Not stored anywhere yet** | Extract client-side from `videoRef.current` after load (see below) |
-| Codec | **Not stored anywhere yet** | Extract client-side via `MediaSource.isTypeSupported()` probe or `video.getVideoPlaybackQuality()` — limited; best option is to store at upload time |
-
-**FPS extraction options:**
-
-- **Browser API (client-side):** `HTMLVideoElement` does not expose `fps` directly in any browser. `video.getVideoPlaybackQuality()` gives `totalVideoFrames` and `totalVideoFramesDropped` but not the native frame rate. The `VideoDecoder` API (Chromium 94+) can read it from encoded chunks but it is complex and not cross-browser. **Practical approach:** calculate an approximate fps from `video.requestVideoFrameCallback()` during playback — accurate but only available while playing, and only in Chromium.
-
-- **Server-side at upload time (recommended):** Store fps in the Firestore asset document during the upload-complete callback. The `@google-cloud/storage` SDK can fetch GCS object metadata, but GCS does not store video fps. A proper solution requires running `ffprobe` on the server — which requires either a Cloud Function with `fluent-ffmpeg` / `ffprobe-static`, or calling a video intelligence API.
-
-**Recommended approach for v1.3 (no new server dependency):**
-1. Display fields already stored in Firestore (resolution, filesize, duration) immediately.
-2. For fps: derive an approximate display value from `asset.duration` and a frame count sniffed via `requestVideoFrameCallback` when the video plays. Show "~30 fps" if the video is at default fps or use the stored duration and `DEFAULT_FPS = 30` constant already in `VideoPlayer.tsx`.
-3. For codec: read `asset.mimeType` (already in Firestore) and display the container format (e.g., "MP4", "WebM") from the MIME type string — not the codec, but sufficient for v1.3.
-4. Defer true fps/codec detection (requiring ffprobe) to a future milestone if needed.
-
-**No new npm packages needed for v1.3.** `requestVideoFrameCallback` is a browser API available in Chrome/Edge; check MDN availability before using.
-
-**Component needed:** A new `FileInfoTab` component rendered in the `CommentSidebar` (or as a sibling panel) that reads from `asset` props already available on the page.
+No new endpoint. No new type. One flag.
 
 ---
 
-### Feature 4: Safe Zones Opacity Slider
+### REVIEW-02: Copy without comments option
 
-**What's needed:** A slider that controls the CSS `opacity` of the `SafeZonesOverlay` `<img>` element. Currently opacity is fixed at 100%.
+**What it needs:** Assurance that the copy does not carry over comments, surfaced to the user as an explicit UI option.
 
-**Stack decision: Native HTML `<input type="range">` — no new library.**
+**Stack decision: No backend change. UI-only affordance.**
 
-Rationale:
-- The volume slider in `VideoPlayer` is already a native `<input type="range">` with custom CSS gradient styling. The exact same pattern works for opacity.
-- `@radix-ui/react-slider` is NOT installed, and installing it for a single slider is not justified when the existing volume control proves the native approach works in this codebase.
-
-**Implementation surface:**
-- `SafeZonesOverlay.tsx`: add `opacity?: number` prop (0–1), apply as inline `style={{ opacity }}` to the `<img>`.
-- `VideoPlayer.tsx`: add `safeZoneOpacity` state (default `1`), add a range slider next to or below `SafeZoneSelector` in the controls bar, pass opacity to `SafeZonesOverlay`.
-- No API changes. No Firestore changes. Pure UI state.
+Reading `copy/route.ts` confirms it copies only `assets` documents — it never touches the `comments` collection. "Copy without comments" is already the default behavior of every copy. The only deliverable is adding a checkbox/label to the copy modal so users understand this is intentional. No API change, no type change.
 
 ---
 
-### Feature 5: Comment Count Badge in Grid View
+### REVIEW-03: Selection-based review links
 
-**What's needed:** Show the comment count badge on `AssetCard` (grid view) the same way `AssetListView` already shows `_commentCount`.
+**What it needs:** Generate a review link scoped to a specific set of manually selected asset IDs rather than an entire folder.
 
-**Stack decision: No library, no API change — data already present.**
+**Stack decision: Type extension + route update. No new library.**
 
-**Current state:**
-- `GET /api/assets` already populates `asset._commentCount` for every asset in the response (see `route.ts` lines 44-56).
-- `AssetListView` already renders `(asset as any)._commentCount ?? 0` in the Comments column.
-- `AssetCard` already has `_versionCount` displayed as a badge. The comment count is available on the same `asset` object but `AssetCard` does not read or display `_commentCount`.
+Add `assetIds?: string[]` to the `ReviewLink` type. In the review link creation modal, when assets are selected in the grid, pass those IDs. In `POST /api/review-links`, accept and persist the array. In the review link resolver (`GET /api/review-links/[token]/route.ts`), when `assetIds` is present, fetch those specific assets rather than querying by `folderId`.
 
-**Implementation surface:** Add a comment count badge to the info section of `AssetCard.tsx`. Lucide's `MessageCircle` or `MessageSquare` icon can be used (both already installed via `lucide-react`). No data fetching, no API changes, no new types needed.
+Firestore does not have a native "fetch by array of document IDs" query, but `Promise.all(assetIds.map(id => db.collection('assets').doc(id).get()))` is the correct pattern for up to ~100 IDs — well within the range of a manual asset selection. This pattern is already used implicitly in other routes in this codebase.
 
----
-
-### Feature 6: Timecode Frame Display Bug Fix
-
-**What's needed:** When stepping frame-by-frame (Shift+ArrowLeft/Right or the `<ChevronLeft>/<ChevronRight>` buttons), the SMPTE timecode display does not update correctly.
-
-**Root cause (identified from code):**
-The rAF time tracking loop in `VideoPlayer.tsx` (lines 115-133) applies a `TIME_THRESHOLD = 0.25` second gate — it only calls `setCurrentTime` when the video time changes by more than 0.25 seconds OR when `scrubbing` is true. A single frame at 30fps is 0.0333 seconds, which is far below this threshold. So after a `stepFrame()` call, the displayed timecode does not update until 0.25s of change accumulates.
-
-**Fix: No new library needed.**
-
-Two approaches:
-1. **Simplest fix:** In `stepFrame()`, also call `setCurrentTime(v.currentTime + dir / DEFAULT_FPS)` directly after setting `v.currentTime`, bypassing the rAF threshold entirely for frame-step operations. `setCurrentTime` is already called in the `seekTo` imperative handle with no threshold guard.
-2. **Alternative:** Add a `stepping` state (like `scrubbing`) that disables the threshold during frame-step operations. Similar to how `scrubbing` bypasses the threshold.
-
-**Recommended fix:** Option 1 — explicit `setCurrentTime` call in `stepFrame()`. It is the minimum change, matches the `seekTo` imperative handle pattern already in the file, and requires no new state.
-
-**No library needed.** Pure logic fix in `VideoPlayer.tsx`.
+The `CreateReviewLinkModal` already receives `folderId` as a prop; it can additionally receive `assetIds?: string[]`. The grid already tracks `isSelected` per asset. The wiring is passing selectedIds from the toolbar down to the modal.
 
 ---
 
-## What Needs Installing
+### COMPARE-01: Compare view audio switch by clicking version label
 
-**Nothing.** All 6 features are implementable with:
-- Browser APIs already used in the project (HTML5 drag-and-drop, `HTMLVideoElement`, `<input type="range">`)
-- Data already fetched and present (`_commentCount`, `width`, `height`, `size`, `duration`, `mimeType`)
-- Components already built (`VersionComparison`, `SafeZonesOverlay`, `AssetCard`)
-- Firestore patterns already established (`versionGroupId`)
+**What it needs:** In side-by-side mode, clicking a version label unmutes that side's audio and mutes the other.
+
+**Stack decision: State refactor inside `VersionComparison.tsx` only. No new library.**
+
+`VersionComparison.tsx` currently has a single shared `muted` boolean state and a unified audio toggle. This feature requires splitting into independent `mutedA`/`mutedB` state variables. The version label buttons (which already exist as clickable elements for the picker) gain a secondary action: set `mutedA = false, mutedB = true` or vice versa when a label is clicked. The `videoARef`/`videoBRef` refs already support independent `muted` property control.
+
+No changes needed outside `VersionComparison.tsx`.
 
 ---
 
-## Alternatives Considered and Rejected
+### COMPARE-02: Compare view shows focused version's comments
 
-| Feature | Alternative | Rejection Reason |
-|---------|-------------|------------------|
-| Safe zones opacity | `@radix-ui/react-slider` | Volume slider already proves native range input works; adding a dep for one slider is wasteful |
-| FPS extraction | `ffprobe-static` on server | Requires binary on Node runtime; incompatible with Vercel serverless. Deferred to future milestone |
-| FPS extraction | Google Video Intelligence API | Overkill and adds cost for v1.3; mimeType + DEFAULT_FPS display is sufficient |
-| Version stack drag | `react-dnd` or `@dnd-kit/core` | Existing drag logic in FolderBrowser uses native HTML5 only; mixing libraries would break existing behavior and add complexity |
-| Asset comparison | New library | `VersionComparison` already ships the wipe-divider + sync video logic |
+**What it needs:** A comment panel in the compare view that shows comments for whichever side is currently focused/active.
+
+**Stack decision: Reuse existing `CommentSidebar` component. Layout refactor only.**
+
+`CommentSidebar` at `src/components/viewer/CommentSidebar.tsx` already accepts an `assetId` prop and handles its own comment fetching via `useComments`. In the compare view, add `focusedSide: 'A' | 'B'` state, derive `focusedAsset` from it, and render `<CommentSidebar assetId={focusedAsset.id} ... />` adjacent to the video area.
+
+The compare view currently uses the full viewport width. Adding a comment panel requires a flex-row layout split: video comparison area (flex-1) + comment panel (fixed width, e.g., 320px). This is a CSS layout change in `VersionComparison.tsx`, not a logic change. The `focusedSide` can be set by clicking either video panel or either version label (which is the same click as COMPARE-01).
+
+---
+
+### MOVE-01: Move to folder context menu option
+
+**What it needs:** A "Move to" item in `AssetCard`'s context menu that opens a folder picker and then moves the asset (and its entire version group) to the selected folder.
+
+**Stack decision: New `MoveToModal` component using existing `FolderBrowser` + `Modal`. No new library.**
+
+The `AssetCard` props interface already declares `onRequestMove?: () => void` — the hook is in place. The context menu `items` array in `AssetCard` needs one new entry calling `onRequestMove`.
+
+The backend already handles group-atomic folder moves: `PUT /api/assets/[assetId]` with `{ folderId }` detects the `folderId` field and batch-updates all siblings (confirmed in `[assetId]/route.ts` lines 60–75).
+
+A new `MoveToModal` component wraps `FolderBrowser` (already built for the "Copy to" flow in `AssetCard`) in the existing `Modal` with a "Move here" confirm button. This is a parallel implementation of the same copy-modal pattern, with a different API call.
+
+**Rejected alternative:** `@radix-ui/react-context-menu` for a proper submenu. The nested "Move to → [folder list]" pattern would benefit from a proper submenu, but the existing `ContextMenu` component + a modal picker gives the same UX with no new dependency. A modal is actually friendlier for folder browsing than a flat submenu.
+
+---
+
+## Consolidated Change Surface
+
+| File | Action | Ticket(s) |
+|------|--------|-----------|
+| `src/types/index.ts` | Add `reviewStatus` to `Asset`; add `assetIds` to `ReviewLink` | STATUS-01, REVIEW-03 |
+| `src/app/api/assets/unstack/route.ts` | New route: extract one asset from group, renumber rest | VSTK-01 |
+| `src/app/api/assets/reorder-versions/route.ts` | New route: accept ordered array, batch-write new version integers | VSTK-01 |
+| `src/app/api/assets/copy/route.ts` | Add `latestOnly` param | REVIEW-01 |
+| `src/app/api/review-links/route.ts` | Accept + persist `assetIds` array | REVIEW-03 |
+| `src/app/api/review-links/[token]/route.ts` | Filter assets by `assetIds` when present | REVIEW-03 |
+| `src/components/files/VersionStackModal.tsx` | New modal: list versions, drag-to-reorder, unstack button | VSTK-01 |
+| `src/components/files/MoveToModal.tsx` | New modal: folder picker for moves | MOVE-01 |
+| `src/components/files/AssetCard.tsx` | Add "Move to" context menu item | MOVE-01 |
+| `src/components/files/AssetGrid.tsx` | Wire up selectedAssetIds → CreateReviewLinkModal | REVIEW-03 |
+| `src/components/review/CreateReviewLinkModal.tsx` | Accept `assetIds` prop, show selection count | REVIEW-03 |
+| `src/components/viewer/VersionComparison.tsx` | Per-side audio state; focusedSide + CommentSidebar panel | COMPARE-01, COMPARE-02 |
+| `src/components/ui/Badge.tsx` | Extend color variants for review status labels | STATUS-01 |
+| `package.json` | No changes | — |
+
+---
+
+## What NOT to Add
+
+**`@dnd-kit/sortable` or `react-beautiful-dnd`:** The version reorder list is bounded (max ~15 items), lives inside a modal without scroll conflicts, and the existing HTML5 drag model is already established throughout the codebase. A library would add bundle weight and force a pattern change.
+
+**`@radix-ui/react-context-menu`:** The custom `ContextMenu` component handles all v1.4 needs (viewport-flip, escape-dismiss, portal rendering). A "Move to" submenu sounds attractive but a modal folder picker gives better UX for nested folder navigation anyway.
+
+**A separate `assetStatuses` Firestore collection:** A field on the existing asset document is correct. A separate collection would add query complexity, a new listener, and an extra index with no benefit at this data scale.
+
+**Server-side copy of comments:** Comments are already not copied by the copy route. REVIEW-02 is a UI-only affordance with zero backend work.
+
+---
+
+## Firestore Index Notes
+
+- `reviewStatus` is not queried at collection level in v1.4 — no new index.
+- `assetIds`-scoped review links fetch by document ID (individual `doc().get()` calls), not by query — no new index.
+- All existing `assets` queries (`projectId + folderId + createdAt`) are unchanged.
 
 ---
 
@@ -177,23 +179,44 @@ Two approaches:
 | Tailwind CSS | ^3.4.1 | Styling |
 | fabric | ^5.3.0 | Annotation canvas |
 | lucide-react | ^0.395.0 | Icons |
-| @radix-ui/* | various | Dropdown, Dialog, Select, Tooltip, Avatar, Progress |
+| @radix-ui/react-dropdown-menu | ^2.0.6 | Dropdown menus |
+| @radix-ui/react-dialog | ^1.0.5 | Dialogs |
+| @radix-ui/react-select | ^2.0.0 | Select inputs |
+| @radix-ui/react-tooltip | ^1.0.7 | Tooltips |
+| @radix-ui/react-avatar | ^1.0.4 | Avatars |
+| @radix-ui/react-progress | ^1.0.3 | Progress bars |
 | zustand | ^4.5.2 | Global state |
 | react-hot-toast | ^2.4.1 | Toast notifications |
 | date-fns | ^3.6.0 | Date formatting |
-| nanoid | ^5.0.7 | ID generation |
+| nanoid | ^5.0.7 | Token/ID generation |
 | react-dropzone | ^14.2.3 | File upload drop zone |
+| clsx + tailwind-merge | ^2.x | Class name utilities |
+| cookies-next | ^4.1.0 | Cookie handling |
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Basis |
+|------|------------|-------|
+| No new packages required | HIGH | Full codebase read; every needed primitive already present |
+| Firestore batch patterns (unstack/reorder) | HIGH | `merge-version/route.ts` confirms the exact same pattern |
+| `assetIds` fetch via `doc().get()` per ID | HIGH | Pattern used implicitly in existing version-fetching code |
+| Native drag-to-reorder in modal | HIGH | Same drag events already used in `AssetListView` and `FolderBrowser` |
+| `CommentSidebar` reuse in compare view | HIGH | Props interface confirmed; `assetId` is the only required input |
+| REVIEW-02 is backend-free | HIGH | `copy/route.ts` confirmed to never touch `comments` collection |
 
 ---
 
 ## Sources
 
-- Codebase: `src/components/viewer/VideoPlayer.tsx` — rAF threshold, `stepFrame`, SMPTE formatter, `DEFAULT_FPS`
-- Codebase: `src/components/viewer/SafeZonesOverlay.tsx` — current opacity-less implementation
-- Codebase: `src/components/viewer/VersionComparison.tsx` — existing comparison renderer
-- Codebase: `src/components/files/AssetCard.tsx` — `_versionCount` badge pattern, absence of `_commentCount` display
-- Codebase: `src/components/files/AssetListView.tsx` — `_commentCount` already displayed in list view
-- Codebase: `src/app/api/assets/route.ts` — `_commentCount` populated server-side for all assets
-- Codebase: `src/types/index.ts` — `Asset._commentCount`, `Asset.width`, `Asset.height`, `Asset.duration`, `Asset.mimeType`
-- MDN: `HTMLVideoElement.requestVideoFrameCallback()` — Chromium-only, no Firefox/Safari (as of 2026)
-- MDN: `HTMLVideoElement.getVideoPlaybackQuality()` — does not expose native fps
+- Codebase: `src/types/index.ts` — full `Asset` and `ReviewLink` shapes
+- Codebase: `src/app/api/assets/copy/route.ts` — confirms comments are never copied
+- Codebase: `src/app/api/assets/merge-version/route.ts` — confirms Firestore batch pattern for version group manipulation
+- Codebase: `src/app/api/assets/[assetId]/route.ts` — confirms group-atomic `folderId` move in PUT handler
+- Codebase: `src/app/api/review-links/route.ts` — current `ReviewLink` creation shape
+- Codebase: `src/components/viewer/VersionComparison.tsx` — per-side video refs and mute state
+- Codebase: `src/components/files/AssetCard.tsx` — `onRequestMove` already in props interface
+- Codebase: `src/components/ui/ContextMenu.tsx`, `Modal.tsx`, `Dropdown.tsx`, `Badge.tsx` — existing UI primitives
+- `package.json` — confirmed full dependency set
+- `.planning/PROJECT.md` — v1.4 requirements and key decisions

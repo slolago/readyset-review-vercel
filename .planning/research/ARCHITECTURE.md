@@ -1,322 +1,373 @@
-# Architecture Patterns — v1.3 Video Review Polish
+# Architecture: v1.4 Review & Version Workflow
 
-**Project:** readyset-review (Frame.io V4 clone)
-**Researched:** 2026-04-07
-**Milestone:** v1.3
+**Project:** readyset-review
+**Researched:** 2026-04-08
+**Confidence:** HIGH — all integration points verified against live codebase
 
 ---
 
 ## Existing Architecture Snapshot
 
+### Firestore Schema (current)
+
 ```
-src/
-  app/(app)/
-    projects/[projectId]/
-      page.tsx                    ← FolderBrowser entry (grid/list view)
-      folders/[folderId]/page.tsx ← same FolderBrowser with folderId
-      assets/[assetId]/page.tsx   ← AssetViewerPage (single-page state machine)
-  components/
-    files/
-      AssetCard.tsx               ← grid card; DnD source via onDragStart prop
-      AssetGrid.tsx               ← thin wrapper, passes DnD callbacks to AssetCard
-      AssetListView.tsx           ← list view; already has _commentCount badge
-      FolderBrowser.tsx           ← DnD orchestrator (rubber-band, move, drop-on-folder)
-    viewer/
-      VideoPlayer.tsx             ← Video.js-less custom player; timecode, safe zones
-      SafeZonesOverlay.tsx        ← renders a single <img> overlay (no opacity prop)
-      SafeZoneSelector.tsx        ← dropdown to pick active safe zone
-      CommentSidebar.tsx          ← single-tab panel; comments only
-      VersionSwitcher.tsx         ← header pill for switching versions
-      VersionComparison.tsx       ← existing side-by-side component (versions only)
-  app/api/assets/
-    route.ts                      ← GET: list assets, inlines _commentCount, _versionCount
-    [assetId]/route.ts            ← GET/PUT/DELETE single asset + versions array
-    copy/route.ts                 ← POST: duplicate or copy-to-folder
-    size/route.ts                 ← GET: folder size in bytes
+assets/{assetId}
+  projectId, folderId, name, type, mimeType, url, gcsPath,
+  thumbnailUrl, thumbnailGcsPath, duration, width, height, size,
+  uploadedBy, status: 'uploading'|'ready', version, versionGroupId,
+  versionOrder (unused in current queries), createdAt, frameRate?
+
+comments/{commentId}
+  assetId, projectId, reviewLinkId?, authorId, authorName, authorEmail?,
+  text, timestamp?, annotation?, resolved, parentId, createdAt
+
+reviewLinks/{token}   (token IS the doc ID)
+  token, projectId, folderId, name, createdBy, expiresAt, allowComments,
+  allowDownloads, allowApprovals, showAllVersions, password?, createdAt
 ```
 
-### Key data patterns
+### API Routes (current)
 
-- **Version stack** — assets share `versionGroupId` (= root asset ID). The grid list endpoint groups by `versionGroupId` and returns only the latest version with `_versionCount` injected.
-- **Comment counts** — computed server-side in `GET /api/assets` by scanning `comments` collection filtered by `projectId`, then joined into `_commentCount` on each asset. Already consumed by `AssetListView`. **Grid view does not currently display this badge.**
-- **DnD move** — uses `application/x-frame-move` dataTransfer type carrying `{ ids: string[] }`. Only folder cards are drop targets today; asset cards are drag sources only.
-- **Timecode** — `DEFAULT_FPS = 30` is hardcoded in `VideoPlayer.tsx`. SMPTE formatter uses this constant. `formatTimestamp` in `utils.ts` is just an alias for `formatDuration` (MM:SS only, no frame digits).
-- **Safe zone** — `SafeZonesOverlay` takes no `opacity` prop; opacity is implicitly 1.
-- **Asset metadata** — `Asset` type has `width`, `height`, `duration`, `size`, `mimeType` but **no codec, frameRate, or bitrate fields**. These are never stored or displayed anywhere.
+```
+GET/POST  /api/assets                  — list (grouped by version), batch upload sign
+GET/PUT/DELETE /api/assets/[assetId]   — single asset; PUT handles folderId batch-move
+POST      /api/assets/merge-version    — atomic batch merge of two version stacks
+POST      /api/assets/copy             — copies entire version stack to target folder
+GET       /api/assets/size             — folder size badge
+GET/POST  /api/review-links            — list/create, folderId-scoped
+GET/PATCH/DELETE /api/review-links/[token]
+GET/POST  /api/comments
+PUT/DELETE /api/comments/[commentId]
+GET/POST  /api/folders
+GET/PUT/DELETE /api/folders/[folderId]
+```
 
----
+### Key Component Facts
 
-## Feature Integration Analysis
-
-### Feature 1: Version Stacking via Drag-and-Drop
-
-**What it does:** Drop asset A onto asset B in the grid to absorb A into B's version stack.
-
-**Current state:** DnD drop targets are folder cards (`handleFolderDrop` in `FolderBrowser.tsx`). Asset cards are drag sources but have no `onDragOver` / `onDrop` handlers. The existing `PUT /api/assets/[assetId]` accepts arbitrary field updates including `versionGroupId`.
-
-**Integration approach:**
-
-1. **Modified: `AssetCard.tsx`** — Add `onDragOver`, `onDragLeave`, `onDrop` props. When `application/x-frame-move` payload arrives and the drop target is a different asset card (not a folder), fire an `onDropAsset` callback instead of a folder-move callback. Visual: highlight border on drag-over (same pattern as `isDropTarget` on folder cards).
-
-2. **Modified: `AssetGrid.tsx`** — Accept `onDropAssetOntoAsset?: (sourceId: string, targetId: string) => void` prop. Wire it through to each `AssetCard`.
-
-3. **Modified: `FolderBrowser.tsx`** — Implement `handleAssetDrop(targetAssetId, e)`. Logic:
-   - Read `application/x-frame-move` payload (`ids`).
-   - Filter to the source asset ID (single item — version stacking with multiple sources is ambiguous; reject or take first).
-   - Guard: source and target must not already share the same `versionGroupId`.
-   - Call `PUT /api/assets/[sourceId]` with `{ versionGroupId: targetGroupId }`. **No new API route needed** — the existing PUT already accepts field updates.
-   - After success, call `refetchAssets()`.
-
-4. **New API endpoint: `POST /api/assets/merge-version`** — Preferred over raw PUT for correctness. A merge must also update `versionGroupId` on all assets in the source's existing group, reassign `version` numbers to avoid collisions, and optionally delete or re-parent. A raw PUT on a single asset would leave sibling versions orphaned with the old `versionGroupId`. The dedicated endpoint handles the batch atomically via Firestore batch write.
-
-   ```
-   POST /api/assets/merge-version
-   Body: { sourceId: string, targetId: string }
-   Logic:
-     1. Fetch source and all its group siblings (versionGroupId == source.versionGroupId)
-     2. Fetch target's versionGroupId (the authoritative group to join)
-     3. Compute next version numbers (max existing version in target group + 1, +2, ...)
-     4. Batch update: set all source group members' versionGroupId = targetGroupId, version = new numbers
-     5. Update target's _versionCount (or rely on server-computed value at read time)
-   ```
-
-**Self-drop guard:** In `AssetCard.onDrop`, skip if `dragPayload.ids.includes(asset.id)`.
-
-**Same-group guard:** Check `asset.versionGroupId === source.versionGroupId` before firing callback.
+- **VersionStackModal** lives inside `AssetCard.tsx` as a collocated function. It fetches versions via `GET /api/assets/[assetId]` and currently renders delete-only.
+- **FolderBrowser** owns all multi-select state, move modal state, and the `handleMoveSelected` function that calls `PUT /api/assets/[assetId]` with `{ folderId }`. The PUT route already batch-moves all versions in the group atomically.
+- **AssetCard** owns the context menu and calls `onRequestMove()` which propagates up to FolderBrowser.handleRequestMoveItem — the move-to-folder wiring already exists at the browser level; what's missing is confirming the prop wire is connected.
+- **VersionComparison** receives `versions: Asset[]` (pre-fetched, already have `signedUrl`). It has no comment-awareness; `muted` is a single shared boolean, not per-side.
+- **CreateReviewLinkModal** takes `{ projectId, folderId }` and sends them to `POST /api/review-links`. No concept of `assetIds`.
+- **`GET /api/review-links/[token]`** resolves assets via Firestore query on `(projectId, folderId, status=ready)`. It does NOT support filtering by an assetIds array.
+- The `AssetStatus` type alias currently equals `'uploading' | 'ready'` — this is the upload lifecycle status, NOT a review QC status. The names will collide; the new QC field must use a different name.
 
 ---
 
-### Feature 2: Asset Comparison (Side-by-Side)
-
-**What it does:** Select 2+ assets in the grid then open a side-by-side comparison view.
-
-**Current state:** `VersionComparison` already exists at `src/components/viewer/VersionComparison.tsx` — it renders two assets side-by-side. It is currently only accessible from the asset viewer when a version stack has 2+ versions. It is not reachable from the grid.
-
-**Integration approach — no new route needed:**
-
-The cleanest path is a modal overlay launched from `FolderBrowser` when 2+ items are selected:
-
-1. **Modified: `FolderBrowser.tsx`** — When `selectedIds.size >= 2`, show a "Compare" button in the multi-select action bar. On click, open `<AssetCompareModal>`.
-
-2. **New: `src/components/files/AssetCompareModal.tsx`** — Full-screen modal that accepts an array of `Asset` objects (already in scope in FolderBrowser via the `assets` array). Internally uses `VersionComparison` (or a refactored version of it) to show two panels side-by-side. If more than 2 are selected, the modal lets the user pick which two to compare (or defaults to the first two).
-
-3. **VersionComparison reuse vs. duplication:** `VersionComparison` currently expects `assetA` and `assetB` props of type `Asset`. Reusing it directly inside `AssetCompareModal` works if the signed URLs are already available (they are — the grid API inlines `signedUrl` on each ready asset). No refetch needed for the modal. Check whether `VersionComparison` renders a `<video>` or calls back into `VideoPlayer` — if it has its own playback controls, it is already self-contained.
-
-**Alternative (new route):** A dedicated route like `/projects/[projectId]/compare?a=id1&b=id2` is cleaner for deep-linking but requires passing signed URLs through the URL (not safe) or re-fetching. The modal approach avoids this.
+## Feature-by-Feature Integration Analysis
 
 ---
 
-### Feature 3: File Information Tab
+### 1. Version Stack Unstack + Reorder (VSTK-01)
 
-**What it does:** New tab in the asset viewer sidebar showing fps, resolution, size, codec, duration.
+**What changes**
 
-**Current state:** `CommentSidebar` is a single-purpose panel with no tab mechanism. Its interface takes `asset` and surfaces comment-related UI only.
+The `VersionStackModal` inside `AssetCard.tsx` currently renders a static list with delete-only. It needs drag-to-reorder and an "Unstack" (eject) action per version.
 
-**Integration approach:**
+**Firestore changes**
 
-1. **Modified: `src/app/(app)/projects/[projectId]/assets/[assetId]/page.tsx`** — Replace `<CommentSidebar>` with a tabbed sidebar wrapper. Add a tab state (`'comments' | 'info'`). Render tab header ("Comments" | "Info") above the panel, then conditionally render `CommentSidebar` or `FileInfoPanel`.
+No new fields required. `version` (integer) already defines order within the group. Reordering means updating `version` numbers across all members of the group in a batch. Unstacking means:
+1. Set the ejected asset's `versionGroupId` to its own `id` (or remove the field — query fallback handles `asset.id` as groupId when field is absent).
+2. Set `version = 1` on the ejected asset.
 
-2. **New: `src/components/viewer/FileInfoPanel.tsx`** — Stateless display component. Props: `asset: Asset`. Displays:
-   - Resolution: `asset.width` x `asset.height` (already stored)
-   - Duration: formatted from `asset.duration` (already stored)
-   - File size: formatted from `asset.size` (already stored)
-   - MIME type: `asset.mimeType` (already stored)
-   - Frame rate: **not stored** — requires schema change (see below)
-   - Codec: **not stored** — requires schema change (see below)
+The existing `merge-version` route shows exactly this pattern in reverse — the batch there is the template.
 
-3. **Schema change required for fps/codec:** The `Asset` type in `src/types/index.ts` has no `frameRate` or `codec` fields. These must be:
-   - Added to the `Asset` interface: `frameRate?: number; codec?: string;`
-   - Populated at upload time by the upload-complete handler (currently sets `width`, `height`, `duration`).
-   - If the upload-complete endpoint does not extract these today, `FileInfoPanel` must gracefully show "—" for missing values rather than failing.
+**New API routes**
 
-   **Confidence on current extraction:** The codebase has no `codec` or `frameRate` in any API or type definition (verified by grep). This is a gap. Displaying only the already-stored fields (resolution, size, duration, mimeType) is safe for MVP; fps/codec can be deferred or added in a follow-up.
+Two new routes:
+- `POST /api/assets/reorder-versions` — body: `{ groupId, orderedIds: string[] }` — batch-writes new version numbers 1..N in the given order.
+- `POST /api/assets/unstack-version` — body: `{ assetId }` — removes asset from its group, resets to standalone.
 
-4. **No new API route needed.** All displayable data is returned by the existing `GET /api/assets/[assetId]` response (via `useAsset` hook).
+Both need auth + `canAccessProject` checks. Both use `db.batch()`.
 
----
+**Component changes**
 
-### Feature 4: Safe Zones Opacity Slider
+`VersionStackModal` (collocated in `AssetCard.tsx`) — modify in place:
+- Add drag-to-reorder rows. Use HTML5 drag API (`draggable`, `onDragStart`, `onDragOver`, `onDrop`) on each version row. Keep state as `orderedVersions: Asset[]`, derive new order on drop.
+- Add "Unstack" button (eject icon) per row — disabled when only one version in group.
+- On reorder commit (drag end or explicit Save button), call `POST /api/assets/reorder-versions`.
+- On unstack, call `POST /api/assets/unstack-version`, then call `onDeleted?.()` to trigger parent grid refetch.
+- Optimistic UI: update local `orderedVersions` state immediately; revert on API error.
 
-**What it does:** Add an opacity control to the safe zones overlay.
+**No new top-level components** — all changes contained to the collocated modal function.
 
-**Current state:** `SafeZonesOverlay` renders a single `<img>` with hardcoded `opacity: 1` (via `objectFit: fill` style, no opacity). `SafeZoneSelector` is the dropdown that sets `activeSafeZone` state in `VideoPlayer`. The active safe zone and the overlay are both local state inside `VideoPlayer`.
-
-**Integration approach — minimal, self-contained:**
-
-1. **Modified: `SafeZonesOverlay.tsx`** — Add `opacity?: number` prop. Apply as `style={{ opacity: opacity ?? 1, ... }}` on the `<img>` element.
-
-2. **Modified: `VideoPlayer.tsx`** — Add `safeZoneOpacity` state (default `0.8` or `1`). Pass it to `SafeZonesOverlay`. Render an opacity slider in the controls bar adjacent to `SafeZoneSelector` — visible only when `activeSafeZone` is non-null.
-
-   Slider placement: right side of the controls row, immediately after `<SafeZoneSelector>`. A 60px `<input type="range" min={0} max={1} step={0.05}>` with the same styling as the existing volume slider.
-
-**No new components, no new API routes.**
+**Dependencies:** None. Build this first — it has no dependencies on other v1.4 features.
 
 ---
 
-### Feature 5: Comment Count Badge on AssetCard (Grid View)
+### 2. Asset Status Field (STATUS-01)
 
-**What it does:** Show the comment count on each card in grid view, matching the existing badge in list view.
+**What changes**
 
-**Current state:** The `GET /api/assets` route already injects `_commentCount` on each asset object. `AssetListView` already renders this count (`(asset as any)._commentCount ?? 0`). `AssetCard.tsx` never reads `_commentCount`.
+The existing `AssetStatus = 'uploading' | 'ready'` type is the upload lifecycle. The new QC status is a separate concept.
 
-**Integration approach — trivial modification:**
+**Firestore changes**
 
-1. **Modified: `AssetCard.tsx`** — In the `<div className="p-3">` info section, add a comment count badge. Read `(asset as any)._commentCount as number | undefined`. Render a `MessageSquare` icon + count when `_commentCount > 0`. Position: bottom-right of the info strip, alongside the existing "N versions" text.
+Add optional field to the `assets` collection:
 
-   ```tsx
-   // In the info div, after versionCount display:
-   {commentCount > 0 && (
-     <span className="flex items-center gap-0.5 text-xs text-frame-textMuted">
-       <MessageSquare className="w-3 h-3" />
-       {commentCount}
-     </span>
-   )}
-   ```
+```
+reviewStatus?: 'approved' | 'needs_revision' | 'pending'
+```
 
-2. **No changes to API, hooks, or types.** `_commentCount` is already on the wire; it is already typed as optional on `Asset` (`_commentCount?: number` in `src/types/index.ts`).
-
-**Data freshness:** Count is computed at page load (server-side in the list endpoint). It is not real-time — consistent with the list view behavior. Acceptable for a grid badge.
-
----
-
-### Feature 6: Timecode Frame Mode Bug Fix
-
-**What it does:** Fix the SMPTE timecode display not updating correctly when stepping frame-by-frame.
-
-**Root cause (inferred from code):** `formatSMPTE` in `VideoPlayer.tsx` uses `DEFAULT_FPS = 30` (hardcoded). The `currentTime` state is updated inside a `requestAnimationFrame` loop with a 0.25s threshold (`TIME_THRESHOLD`). When `stepFrame` increments by `1 / DEFAULT_FPS` (~33ms), this change is **smaller than the 0.25s threshold**, so `setCurrentTime` is never called unless `scrubbing` is true. The timecode display does not update after single-frame steps.
-
-**Fix:** The rAF loop must bypass the threshold when the video is paused and a frame step just occurred. Two approaches:
-
-**Option A (cleanest):** In `stepFrame()`, after setting `videoRef.current.currentTime`, also call `setCurrentTime(videoRef.current.currentTime)` and `onTimeUpdate?.(videoRef.current.currentTime)` directly. The rAF loop already polls continuously; the redundant call is harmless and guarantees the UI is immediately updated without waiting for the next tick to cross the threshold.
-
-**Option B:** Add a `stepping` ref similar to `scrubbing`. When `stepping === true`, the rAF loop fires without threshold gating. Reset after one tick. More complex, less necessary.
-
-**Recommended: Option A.** One-line fix in `stepFrame`:
+Default is absent/undefined, which the UI treats as `'pending'`. Do NOT name it `status` (collision with existing upload lifecycle field). The new type lives in `src/types/index.ts`:
 
 ```typescript
-const stepFrame = (dir: 1 | -1) => {
-  const v = videoRef.current;
-  if (!v) return;
-  onUserInteraction?.();
-  v.pause(); setPlaying(false);
-  v.currentTime = Math.max(0, Math.min(duration, v.currentTime + dir / DEFAULT_FPS));
-  // Immediately sync display — threshold-based rAF loop misses sub-250ms changes
-  setCurrentTime(v.currentTime);
-  onTimeUpdate?.(v.currentTime);
-};
+export type ReviewStatus = 'approved' | 'needs_revision' | 'pending';
+// Add to Asset interface:
+reviewStatus?: ReviewStatus;
 ```
 
-**Files changed:** `VideoPlayer.tsx` only. No API, no types, no new components.
+**API changes**
+
+`PUT /api/assets/[assetId]` already accepts arbitrary `updates` and writes them to Firestore. A `reviewStatus` update works today with zero API changes, because the PUT handler does `await db.collection('assets').doc(params.assetId).update(updates)`.
+
+A dedicated status endpoint is cleaner for explicit validation: `PUT /api/assets/[assetId]/status` — body: `{ reviewStatus }`. Validates value is in the enum. Optional but recommended.
+
+**Component changes**
+
+- `AssetCard` — ADD a colored status badge in the info section. Badge colors: green = approved, amber = needs_revision, grey/none = pending. Click badge opens a small popover with 3 status options.
+- `AssetCard` context menu — ADD "Set status" item.
+- `AssetListView` — ADD a status column.
+- `AssetGrid` / `FolderBrowser` — ADD a status filter bar above the grid. Filter state lives in `FolderBrowser` as `statusFilter: ReviewStatus | 'all'`. Filtering is client-side against the already-fetched `assets` array.
+- `types/index.ts` — ADD `ReviewStatus` type, add `reviewStatus?: ReviewStatus` to `Asset`.
+
+**Dependencies:** None. Can build independently. Recommended second.
 
 ---
 
-## Component Inventory: New vs Modified
+### 3. Smart Copy to Review (REVIEW-01 + REVIEW-02)
 
-| Component / File | Status | Notes |
-|---|---|---|
-| `AssetCard.tsx` | **Modified** | Add DnD drop target props + comment count badge |
-| `AssetGrid.tsx` | **Modified** | Add `onDropAssetOntoAsset` prop; thread to cards |
-| `FolderBrowser.tsx` | **Modified** | Add `handleAssetDrop` callback; wire "Compare" button |
-| `SafeZonesOverlay.tsx` | **Modified** | Add `opacity` prop |
-| `VideoPlayer.tsx` | **Modified** | Safe zone opacity state + slider; `stepFrame` fix |
-| `CommentSidebar.tsx` | **Unchanged** | Sidebar content is preserved as-is |
-| `AssetViewerPage` (page.tsx) | **Modified** | Add tab switcher state + conditional sidebar render |
-| `FileInfoPanel.tsx` | **New** | `src/components/viewer/FileInfoPanel.tsx` |
-| `AssetCompareModal.tsx` | **New** | `src/components/files/AssetCompareModal.tsx` |
-| `POST /api/assets/merge-version` | **New route** | Atomic version group merge via Firestore batch |
-| `Asset` type (types/index.ts) | **Modified** | Add `frameRate?: number; codec?: string;` (optional, for future use) |
+**What changes**
 
----
+Current `POST /api/assets/copy` copies the entire version stack. The new "smart copy" copies only the latest version and optionally presents a "strip comments" option.
 
-## New API Routes
+**Firestore changes**
 
-| Route | Method | Purpose | Urgency |
-|---|---|---|---|
-| `/api/assets/merge-version` | POST | Atomically merge one version group into another: reassign `versionGroupId` + renumber `version` fields for all members of the source group | Required for version-stack DnD |
+None. The copy operation creates new asset documents. For "strip comments," the copy simply does not copy comment documents (comments are a separate collection keyed by `assetId`; copies get new IDs so comments never follow copies — this is already the existing behavior).
 
-No other new API routes are needed. All other features read or mutate through existing endpoints.
+**API changes**
 
----
+Extend `POST /api/assets/copy` with one new optional body param:
+- `latestVersionOnly?: boolean` — when true, only copy the asset with the highest `version` number in the stack (instead of all).
 
-## Data Flow: Comment Count
+"Strip comments" requires no backend change since comments never copy today.
 
-```
-Page load
-  → GET /api/assets?projectId=X&folderId=Y
-  → Server scans comments collection (projectId == X)
-  → Builds commentCountMap keyed by assetId
-  → Injects asset._commentCount for each grouped asset
-  → JSON response to client
-  → useAssets hook stores in local state
-  → AssetCard reads (asset as any)._commentCount  ← NEW
-  → AssetListView reads (asset as any)._commentCount  ← existing
+Modified copy logic when `latestVersionOnly: true`:
+```typescript
+// allVersions is sorted ascending by version
+const toActuallyCopy = latestVersionOnly
+  ? [allVersions[allVersions.length - 1]]
+  : allVersions;
+// Set version = 1 and new versionGroupId on the single copy
 ```
 
-This is a static count at list time. It does not update when new comments arrive without a page reload or explicit refetch. This is the same behavior as the list view. Real-time counts would require a Firestore listener per-asset in the grid, which is expensive; static is the right call here.
+**Component changes**
+
+Replace the simple folder-pick flow in `AssetCard` with a `SmartCopyModal` that shows:
+- Folder picker (reuse existing inline folder list from `openCopyTo`)
+- Toggle: "Latest version only" (default on)
+- Toggle: "Without comments" (cosmetic label only — comments never copy; shown for user clarity)
+- Copy button
+
+`SmartCopyModal` is a new component (~80 lines). Can be collocated in `AssetCard.tsx` or extracted to `components/files/SmartCopyModal.tsx`.
+
+**Dependencies:** None. REVIEW-01/02 are a single unit.
 
 ---
 
-## Build Order (Dependency-Driven)
+### 4. Selection-Based Review Links (REVIEW-03)
 
-**Phase order recommendation:**
+**What changes**
 
-1. **Timecode frame bug fix** — Zero dependencies, zero risk, isolated to `VideoPlayer.tsx`. Ship first to unblock QA on other player features.
+Review links are currently scoped to `folderId | null`. The new scope is an explicit `assetIds: string[]`.
 
-2. **Safe zones opacity slider** — Isolated to `SafeZonesOverlay.tsx` + `VideoPlayer.tsx`. No new components. Can be done in the same session as the timecode fix.
+**Firestore changes**
 
-3. **Comment count on AssetCard** — One-line read from an already-available field. No API changes. Completely independent of everything else.
+Add optional field to `reviewLinks` collection:
 
-4. **File information tab** — Requires: (a) adding tab state to `AssetViewerPage`, (b) creating `FileInfoPanel`. Independent of grid features. Should be done before the grid features since it modifies `page.tsx` which the comparison feature might also touch.
+```
+assetIds?: string[]   // when present, link shows only these specific assets
+```
 
-5. **Asset comparison modal** — Requires: `AssetCompareModal` (new), `FolderBrowser` multi-select action bar update. `VersionComparison` already exists. No API changes. Does not block version-stack DnD.
+When `assetIds` is set, `folderId` should be null (or set to the source folder for breadcrumb context). The resolution logic in the token GET route checks `assetIds` first.
 
-6. **Version stacking via DnD** — Most complex. Requires: `AssetCard` drop handling, `AssetGrid` prop threading, `FolderBrowser` orchestration, and the new `POST /api/assets/merge-version` route. Build the API route first, test it, then wire up the UI.
+```typescript
+// Add to ReviewLink interface (types/index.ts):
+assetIds?: string[];
+```
 
-**Rationale for ordering:**
-- Bug fixes first — no risk, immediate value.
-- Read-only UI changes (comment badge, file info, opacity) before write operations (merge-version).
-- Comparison modal before version stacking — both touch `FolderBrowser` but comparison is read-only; having it working makes it easier to visually verify that version stacking produces the right result.
-- Version stacking last because it has the only new API route and the highest data-integrity risk (renumbering version fields).
+**API changes**
 
----
+`POST /api/review-links` — accept optional `assetIds: string[]` in body and store in Firestore.
 
-## Anti-Patterns to Avoid
+`GET /api/review-links/[token]` — modify asset resolution:
+```typescript
+if (link.assetIds?.length) {
+  // db.collection('assets').where('__name__', 'in', link.assetIds).get()
+  // Note: Firestore 'in' is capped at 30; batch into chunks for >30
+} else {
+  // existing folderId-scoped query (unchanged)
+}
+```
 
-### Anti-Pattern 1: Raw PUT for Version Group Merge
-**What it is:** Calling `PUT /api/assets/[sourceId]` with `{ versionGroupId: targetGroupId }` directly from the client to perform a version merge.
-**Why it's bad:** A version stack can have multiple members. A single-asset PUT leaves sibling assets in the source group with a stale `versionGroupId`. The grid then shows orphaned version groups or incorrect `_versionCount` badges.
-**Instead:** Use the dedicated `POST /api/assets/merge-version` endpoint that batch-updates all group members atomically.
+**Component changes**
 
-### Anti-Pattern 2: Real-Time Firestore Listener for Comment Counts in Grid
-**What it is:** Adding `onSnapshot` listeners on the `comments` collection inside `AssetCard` or `AssetGrid` to keep counts live.
-**Why it's bad:** A grid with 40 assets would open 40 concurrent Firestore listeners. This hits billing limits, slows initial render, and is architecturally inconsistent with the rest of the app.
-**Instead:** Use the server-computed `_commentCount` from the list API. Accept eventual consistency; counts update on next page load or manual refetch.
+- `FolderBrowser` — when `selectedIds.size > 0`, show "Create review link from selection" in the selection action toolbar (currently has Delete, Download, Compare). Click opens `CreateReviewLinkModal` with `assetIds` prop.
+- `CreateReviewLinkModal` — add optional `assetIds?: string[]` prop. When provided, show "Scoped to X assets" label instead of folder picker section. Pass `assetIds` to `POST /api/review-links` body.
 
-### Anti-Pattern 3: New Comparison Route with URL-Encoded Signed URLs
-**What it is:** Creating `/projects/[projectId]/compare?a=id1&b=id2` and re-fetching signed URLs server-side.
-**Why it's bad:** Signed URLs are time-limited (120s). A comparison route that re-fetches on navigate works, but is slower and adds latency vs. the modal approach which reuses already-fetched assets.
-**Instead:** Use a client-side modal that receives the `Asset` objects (including their cached `signedUrl`) directly from the parent grid state.
-
-### Anti-Pattern 4: Hardcoding FPS in File Info Panel
-**What it is:** Displaying `30 fps` as the frame rate in `FileInfoPanel` when no `frameRate` field exists in Firestore.
-**Why it's bad:** Misleads users reviewing 24fps film or 60fps content.
-**Instead:** Show `—` when `frameRate` is absent. Log a TODO to extract fps at upload time.
+**Dependencies:** None from other v1.4 features.
 
 ---
 
-## Scalability Considerations
+### 5. Compare View Audio & Comments (COMPARE-01 + COMPARE-02)
 
-| Concern | Current scale | Implication |
-|---|---|---|
-| Comment count scan | Scans all comments for a project on every grid load | Fine at <10K comments; add Firestore index or denormalized counter if counts exceed that |
-| Version merge batch | Touches N docs in one Firestore batch | Batches are capped at 500 writes; version stacks are never that large — no concern |
-| Comparison modal assets | Two `<video>` elements simultaneously | Two concurrent signed URL streams; modern browsers handle this without issue |
-| Safe zone overlay | One `<img>` per active zone | Negligible |
+**What changes**
+
+`VersionComparison` currently has a single shared `muted` boolean and no comment display. Need per-side audio control and per-version comment panel.
+
+**Firestore changes**
+
+None. Comments are already fetchable via `GET /api/comments?assetId=X`.
+
+**API changes**
+
+None. `GET /api/comments` already accepts `assetId` query param.
+
+**Component changes — VersionComparison.tsx**
+
+Significant internal refactor; no prop interface change (still receives `versions: Asset[]`):
+
+**COMPARE-01 — per-side audio:**
+- Replace `muted: boolean` with `mutedA: boolean, mutedB: boolean`.
+- `VersionLabel` subcomponent (already exists) gains a mute toggle icon button.
+- "Click version label to switch audio" behavior: clicking the label for side B unmutes B and mutes A; clicking side A does the reverse. Implement as `handleLabelAudioToggle(side: 'A' | 'B')`.
+- `videoARef.current.muted = mutedA`, `videoBRef.current.muted = mutedB` in the relevant `useEffect`.
+
+**COMPARE-02 — per-version comments:**
+- Add state: `commentsA: Comment[], commentsB: Comment[], commentsLoading: boolean`.
+- `useEffect` on `[selectedIdA, selectedIdB]` — parallel fetch `GET /api/comments?assetId={selectedIdA}` and `GET /api/comments?assetId={selectedIdB}`. Requires `useAuth` hook for token.
+- Add a comment panel below the video. Simplest approach: a tab row ("V{A.version} comments" | "V{B.version} comments") showing the relevant list. Active tab tracks the "audio-active" side.
+- `Comment` type is already in `src/types/index.ts`.
+
+**Data flow note:** `VersionComparison` receives `versions: Asset[]` from `GET /api/assets/[assetId]` which already returns the full version set. Comment fetch is additive local state.
+
+**Dependencies:** Build COMPARE-01 (audio) before COMPARE-02 (comments) — the "active side" concept set up for audio is reused to drive comment panel tab selection.
 
 ---
 
-## Sources
+### 6. Move to Folder (MOVE-01)
 
-- Code read directly: `src/app/(app)/projects/[projectId]/assets/[assetId]/page.tsx`, `src/components/files/AssetCard.tsx`, `src/components/files/AssetGrid.tsx`, `src/components/files/FolderBrowser.tsx`, `src/components/viewer/VideoPlayer.tsx`, `src/components/viewer/SafeZonesOverlay.tsx`, `src/components/viewer/CommentSidebar.tsx`, `src/app/api/assets/route.ts`, `src/app/api/assets/[assetId]/route.ts`, `src/types/index.ts`
-- Pattern: Firestore batch write limit = 500 operations (Firestore documentation, HIGH confidence)
-- Pattern: `requestAnimationFrame` threshold gating causing sub-threshold updates to be dropped (inferred from code, HIGH confidence — bug is directly visible in `stepFrame` vs rAF loop logic)
+**What changes**
+
+The "Move to" option already appears in `AssetCard`'s context menu and calls `onRequestMove?.()`. `FolderBrowser.handleRequestMoveItem` already responds by setting `selectedIds` to just that asset and opening the move modal. `handleMoveSelected` calls `PUT /api/assets/[assetId]` with `{ folderId }`. The PUT route already batch-moves all versions.
+
+**In other words: the full move-to-folder pipeline already exists.** The question is whether the prop wire is connected.
+
+The chain to verify:
+```
+FolderBrowser → <AssetGrid onRequestMove={handleRequestMoveItem} ... />  ← verify
+AssetGrid     → <AssetCard onRequestMove={() => onRequestMove(asset.id)} ... />  ← exists
+AssetCard     → ContextMenu "Move to" onClick={() => onRequestMove?.()}  ← exists
+```
+
+If `FolderBrowser` already passes `onRequestMove` to `AssetGrid`, MOVE-01 is complete. If not, the fix is one line: add `onRequestMove={handleRequestMoveItem}` to the `<AssetGrid>` JSX in `FolderBrowser`.
+
+**API changes:** None.
+
+**Firestore changes:** None.
+
+**Dependencies:** None. Verify first in the build — may be a no-op feature.
+
+---
+
+## Firestore Schema Diff (v1.3 → v1.4)
+
+| Collection | Field | Change | Type | Notes |
+|------------|-------|--------|------|-------|
+| `assets` | `reviewStatus` | ADD | `'approved' \| 'needs_revision' \| 'pending'` | Optional; absence = pending |
+| `reviewLinks` | `assetIds` | ADD | `string[]` | Optional; when present, folderId scope is bypassed |
+
+No other schema changes required. Existing `version` and `versionGroupId` fields cover all VSTK-01 needs.
+
+---
+
+## API Route Diff (v1.3 → v1.4)
+
+| Route | Method | Change | Purpose |
+|-------|--------|--------|---------|
+| `/api/assets/reorder-versions` | POST | NEW | Batch-update version numbers for a group in given order |
+| `/api/assets/unstack-version` | POST | NEW | Eject one asset from its version group |
+| `/api/assets/copy` | POST | MODIFY | Add `latestVersionOnly?: boolean` param |
+| `/api/assets/[assetId]/status` | PUT | NEW (optional) | Validated reviewStatus update with enum check |
+| `/api/review-links` | POST | MODIFY | Accept and store `assetIds?: string[]` |
+| `/api/review-links/[token]` | GET | MODIFY | Resolve assets from `assetIds` array when present |
+
+---
+
+## Component Diff (v1.3 → v1.4)
+
+### Modified Components
+
+| Component | File | Nature of Change |
+|-----------|------|-----------------|
+| `VersionStackModal` | `AssetCard.tsx` (collocated) | Add drag-to-reorder rows, Unstack button, Save order action |
+| `AssetCard` | `components/files/AssetCard.tsx` | Add reviewStatus badge + picker, replace copy modal with SmartCopyModal |
+| `AssetListView` | `components/files/AssetListView.tsx` | Add reviewStatus column |
+| `FolderBrowser` | `components/files/FolderBrowser.tsx` | Add status filter bar; add "Create review link from selection" toolbar action |
+| `VersionComparison` | `components/viewer/VersionComparison.tsx` | Per-side audio mute state; comment fetch + display per selected version |
+| `CreateReviewLinkModal` | `components/review/CreateReviewLinkModal.tsx` | Accept `assetIds?` prop; send to API; show scoped label |
+| `types/index.ts` | `src/types/index.ts` | Add `ReviewStatus` type; update `Asset` and `ReviewLink` interfaces |
+
+### New Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `SmartCopyModal` | `components/files/SmartCopyModal.tsx` or collocated in `AssetCard.tsx` | Copy options: latest-version-only toggle, strip-comments label, folder picker |
+| `ReviewStatusBadge` | Inline in `AssetCard` or `components/files/ReviewStatusBadge.tsx` | Colored pill badge with click-to-change popover |
+| `CompareCommentPanel` | Collocated in `VersionComparison.tsx` | Renders comment list for one version side in compare view |
+
+---
+
+## Suggested Build Order
+
+```
+1. MOVE-01     — verify prop wire; likely 0-1 lines, clears the requirement
+2. VSTK-01     — version stack reorder + unstack (2 new API routes + modal UI)
+3. STATUS-01   — reviewStatus type + badge + filter (touches many files, each small)
+4. REVIEW-01/02 — smart copy (1 API param + SmartCopyModal)
+5. REVIEW-03   — selection review links (schema + 2 API changes + modal prop)
+6. COMPARE-01  — per-side audio mute in VersionComparison
+7. COMPARE-02  — per-version comments in VersionComparison
+```
+
+**Ordering rationale:**
+- MOVE-01 first: lowest risk, may already work entirely, surfaces quickly.
+- VSTK-01 second: self-contained, new API routes + modal behavior, good warm-up.
+- STATUS-01 third: new type + Firestore field + UI badge — many files but each change is small and independent.
+- REVIEW-01/02 fourth: one API param change + one new modal component — low risk.
+- REVIEW-03 fifth: depends on understanding the copy patterns established in REVIEW-01/02; Firestore and API changes are straightforward.
+- COMPARE-01/02 last: most self-contained (changes stay inside VersionComparison.tsx) but most complex internal state work — best done with all other features cleared.
+
+---
+
+## Cross-Cutting Concerns
+
+### Optimistic UI Pattern
+
+The codebase uses a consistent pattern: call API, on success call `onDeleted?.()` / `onVersionUploaded?.()` / `onCopied?.()` to trigger `refetchAssets()` in FolderBrowser. For VSTK-01 reordering: update local `orderedVersions` state immediately, then call API; on error, refetch to revert.
+
+### Batch Atomicity Pattern
+
+All multi-asset writes use `db.batch()` (established in merge-version and PUT with folderId). VSTK-01 reorder and unstack must follow this pattern.
+
+### Auth Pattern
+
+All API routes: `getAuthenticatedUser(request)` then `canAccessProject(user.id, projectId)`. New routes must follow the same pattern exactly.
+
+### reviewStatus vs status Naming
+
+The existing `AssetStatus = 'uploading' | 'ready'` maps to the `status` field in Firestore. The new QC field must be `reviewStatus` everywhere — in Firestore documents, in the TypeScript `Asset` interface, and in API request/response bodies — to avoid collision.
+
+### Firestore in-query Limit for assetIds
+
+Firestore `where('__name__', 'in', ids)` is capped at 30 items per clause. Review selection-based links with more than 30 assets need multiple batched queries merged client-side. In practice, review selections are small, but the batch logic should be in place from the start.

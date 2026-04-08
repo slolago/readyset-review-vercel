@@ -1,415 +1,250 @@
-# Feature Landscape: v1.3 Video Review Polish
+# Feature Landscape — v1.4 Review & Version Workflow
 
-**Domain:** Video review platform (Frame.io-style)
-**Researched:** 2026-04-07
-**Confidence:** HIGH — based entirely on codebase analysis + known video review tool conventions
-
----
-
-## Codebase Context Summary
-
-Before speccing each feature, key facts about the existing system:
-
-- Drag-to-move uses `dataTransfer.setData('application/x-frame-move', JSON.stringify({ ids }))` — a custom MIME type
-- Version stacks use `versionGroupId` on the `Asset` document (Firestore); the root asset's `id` is the canonical `versionGroupId`
-- Version stack management already exists via `VersionStackModal` in `AssetCard`
-- `VersionComparison` is a wipe/slider component for comparing two *versions of the same stack* — triggered by `compareMode` in the viewer
-- `Asset` type already stores `width`, `height`, `duration`, `size`, `mimeType` — but NOT `fps`, `codec`, or `bitrate`
-- `SafeZonesOverlay` renders a PNG at 100% width/height with no `opacity` prop
-- `AssetCard` shows a version badge (`V{n}`, Layers icon) and version count in footer — but NO comment count badge
-- `AssetListView` already has a `_commentCount` column (from `asset._commentCount`)
-- `Asset` type has `_commentCount?: number` already defined
-- Timecode: `formatSMPTE` uses `Math.floor(t * DEFAULT_FPS) % DEFAULT_FPS` for frame number; `DEFAULT_FPS = 30` hardcoded; `currentTime` state is updated via a rAF loop with 0.25s threshold (which means frame-step does not always trigger a state update)
+**Domain:** Media review / video production QC platform (Frame.io clone)
+**Researched:** 2026-04-08
+**Confidence:** HIGH (codebase verified) / MEDIUM (UX patterns, Frame.io docs via search)
 
 ---
 
-## Feature 1: Version Stacking via Drag & Drop
+## Existing Codebase Snapshot (what we're building on)
 
-### What it is
-User drags asset A (the "dragged" card) and drops it onto asset B (the "target" card) in grid or list view. The result is that A gets added to B's version stack — B becomes the canonical root, A becomes a new version number.
+Key facts that constrain every feature below:
 
-### Expected UX Behavior (Table Stakes)
-
-**Drag initiation**
-- Dragging an AssetCard already fires `onDragStart` which sets `application/x-frame-move` in dataTransfer
-- A new MIME type should be added alongside: `application/x-frame-version-stack` carrying the dragged asset's ID
-- OR: the existing payload type is reused but the drop target (an AssetCard, not a Folder) detects the drop
-
-**Visual feedback while dragging over an asset card (drop target)**
-- The target AssetCard changes its border to the accent color (`border-frame-accent`) — same treatment as folder drop targets use `isDropTarget` today
-- A tooltip or label appears on the card: "Stack as new version" or "Add to version stack"
-- The cursor changes to `copy` or a stack icon (not `move` — this is version-stacking, not moving)
-- Cards that are NOT valid drop targets (same asset, uploading asset, or asset already in a different version group with incompatible type) should show a `not-allowed` cursor on hover
-
-**Drop confirmation**
-- On drop, show a confirmation toast: "Added [asset A name] to [asset B name]'s version stack"
-- The dragged card (A) disappears from the grid because it is now a version within B's stack — B's version count badge increments
-- No confirmation dialog required — this mirrors how Frame.io handles it (immediate, undoable via version stack management)
-
-**What happens to the data**
-- Asset A's `versionGroupId` is updated to match asset B's `versionGroupId` (or asset B's `id` if B had no stack)
-- Asset A's `version` number is set to `max(existing versions in group) + 1`
-- If asset A already had its own version stack (A is itself a root with versions A1, A2, A3), the entire A stack merges into B's stack — all A-stack members get their `versionGroupId` rewritten to B's group ID, and their version numbers are renumbered to continue from where B's stack ends
-
-**Collision case: both assets already have different stacks**
-- This is the hard case. The expected behavior in Frame.io is: the *dragged* asset's entire version group merges into the *target*'s version group
-- The target stack "wins" the group ID
-- Version numbers are renumbered: existing B-group versions keep their numbers; A-group versions get renumbered starting from `maxBVersion + 1`
-- The merge should happen server-side in a single API call to avoid partial state
-- After merge: only one card remains visible in the grid (the target B), showing the combined version count
-
-**What does NOT happen**
-- No dialog asking "which stack wins" — the drop target always wins
-- No undo in-product (user can use "Manage version stack" to delete versions if they made a mistake)
-- Dropping a folder onto an asset card does nothing (only asset-to-asset stacking is supported)
-- Dropping multiple selected assets onto a card does nothing (or shows an error toast) — version stacking is one-at-a-time for clarity
-
-**Invalid drop cases**
-- Dropping an asset onto itself: no-op, no feedback
-- Dropping an asset onto an uploading card: blocked (`isUploading` guard)
-- Dropping onto a card that is part of the same version group: no-op (they are already stacked)
-
-### Nice-to-Have
-- Shift-key modifier: holding Shift while dragging shows "Stack" indicator, without Shift dragging moves to a folder — disambiguates the two drag behaviors when cursor is over an asset card
-- Actually Frame.io uses drag over asset card = stack, drag over folder = move, which is cleaner — worth adopting without a modifier key
-
-### Implementation Notes (for roadmap authors)
-- The current `handleItemDragStart` in `FolderBrowser` fires for all items; AssetCard itself also gets `onDragStart` forwarded — the grid-level handler needs to add asset card drop targets with `onDragOver` / `onDrop`
-- A new API endpoint or extension of `PUT /api/assets/[assetId]` needs to handle the `versionGroupId` reassignment — including the full-group-merge case
-- The `application/x-frame-move` type must remain as-is to avoid breaking existing folder-drop logic; version-stack DnD should use a DIFFERENT type: `application/x-frame-stack`
+- `Asset.status` is currently `'uploading' | 'ready'` — no QC status field exists yet
+- `ReviewLink` is folder-scoped only (`folderId: string | null`) — no asset-ID list field exists
+- `VersionStackModal` only shows delete per version — no reorder or unstack
+- `VersionComparison` has one global muted toggle; audio is actually always muted on side B (hardcoded `muted` on `videoBRef`); no comment sidebar at all in compare view
+- `AssetCard` context menu already has "Move to" item calling `onRequestMove` — the callback is wired in `AssetGrid` but the actual folder-picker + API move is not implemented
+- `AssetFolderPickerModal` already exists (used for "Copy to") — reusable for "Move to"
+- `CreateReviewLinkModal` already has `showAllVersions` toggle — no "latest only" or "strip comments" options
 
 ---
 
-## Feature 2: Asset Comparison View (Cross-Asset)
+## Table Stakes
 
-### What it is
-User selects 2 assets from the grid (multi-select checkboxes), right-clicks or uses a toolbar button to choose "Compare assets", and sees a side-by-side or split view of both assets with synchronized playback.
+Features that production teams expect in any serious media review tool. Absence makes the product feel unfinished.
 
-### Distinguishing from Existing VersionComparison
-The existing `VersionComparison` component is a wipe/slider between two versions of the *same* stack, accessed from the viewer header. This is a DIFFERENT feature: comparing two *independent* assets (different files, potentially different projects or folders). The UI entry point is the grid/list multi-select context, not the viewer.
-
-### Expected UX Behavior (Table Stakes)
-
-**Entry point**
-- User selects exactly 2 assets using the checkbox multi-select already in the grid
-- A "Compare" button appears in the bulk-action toolbar that appears when items are selected
-- Right-clicking a selected group also shows "Compare assets" in the ContextMenu (only visible when exactly 2 assets are selected)
-- Selecting more than 2 shows the button disabled with a tooltip "Select exactly 2 assets to compare"
-
-**Comparison view layout**
-- Opens in a full-screen or full-panel view replacing the current grid
-- Two video players side by side (50/50 split, not a wipe slider — this is side-by-side, not wipe)
-- Each panel has its own asset name label at the top
-- A shared scrubber at the bottom controls both players simultaneously
-- Play/Pause button controls both videos together
-- Both videos seek to the same time when the scrubber is used
-
-**Synchronization behavior**
-- Play is synchronized: both videos start at the same instant
-- Seek is synchronized: scrubbing one scrubber moves both
-- Frame stepping (if controls are provided) steps both by one frame
-- If the two videos have different durations, the shorter one stops at its end while the longer continues (or both stop at the shorter duration — the simpler choice)
-- Audio: only one side plays audio at a time; a toggle button lets user switch which side has audio
-
-**Exit comparison**
-- A prominent "Exit comparison" or "X" button at the top returns to the grid view
-- Browser back button also exits
-
-**Comparison for images**
-- If both assets are images: side-by-side static images, no playback controls
-- A zoom control (scroll or pinch) that is synchronized between both panels would be nice-to-have but not required
-
-### Nice-to-Have
-- "Sync lock" toggle to temporarily unsync playback (so user can independently scrub each side)
-- Swapping which asset is left vs right
-- Wipe/slider mode as alternative to side-by-side (this already exists in `VersionComparison` — could be reused)
-
-### Table Stakes vs Nice-to-Have
-
-| Behavior | Table Stakes | Nice-to-Have |
-|----------|-------------|--------------|
-| Side-by-side layout | YES | |
-| Synchronized play/pause | YES | |
-| Synchronized seek scrubber | YES | |
-| Asset name labels on each side | YES | |
-| Exit button | YES | |
-| Audio toggle per side | YES | |
-| Sync-lock toggle | | YES |
-| Wipe/slider mode | | YES |
-| Image zoom sync | | YES |
-
-### Implementation Notes
-- The existing `VersionComparison` is a wipe component — it can be referenced for the video sync logic (event listeners on video A drive video B)
-- This feature needs a new route or modal since it operates on 2 arbitrary assets, not on the viewer page
-- Option A: Navigate to a new `/compare?a=[id]&b=[id]` route
-- Option B: Open a full-screen modal overlay from the grid
-- Option B avoids URL complexity and is simpler to implement for v1.3
-- The `FolderBrowser` selection state already tracks `selectedIds: Set<string>` — the compare action can read from this
+| Feature | Why Expected | Complexity | Codebase Hook |
+|---------|--------------|------------|---------------|
+| VSTK-01a: Unstack individual version | Frame.io legacy + V4 both support it. Users need to rescue a misplaced file from a stack without deleting it. | Medium | Extend `VersionStackModal`; new API endpoint to detach version from `versionGroupId` |
+| VSTK-01b: Reorder versions within a stack | Frame.io V4 added PATCH reorder in 2025. Editors expect V1/V2/V3 labels to reflect chronological or intentional order. Without this, version numbers get confusing when files are merged in the wrong order. | Medium-High | Drag-to-reorder in `VersionStackModal`; new API to update `version` numbers atomically |
+| STATUS-01: APPROVED / status label on asset card | Frame.io has shipped "Needs Review", "In Progress", "Approved" since at least v2. A green APPROVED badge on a thumbnail is the single clearest QC signal in a grid. | Low-Medium | New `labelStatus` field on `Asset` type; badge in `AssetCard` thumbnail overlay |
+| MOVE-01: "Move to..." folder picker | Already scaffolded in context menu and `AssetGrid`. Drag-to-move exists for grid drop targets. Context menu "Move to" stub exists but does nothing. Users expect right-click → Move to → folder tree. | Low | `AssetFolderPickerModal` is reusable; just needs a Move API route and the parent to wire `onRequestMove` |
+| COMPARE-01: Click version label to switch active audio | Current compare view: audio hardcoded muted on side B. The single audio toggle mutes/unmutes side A only. This is a known gap — in Frame.io, clicking either version label makes that side the "audio source." | Medium | Change `VersionComparison` to track `activeAudioSide: 'A' | 'B'`; apply `muted` based on it |
+| COMPARE-02: Compare view shows active version's comments | Frame.io V4's Comparison Viewer explicitly supports "leave comments on either version." Without this, compare mode is a dead end for QC — no feedback possible. | High | Requires passing `projectId` + `assetId` into `VersionComparison`; render `CommentSidebar` filtered to active version |
 
 ---
 
-## Feature 3: File Information Tab
+## Differentiators
 
-### What it is
-A second tab in the comment sidebar panel (alongside the existing "Comments" tab) labeled "Info" or "File info" that displays technical metadata about the asset.
+Features beyond baseline that add meaningful workflow value for production QC pipelines. Not expected, but valued.
 
-### Expected UX Behavior (Table Stakes)
-
-**Tab placement**
-- The sidebar currently has no tab structure — it is always the comment list + comment input
-- Add a tab bar at the top of the sidebar with two tabs: "Comments" and "Info"
-- "Comments" tab is the default and shows existing content unchanged
-- "Info" tab shows the file metadata panel
-
-**Metadata displayed (table stakes)**
-
-| Field | Source | Format |
-|-------|--------|--------|
-| File name | `asset.name` | Plain text |
-| File type | `asset.mimeType` | e.g. "video/mp4" |
-| File size | `asset.size` | Human-readable, e.g. "142.3 MB" (already have `formatBytes`) |
-| Duration | `asset.duration` | MM:SS format (already have `formatDuration`) |
-| Resolution | `asset.width x asset.height` | e.g. "1920 x 1080" |
-| Aspect ratio | computed from width/height | e.g. "16:9" |
-| Uploaded by | `asset.uploadedBy` | User name string |
-| Upload date | `asset.createdAt` | Human-readable date |
-| Version | `asset.version` | "V3" |
-
-**Metadata NOT in Firestore (requires extraction)**
-The following fields are NOT currently stored on the `Asset` document and require additional work:
-
-| Field | Gap | Solution |
-|-------|-----|----------|
-| FPS / frame rate | Not stored | Must be extracted at upload time via ffprobe (server-side) or read from `videoRef.current` after load |
-| Codec | Not stored | Requires ffprobe server-side; browser cannot read this reliably |
-| Bitrate | Not stored | Requires ffprobe server-side |
-
-**Recommendation for v1.3:** Display only what is already in Firestore. Show `width x height`, `duration`, `size`, `mimeType`, `uploadedBy`, `createdAt`, `version`. Add an `fps` field stub (display "—" if not present) so the schema is future-ready. Do NOT block this feature on ffprobe integration — that is a separate infrastructure task.
-
-**Layout**
-- Each field is a label + value row
-- Labels are muted text (like `text-frame-textMuted`), values are white
-- Group fields into sections: "File" (name, type, size) and "Video" (duration, resolution, fps, codec)
-- For image assets: hide the "Video" section, show "Image" section instead (resolution only)
-
-### Nice-to-Have
-- Copy button next to the file name
-- "Open in new tab" link
-- Color space / HDR indicator
-
-### Table Stakes vs Nice-to-Have
-
-| Field | Table Stakes | Nice-to-Have |
-|-------|-------------|--------------|
-| Name, size, type | YES | |
-| Duration, resolution | YES | |
-| Uploaded by, date | YES | |
-| Aspect ratio computed | YES | |
-| FPS (if stored) | YES (show "—" if missing) | |
-| Codec | | YES (requires ffprobe) |
-| Bitrate | | YES (requires ffprobe) |
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| REVIEW-03: Selection-based review link | Frame.io V4 supports sharing specific assets from anywhere. Folder-scoped links force users to create folders just to share a subset. Selection-based links enable "share exactly these 3 hero shots" without folder reorganization. | Medium-High | `ReviewLink` needs an `assetIds: string[]` field alongside `folderId`; review page logic must union both |
+| REVIEW-01: Smart copy — latest version only | When copying a version-stacked asset to Client Facing Folder, copying the whole stack is noise. "Latest only" copies only the highest-version asset. Reduces clutter for clients. | Low-Medium | `POST /api/assets/copy` needs a `latestVersionOnly: boolean` flag; server looks up stack and copies only the max-version asset |
+| REVIEW-02: Copy without comments | Stripping comments on copy-to-client-folder is a common production gate. The client should not see internal notes ("ADD LOGO HERE") when they receive the deliverable copy. | Low | `POST /api/assets/copy` needs a `stripComments: boolean` flag; server skips the comment-copy step if set |
+| STATUS-01b: Status filter in grid | Once APPROVED labels exist, users want to filter "show only unapproved" to find remaining work. A single-click filter chip above the grid is standard in Filestage and Frame.io. | Low-Medium | Client-side filter on the assets array; no API change needed |
 
 ---
 
-## Feature 4: Safe Zones Opacity Slider
+## Anti-Features
 
-### What it is
-A slider control next to the safe zones selector that adjusts the transparency of the safe-zone PNG overlay.
+Things that would seem natural to add but should be explicitly avoided in v1.4.
 
-### Expected UX Behavior (Table Stakes)
-
-**Control placement**
-- Immediately to the right of the existing `SafeZoneSelector` dropdown in the video player controls bar
-- The slider is only visible when a safe zone is active (i.e., `activeSafeZone !== null`)
-- When no safe zone is selected the slider is hidden to avoid clutter
-
-**Slider behavior**
-- Range: 0% to 100% opacity (value 0.0 to 1.0)
-- Default: 100% (fully opaque) — same as current behavior
-- Dragging left makes the overlay more transparent
-- Dragging right makes it more opaque
-- Changes apply immediately (no confirm needed)
-
-**Persistence**
-- The opacity value does not need to persist across sessions; reset to 100% when a different safe zone is selected or when page is reloaded
-- Nice-to-have: persist in `localStorage` per safe zone or globally
-
-**Implementation**
-- `SafeZonesOverlay` currently has NO opacity prop — the `img` element uses no opacity style
-- Change: pass an `opacity` prop to `SafeZonesOverlay` and apply it as `style={{ opacity }}`
-- In `VideoPlayer`, add `safeZoneOpacity` state (default `1`), reset it when `activeSafeZone` changes
-- The slider renders as a small horizontal range input, same styling as the volume slider
-
-### Nice-to-Have
-- Preset buttons: 25%, 50%, 75% instead of a slider (simpler UX for mobile)
-- Label showing the current percentage ("75%")
-
-### Table Stakes vs Nice-to-Have
-
-| Behavior | Table Stakes | Nice-to-Have |
-|----------|-------------|--------------|
-| Slider 0–100% | YES | |
-| Only visible when safe zone active | YES | |
-| Immediate application | YES | |
-| Reset when safe zone changes | YES | |
-| Persist in localStorage | | YES |
-| Percentage label | | YES |
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Custom status label editor (user-defined statuses) | Frame.io V4 offers 32 custom metadata fields. This is significant scope and requires a settings UI, migration logic, and display logic for arbitrary strings. V1.4 is about QC workflow, not metadata customization. | Ship 4 fixed statuses: APPROVED, NEEDS_REVISION, IN_REVIEW, PENDING. That covers 95% of QC pipelines. |
+| Multi-approver workflow / approval gates | Workfront-style sequential approval chains are a product unto themselves. They require roles, notifications, deadlines, escalation. Out of scope. | The `allowApprovals` toggle on review links + APPROVED status label covers the lightweight use case adequately. |
+| Real-time comment sync in compare view | Live comment updates via Firestore subscription in the compare overlay would require a new subscription + presence system. The compare view is a focused diff tool, not a live collaboration surface. | Fetch comments once on side-switch; manual refresh if needed. |
+| Bulk status change (select all, then approve) | Adds selection state management in a second context, checkbox orchestration, and batch Firestore writes. Not worth the scope for v1.4. | Single-asset status change from context menu or asset viewer is sufficient. |
+| Version stack merge across folders | Merging versions from different folders raises complex ownership/path questions. | Keep drag-to-stack limited to same-folder assets, as it is today. |
 
 ---
 
-## Feature 5: Comment Count Badge on Grid View AssetCard
+## Feature Details by Ticket
 
-### What it is
-A visible comment count on each card in the grid view — matching what the list view already shows via `asset._commentCount`.
+### VSTK-01a — Unstack Individual Version
 
-### Expected UX Behavior (Table Stakes)
+**Expected UX:** In the "Version stack" modal, each row has two actions: Delete (existing) and Unstack. "Unstack" removes the version from the group but does NOT delete the file — it becomes a standalone asset in the same folder. Version numbers of remaining stack members are re-normalized.
 
-**Visual treatment**
-- A small badge overlaid on the card thumbnail, bottom-left corner
-- Uses a speech-bubble icon (or the existing `MessageCircle` from lucide) + count number
-- Only shown when `_commentCount > 0` — no badge for zero comments (avoids noise)
-- Same visual language as the duration badge (bottom-right): `bg-black/60 backdrop-blur-sm rounded text-xs text-white`
+**Edge cases:**
+- Unstacking when only 2 versions remain: the remaining asset also becomes standalone, stack is dissolved.
+- Unstacking the "group representative" asset (the one whose `id` is the stack head): group head should transfer to the next highest version.
+- UI: disable Unstack when only 1 version remains (same guard as Delete).
 
-**Position**
-- Bottom-left of the thumbnail — avoids collision with the existing duration badge (bottom-right) and type/version badges (top-left)
-- Alternative: inline in the card footer below the name, but overlay on thumbnail is more scannable
-
-**Content**
-- Shows only the number if small: "4"
-- For large numbers: "99+" (cap at 99 to avoid layout issues)
-
-**Data availability**
-- `asset._commentCount` already exists as an optional field on the `Asset` type
-- The assets API already computes this at fetch time for list view — verify it is also included in the grid view fetch (same endpoint, same response, so it should be)
-- No new backend work needed
-
-### Nice-to-Have
-- Tooltip on hover: "4 comments"
-- Red dot indicator for unresolved comments specifically (requires `_unresolvedCommentCount`)
-
-### Table Stakes vs Nice-to-Have
-
-| Behavior | Table Stakes | Nice-to-Have |
-|----------|-------------|--------------|
-| Comment count badge, >0 only | YES | |
-| Bottom-left of thumbnail | YES | |
-| "99+" cap | YES | |
-| Tooltip | | YES |
-| Unresolved-only indicator | | YES |
+**API:** `POST /api/assets/{id}/unstack` sets `versionGroupId = asset.id` (its own ID), sets `version = 1`, re-normalizes others in the stack.
 
 ---
 
-## Feature 6: Timecode Frame Mode Bug Fix
+### VSTK-01b — Reorder Versions
 
-### What the Bug Is
+**Expected UX:** In the "Version stack" modal, rows are drag-to-reorder (vertical drag handles on left side). Dropping a row re-assigns `version` numbers in displayed order. Version 1 = top of list = "oldest/base"; version N = bottom = "latest." Modal shows a "Save order" button that appears only after the order changes; idle state has no save button (no unnecessary cognitive load).
 
-When `timecodeMode === 'smpte'` (MM:SS:FF format) and the user presses the frame step buttons (ChevronLeft / ChevronRight), the timecode display does NOT update to show the new frame number.
+**Complexity note:** Firestore batch update of N version numbers. Need optimistic UI — reorder locally immediately, commit on "Save order," rollback on failure.
 
-### Root Cause Analysis
+**Dependency:** VSTK-01a (unstack) and VSTK-01b (reorder) both touch `VersionStackModal` — implement together.
 
-The rAF loop in `VideoPlayer` that drives `setCurrentTime` has a threshold guard:
+---
+
+### STATUS-01 — Asset Status Labels
+
+**Expected UX (Frame.io pattern):**
+- Status is a small colored badge on the thumbnail (bottom-left or alongside the type badge).
+- Status values: `APPROVED` (green), `NEEDS_REVISION` (red/orange), `IN_REVIEW` (yellow), `PENDING` (gray/default — visually absent or neutral).
+- `PENDING` is the default; badge only shows if status is not PENDING (same philosophy as comment count badge: hidden when zero).
+- Right-click context menu gets a "Set status" submenu with the 4 values.
+- In the asset viewer, status is also visible in the Info tab.
+- Clicking a status badge directly (on the card) opens the set-status submenu inline — matches Frame.io muscle memory.
+
+**Data model change:** Add `labelStatus?: 'APPROVED' | 'NEEDS_REVISION' | 'IN_REVIEW' | 'PENDING'` to `Asset` interface. Default absent/`PENDING`.
+
+**API:** `PATCH /api/assets/{id}` already exists (used for rename). Add `labelStatus` to the allowed update fields.
+
+**Visual design:** Use existing badge system (same pattern as V-count badge in `AssetCard`). Colors:
+- APPROVED: `bg-green-500/80` with check icon
+- NEEDS_REVISION: `bg-red-500/80` with X or alert icon
+- IN_REVIEW: `bg-yellow-500/80` with eye icon
+- PENDING: no badge (absent)
+
+---
+
+### REVIEW-01 + REVIEW-02 — Smart Copy to Client Facing Folder
+
+**Expected UX:** "Copy to" modal (`AssetFolderPickerModal`) gets two checkboxes at the bottom:
+- "Latest version only" (checked by default when asset has multiple versions)
+- "Strip comments" (unchecked by default)
+
+"Latest version only" only appears when the asset is in a version stack (version count > 1). "Strip comments" always appears.
+
+**API change:** `POST /api/assets/copy` body gains `latestVersionOnly?: boolean` and `stripComments?: boolean`. Server logic:
+- `latestVersionOnly = true`: fetch all versions in the `versionGroupId`, find max `version`, copy only that asset.
+- `stripComments = false` (default): existing behavior, copy comments too.
+- `stripComments = true`: copy asset record only, skip comment documents.
+
+**Dependency:** Reuses `AssetFolderPickerModal` — needs minor extension (two checkboxes added to footer area).
+
+---
+
+### REVIEW-03 — Selection-Based Review Links
+
+**Expected UX (Frame.io V4 pattern):**
+1. User selects 1+ assets using existing checkbox selection in the grid.
+2. In the bulk actions toolbar (already shown when `selectedIds.size > 0`), a new button: "Create review link."
+3. Opens `CreateReviewLinkModal` with a new mode: pre-populated with the selected asset IDs rather than a folderId.
+4. The created link routes to a review page that renders only those specific assets regardless of their folder location.
+5. Link label shows "X assets selected" instead of folder name.
+
+**Data model change:** `ReviewLink` gains `assetIds?: string[]`. When `assetIds` is set, `folderId` is null (mutually exclusive). Review page API must handle both modes.
+
+**Complexity:** Medium-High. The review page (`/review/[token]/page.tsx`) needs to handle asset-list mode: fetch each asset individually or via a batch query by IDs. The `ReviewLink` creation API must accept `assetIds`. The review page rendering is the same — just a different data source.
+
+**Dependency:** Existing selection infrastructure (`selectedIds`, `onToggleSelect`) and bulk actions toolbar.
+
+---
+
+### COMPARE-01 — Compare View Audio Switch by Click
+
+**Expected UX:** In `VersionComparison`, both version label buttons (A and B) act as the audio source selector. Clicking a label makes that side's video the audio source (the other is muted). Current active audio side should be visually indicated on the label (e.g., a speaker icon, or a subtle ring/glow vs. the current static A/B styling).
+
+**Current state:** Side A is the audio master; side B is always `muted`. The mute button mutes/unmutes side A only.
+
+**Implementation:** Add `activeAudioSide: 'A' | 'B'` state (default `'A'`). Apply `muted={activeAudioSide !== 'A'}` to videoA and `muted={activeAudioSide !== 'B'}` to videoB. `VersionLabel` button `onClick` sets `activeAudioSide` to its side. The existing global mute toggle (`muted` state) becomes a secondary mute-all override. Visual indicator: speaker icon on the active label, VolumeX on the inactive.
+
+**Complexity:** Low. Purely UI state change in `VersionComparison`. No API, no new components.
+
+---
+
+### COMPARE-02 — Compare View Shows Focused Version's Comments
+
+**Expected UX (Frame.io V4 pattern):** A comments sidebar is visible alongside the comparison viewer. Clicking a version label makes that version "active" — the sidebar shows that version's comments (filtered by `assetId`). Sidebar collapses/hides if toggled to keep the comparison area focused.
+
+**Current state:** `VersionComparison` has no sidebar, no comment loading, no `projectId` prop.
+
+**Implementation approach:**
+- Add `projectId: string` prop to `VersionComparison`.
+- Add `activeCommentSide: 'A' | 'B'` state (shares with COMPARE-01's `activeAudioSide` — clicking a label sets both audio and comment source).
+- Render `CommentSidebar` on the right, passing `assetId = activeCommentSide === 'A' ? assetA.id : assetB.id` and `projectId`.
+- Layout: comparison viewer takes remaining width, sidebar fixed width (~320px, same as normal viewer sidebar).
+- Add a toggle button to show/hide the sidebar (default shown).
+
+**Dependency:** COMPARE-01 (both features share the "click label = set active side" interaction). Implement together. Requires `CommentSidebar` to accept an `assetId` prop override (check if it reads from page context or props).
+
+**Complexity:** High. Layout restructure, new prop threading, comment subscription for `activeCommentSide`'s asset.
+
+---
+
+### MOVE-01 — Move to Folder Context Menu
+
+**Expected UX:** Right-click → "Move to" → folder picker modal (identical to "Copy to" modal but titled "Move to folder"). Selecting a destination removes the asset from its current folder and places it in the target. Toast "Moved to [folder name]."
+
+**Current state:** Context menu item exists, `onRequestMove` callback defined in `AssetCard`, passed up through `AssetGrid` props. Parent page (`folderId/page.tsx`) receives `onRequestMove` but the handler is not implemented — the move modal never opens.
+
+**API:** `PATCH /api/assets/{id}` with `{ folderId: targetFolderId }`. The existing rename route handles `PUT` with `name`. Confirm whether PATCH or PUT is used; extend to accept `folderId`.
+
+**Reuse:** `AssetFolderPickerModal` is already built with tree navigation. Rename title to "Move to folder" and highlight/disable the current folder row.
+
+**Complexity:** Low. The hard parts (picker modal, API patch route) either exist or are trivial extensions.
+
+---
+
+## Feature Dependencies Map
 
 ```
-if (scrubbing || Math.abs(t - lastReported) >= TIME_THRESHOLD) {
-  // TIME_THRESHOLD = 0.25
-```
+VSTK-01a (Unstack) ──┐
+                      ├── both touch VersionStackModal — implement in one pass
+VSTK-01b (Reorder) ──┘
 
-Stepping one frame at 30fps advances time by `1/30 ≈ 0.033s`. This is well below the 0.25s threshold. The rAF loop sees the new `currentTime` but does NOT call `setCurrentTime`, so React state does not update, and the displayed timecode stays frozen.
+COMPARE-01 (Audio switch) ──┐
+                             ├── both require "active side" concept — implement together
+COMPARE-02 (Comments)   ────┘
 
-In `mmss` mode (MM:SS) users do not notice because `formatDuration` only shows whole seconds — a 0.033s change would not change the display anyway. In `smpte` mode the frame number IS supposed to change by 1, but it does not because `currentTime` state is stale.
+REVIEW-01 (Latest only) ──┐
+                           ├── both extend AssetFolderPickerModal footer + copy API — implement together
+REVIEW-02 (Strip cmts) ───┘
 
-### Correct Behavior
-
-After each frame step, the timecode display in smpte mode should immediately update to show the new frame number. For example:
-- Current: `00:05:14` (5 seconds, frame 14)
-- Press next frame
-- Should immediately show: `00:05:15`
-- Shows instead: `00:05:14` (frozen until 0.25s has accumulated)
-
-### Fix Specification
-
-**Option A (simplest):** After calling `v.currentTime = ...` in `stepFrame`, immediately call `setCurrentTime(v.currentTime)`. Since the `videoRef.current.currentTime` update is synchronous for assignment (the seek may be async in the browser, but the value is set immediately), reading it back and setting state forces an immediate re-render with the correct timecode. This bypasses the rAF throttle for the specific step-frame action.
-
-**Option B:** Lower the `TIME_THRESHOLD` when `timecodeMode === 'smpte'` to `1/DEFAULT_FPS - epsilon`. But this re-renders at 30fps during normal playback in smpte mode — wasteful.
-
-**Option A is the correct fix.** It is a one-line addition in `stepFrame` and in the keyboard handler (`ArrowLeft` / `ArrowRight` with Shift modifier).
-
-**Also affects:** Keyboard frame-step (`Shift+ArrowLeft`, `Shift+ArrowRight`). The same fix must be applied in the keyboard handler that updates `v.currentTime`.
-
-### What Correct Behavior Should Look Like
-
-| Action | mmss display | smpte display |
-|--------|-------------|---------------|
-| Frame step forward | No change visible (sub-second) | Frame number increments by 1 immediately |
-| Frame step backward | No change visible | Frame number decrements by 1 immediately |
-| Normal playback | Updates per second | Updates per frame at 30fps (acceptable rAF behavior) |
-| Scrubbing | Updates smoothly | Updates smoothly |
-
-### Note on DEFAULT_FPS
-
-The current `DEFAULT_FPS = 30` constant is hardcoded. Real-world clips may be 23.976, 24, 25, 29.97, 50, or 60fps. For v1.3 the fix should use `DEFAULT_FPS` as-is. A proper fps-aware fix (reading `asset.fps` if stored, or detecting from video metadata) is a subsequent improvement tracked under Feature 3 (file info / metadata storage).
-
----
-
-## Anti-Features (Do NOT Build)
-
-| Anti-Feature | Why Avoid |
-|-------------|-----------|
-| Version stack DnD with multi-select | Merging 3+ stacks at once is ambiguous and error-prone; one-at-a-time is safer |
-| Comparison of more than 2 assets | 3-way comparison is niche and layout is hard; defer indefinitely |
-| Codec/bitrate in Info tab without ffprobe | Showing empty fields is misleading; show "—" or omit entirely |
-| Opacity slider visible when no safe zone active | Creates unnecessary clutter in the controls bar |
-| Comment badge for zero count | Zero-count badges add visual noise; only show when count > 0 |
-
----
-
-## Feature Dependencies
-
-```
-Feature 5 (comment badge) → depends on _commentCount being present in asset response
-  → already satisfied: _commentCount is typed on Asset, populated by list view endpoint
-
-Feature 4 (opacity slider) → depends on SafeZonesOverlay accepting opacity prop
-  → 3-line change to SafeZonesOverlay.tsx
-
-Feature 6 (timecode bug) → independent, no dependencies
-
-Feature 1 (version DnD) → depends on:
-  → new MIME type in drag payload (FolderBrowser.tsx + AssetCard.tsx)
-  → new API logic for versionGroupId reassignment + multi-asset group merge
-  → AssetCard gaining onDragOver / onDrop handlers (currently has none)
-  → AssetGrid passing those handlers down
-
-Feature 2 (comparison view) → depends on:
-  → multi-select already working (it is)
-  → new comparison page/modal component
-  → two video players with shared scrubber (can reference VersionComparison sync logic)
-
-Feature 3 (file info tab) → depends on:
-  → CommentSidebar gaining a tab bar
-  → existing Asset fields (width, height, duration, size, mimeType, createdAt, uploadedBy, version)
-  → fps is NOT in Firestore — show "—"
+REVIEW-03 (Selection link) ── independent; depends on existing selection infrastructure only
+MOVE-01               ── independent; depends on existing AssetFolderPickerModal only
+STATUS-01             ── independent; purely additive
 ```
 
 ---
 
-## MVP Recommendation
+## Recommended Implementation Order
 
-**Build in this order:**
+| Order | Ticket(s) | Rationale |
+|-------|-----------|-----------|
+| 1 | MOVE-01 | Already 80% scaffolded; highest leverage per hour; closes an open stub |
+| 2 | STATUS-01 | High visibility; pure data + badge addition; no complex state or layout |
+| 3 | COMPARE-01 | Low complexity; fixes a known audio UX bug; prerequisite for COMPARE-02 |
+| 4 | VSTK-01a + VSTK-01b | Single modal pass; atomic Firestore batch; medium complexity |
+| 5 | REVIEW-01 + REVIEW-02 | Single modal + API pass; low-medium complexity |
+| 6 | COMPARE-02 | Layout restructure + comment loading in new context; most complex after REVIEW-03 |
+| 7 | REVIEW-03 | Data model change + review page logic fork; highest risk, most cross-cutting |
 
-1. **Feature 6 (timecode bug)** — 1–2 line fix, zero risk, ships immediately
-2. **Feature 5 (comment count badge)** — minimal frontend change, no backend, high visibility
-3. **Feature 4 (opacity slider)** — small prop addition to SafeZonesOverlay + slider in VideoPlayer controls
-4. **Feature 3 (file info tab)** — tab bar + metadata display, no backend
-5. **Feature 1 (version DnD)** — new drag type + API endpoint for group merge, moderate complexity
-6. **Feature 2 (comparison view)** — largest new component, build last
+Defer to v1.5: STATUS-01b (grid filter by status) — no new data, purely client-side, but design space is already crowded in v1.4.
 
-**Defer:** fps/codec display in File Info tab until an ffprobe pipeline is added to the upload flow.
+---
+
+## Confidence Assessment
+
+| Feature | Confidence | Basis |
+|---------|------------|-------|
+| VSTK-01 UX patterns | HIGH | Frame.io V4 API docs confirm reorder + unstack operations; codebase read confirms current modal shape |
+| STATUS-01 UX patterns | HIGH | Frame.io ships Needs Review/In Progress/Approved since v2; developer forum confirms; `Asset` type confirmed has no `labelStatus` field |
+| REVIEW-01/02 UX patterns | MEDIUM | Inferred from production pipeline conventions; no exact Frame.io equivalent found (Frame.io does not copy stacks, it references them); pattern is sound |
+| REVIEW-03 UX patterns | HIGH | Frame.io V4 and legacy both confirm asset-selection review links; `ReviewLink` type confirmed folderId-only currently |
+| COMPARE-01 UX patterns | HIGH | Frame.io comparison viewer described as supporting per-side audio; codebase confirms current hardcoded mute on side B |
+| COMPARE-02 UX patterns | HIGH | Frame.io explicitly markets "leave comments on either version" in compare view; confirmed absent in current `VersionComparison` |
+| MOVE-01 UX patterns | HIGH | Universal pattern across all cloud storage / DAM tools; context menu stub confirmed in codebase |
 
 ---
 
 ## Sources
 
-- Codebase analysis: `src/components/viewer/VideoPlayer.tsx`, `src/components/viewer/VersionComparison.tsx`, `src/components/viewer/SafeZonesOverlay.tsx`, `src/components/files/AssetCard.tsx`, `src/components/files/AssetGrid.tsx`, `src/components/files/FolderBrowser.tsx`, `src/types/index.ts`, `src/app/api/assets/[assetId]/route.ts`
-- Frame.io V4 UX conventions (training data, MEDIUM confidence — verified against codebase structure)
-- Confidence: HIGH for all behavioral specs based on codebase + known video review tool patterns
+- [Frame.io Version Stacking (V4 Knowledge Center)](https://help.frame.io/en/articles/9101068-version-stacking) — confirms unstack + reorder operations
+- [Frame.io Comparison Viewer (V4)](https://help.frame.io/en/articles/9952618-comparison-viewer) — confirms per-side commenting and audio compare
+- [Frame.io Developer Forum — Asset Label Status](https://forum.frame.io/t/how-to-update-asset-label-status-via-frameio-api/939) — confirms Needs Review / In Progress / Approved status values
+- [Frame.io Shares (V4)](https://help.frame.io/en/articles/9105232-shares-in-frame-io) — confirms multi-asset selection in review links
+- [Frame.io V4 Changelog](https://developer.adobe.com/frameio/guides/Changelog/) — PATCH reorder version stacks added September 2025
+- Codebase read: `src/types/index.ts`, `src/components/files/AssetCard.tsx`, `src/components/viewer/VersionComparison.tsx`, `src/components/review/CreateReviewLinkModal.tsx`
