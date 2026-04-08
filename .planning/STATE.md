@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: — Video Review Polish
 status: Ready to plan
-stopped_at: ROADMAP.md + REQUIREMENTS.md created for v1.3
-last_updated: "2026-04-08T00:14:26.462Z"
+stopped_at: Completed 24-safe-zones-opacity 24-01-PLAN.md
+last_updated: "2026-04-08T00:24:41.516Z"
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
 ---
 
 # State
@@ -28,7 +28,7 @@ Planned — Milestone v1.3 roadmap complete (phases 23–28). Ready to plan Phas
 
 ## Last Session
 
-Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
+Stopped at: Completed 24-safe-zones-opacity 24-01-PLAN.md
 
 ## Decisions
 
@@ -74,6 +74,7 @@ Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
 - [Phase 20-01]: UserSearchCombobox passes selectedUser.email to existing collaborators POST API — no API contract change needed
 - [Phase 20-01]: Firestore prefix search requires 2+ characters; name query is case-sensitive (v1 limitation, nameLower field can be added later)
 - [Phase 21-admin-panel-polish]: Delete UserRoleSelect.tsx (dead code, stale 'admin'|'user' two-value type) rather than fix it
+- [Phase 24-safe-zones-opacity]: Opacity slider placed after SafeZoneSelector; resets to 1 on every zone change; styled identical to volume slider
 
 ## Roadmap Evolution
 
@@ -118,3 +119,4 @@ Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
 | Phase 20-collaborator-invite-autocomplete P01 | 2min | 2 tasks | 3 files |
 | Phase 21-admin-panel-polish P01 | 2min | 2 tasks | 4 files |
 | Phase 22-asset-download-button P01 | 1min | 2 tasks | 2 files |
+| Phase 24-safe-zones-opacity P01 | 2 min | 2 tasks | 2 files |

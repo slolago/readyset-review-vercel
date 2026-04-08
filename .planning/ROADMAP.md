@@ -29,10 +29,10 @@ Plans:
 **Goal:** Add an opacity slider to the safe zones controls so the overlay transparency is adjustable.
 **Depends on:** Phase 23
 **Requirements:** P24-01, P24-02, P24-03, P24-04, P24-05, P24-06
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 24-01-PLAN.md — Add `opacity` prop to SafeZonesOverlay + opacity slider in VideoPlayer controls
+- [x] 24-01-PLAN.md — Add `opacity` prop to SafeZonesOverlay + opacity slider in VideoPlayer controls
 
 **Success Criteria:**
 1. Opacity slider visible only when a safe zone is active ✓

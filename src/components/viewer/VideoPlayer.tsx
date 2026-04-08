@@ -63,6 +63,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const [tooltipPct, setTooltipPct] = useState(0);
   const [timecodeMode, setTimecodeMode] = useState<'mmss' | 'smpte'>('mmss');
   const [activeSafeZone, setActiveSafeZone] = useState<string | null>(null);
+  const [safeZoneOpacity, setSafeZoneOpacity] = useState(1);
 
   useImperativeHandle(ref, () => ({
     seekTo: (time: number) => {
@@ -360,7 +361,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         {/* Safe zones overlay */}
         {activeSafeZone && videoRect.w > 0 && (
           <div style={{ position: 'absolute', left: videoRect.x, top: videoRect.y, width: videoRect.w, height: videoRect.h, pointerEvents: 'none', zIndex: 5 }}>
-            <SafeZonesOverlay videoRect={videoRect} safeZone={activeSafeZone} />
+            <SafeZonesOverlay videoRect={videoRect} safeZone={activeSafeZone} opacity={safeZoneOpacity} />
           </div>
         )}
 
@@ -506,7 +507,25 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           <div className="flex-1" />
 
           {/* Safe zones */}
-          <SafeZoneSelector selected={activeSafeZone} onSelect={setActiveSafeZone} />
+          <SafeZoneSelector
+            selected={activeSafeZone}
+            onSelect={(file) => { setActiveSafeZone(file); setSafeZoneOpacity(1); }}
+          />
+
+          {/* Opacity slider — visible only when a safe zone is active */}
+          {activeSafeZone && (
+            <div className="flex items-center gap-1.5" title="Overlay opacity">
+              <input
+                type="range" min={0} max={1} step={0.05}
+                value={safeZoneOpacity}
+                onChange={(e) => setSafeZoneOpacity(parseFloat(e.target.value))}
+                className="w-16 cursor-pointer appearance-none h-1 rounded-full outline-none"
+                style={{
+                  background: `linear-gradient(to right, #7a00df 0%, #7a00df ${safeZoneOpacity * 100}%, rgba(255,255,255,0.15) ${safeZoneOpacity * 100}%, rgba(255,255,255,0.15) 100%)`,
+                }}
+              />
+            </div>
+          )}
 
           {/* Annotate */}
           {!isAnnotationMode && (
