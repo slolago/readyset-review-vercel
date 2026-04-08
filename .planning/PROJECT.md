@@ -10,6 +10,19 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
+## Current Milestone: v1.4 Review & Version Workflow
+
+**Goal:** Sharper version control, asset approval statuses, and smarter review link creation for production QC pipelines.
+
+**Target features:**
+- Version stack management — unstack + reorder versions (not just delete)
+- Asset status labels — APPROVED/other statuses on assets for QC identification
+- Smart copy to review folder — copy latest version only (not full stack)
+- Copy without comments — option to strip comments when copying to Client Facing Folder
+- Selection-based review links — generate review links from a specific asset selection
+- Compare view audio & comments — click version label to switch audio; show that version's comments
+- Move to folder — "Move to" context menu option to relocate assets between folders
+
 ## Current State (v1.3 — shipped 2026-04-08)
 
 - **Asset management** — upload, drag-to-move, version stacks (drag-and-drop merge), context menus (rename/copy/duplicate), bulk download, list + grid views
@@ -62,7 +75,14 @@ Fast, accurate video review — frame-level precision, rich metadata, and fluid 
 
 ### Active
 
-*(none — planning next milestone)*
+- [ ] VSTK-01: Version stack unstack + reorder
+- [ ] STATUS-01: Asset status labels (APPROVED/etc.)
+- [ ] REVIEW-01: Smart copy — latest version only
+- [ ] REVIEW-02: Copy without comments option
+- [ ] REVIEW-03: Selection-based review links
+- [ ] COMPARE-01: Compare view audio switch by click
+- [ ] COMPARE-02: Compare view shows focused version's comments
+- [ ] MOVE-01: Move to folder context menu option
 
 ### Out of Scope
 
@@ -91,4 +111,4 @@ Fast, accurate video review — frame-level precision, rich metadata, and fluid 
 
 ---
 
-*Last updated: 2026-04-08 after v1.3 milestone*
+*Last updated: 2026-04-08 — v1.4 milestone started*
