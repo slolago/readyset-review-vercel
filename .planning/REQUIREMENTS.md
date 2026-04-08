@@ -47,4 +47,15 @@
 
 ## Traceability
 
-*(filled by roadmapper)*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| MOVE-01 | Phase 29 — move-to-folder | Pending |
+| STATUS-01 | Phase 30 — asset-review-status | Pending |
+| STATUS-02 | Phase 30 — asset-review-status | Pending |
+| VSTK-01 | Phase 31 — version-stack-management | Pending |
+| VSTK-02 | Phase 31 — version-stack-management | Pending |
+| REVIEW-01 | Phase 32 — smart-copy-options | Pending |
+| REVIEW-02 | Phase 32 — smart-copy-options | Pending |
+| REVIEW-03 | Phase 33 — selection-review-links | Pending |
+| COMPARE-01 | Phase 34 — compare-view-audio-comments | Pending |
+| COMPARE-02 | Phase 34 — compare-view-audio-comments | Pending |
