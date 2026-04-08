@@ -14,7 +14,7 @@
 **Goal:** Fix SMPTE timecode frame number not updating when stepping frame-by-frame.
 **Depends on:** Nothing (isolated bug fix in VideoPlayer.tsx)
 **Requirements:** P23-01, P23-02, P23-03, P23-04
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 23-01-PLAN.md — Fix `stepFrame` and keyboard handler to call `setCurrentTime` directly after advancing, bypassing the 0.25s rAF threshold
