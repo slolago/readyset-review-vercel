@@ -33,6 +33,7 @@ import {
   LayoutGrid,
   LayoutList,
   Download,
+  GitCompare,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import { getProjectColor, formatBytes, forceDownload } from '@/lib/utils';
@@ -41,6 +42,7 @@ import { ContextMenu } from '@/components/ui/ContextMenu';
 import type { MenuItem } from '@/components/ui/ContextMenu';
 import toast from 'react-hot-toast';
 import { CreateReviewLinkModal } from '@/components/review/CreateReviewLinkModal';
+import { AssetCompareModal } from './AssetCompareModal';
 
 interface FolderBrowserProps {
   projectId: string;
@@ -66,6 +68,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   const [folderReviewTarget, setFolderReviewTarget] = useState<string | null>(null);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [allFolders, setAllFolders] = useState<FolderType[]>([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
 
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -900,6 +903,25 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-5 py-3 bg-frame-card border border-frame-border rounded-2xl shadow-2xl">
           <span className="text-sm text-white font-medium mr-1">{selectedIds.size} selected</span>
+          {(() => {
+            const selectedAssets = assets.filter((a) => selectedIds.has(a.id));
+            const canCompare = selectedAssets.length === 2;
+            return (
+              <button
+                onClick={() => canCompare && setShowCompareModal(true)}
+                disabled={!canCompare}
+                title={canCompare ? 'Compare assets' : 'Select exactly 2 assets to compare'}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  canCompare
+                    ? 'text-white bg-frame-accent hover:bg-frame-accent/80'
+                    : 'text-white/30 bg-frame-border cursor-not-allowed'
+                }`}
+              >
+                <GitCompare className="w-3.5 h-3.5" />
+                Compare
+              </button>
+            );
+          })()}
           <button
             onClick={handleOpenMoveModal}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-border hover:bg-frame-borderLight rounded-lg transition-colors"
@@ -992,6 +1014,18 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           onClose={() => setShowMoveModal(false)}
         />
       )}
+
+      {showCompareModal && (() => {
+        const selectedAssets = assets.filter((a) => selectedIds.has(a.id));
+        const canCompare = selectedAssets.length === 2;
+        return canCompare ? (
+          <AssetCompareModal
+            assetA={selectedAssets[0]}
+            assetB={selectedAssets[1]}
+            onClose={() => setShowCompareModal(false)}
+          />
+        ) : null;
+      })()}
 
       {/* Folder size overlay */}
       {!folderSizeLoading && folderSize !== null && folderSize > 0 && (

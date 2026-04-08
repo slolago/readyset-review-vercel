@@ -226,7 +226,7 @@ export function useUpload() {
       updateUpload(uploadId, { assetId });
 
       // Step 1b: Capture thumbnail + extract metadata for videos
-      let videoMeta: { width: number; height: number; duration: number } | null = null;
+      let videoMeta: { width: number; height: number; duration: number; frameRate?: number } | null = null;
       if (file.type.startsWith('video/')) {
         // Run thumbnail capture and metadata extraction in parallel
         const [thumbBlob, meta] = await Promise.all([
