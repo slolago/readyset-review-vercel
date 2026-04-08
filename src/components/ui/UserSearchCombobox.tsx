@@ -130,13 +130,13 @@ export function UserSearchCombobox({
 
       {/* Dropdown */}
       {showDropdown && (
-        <ul className="absolute z-50 mt-1 w-full bg-frame-surface border border-frame-border rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+        <ul className="absolute z-50 mt-1 w-full bg-frame-card border border-frame-border rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
           {results.length > 0
             ? results.map((u) => (
                 <li
                   key={u.id}
                   onMouseDown={() => handleSelect(u)}
-                  className="px-4 py-2.5 cursor-pointer hover:bg-frame-hover flex items-center gap-3"
+                  className="px-4 py-2.5 cursor-pointer hover:bg-frame-cardHover flex items-center gap-3"
                 >
                   <Avatar name={u.name} size="sm" />
                   <div className="min-w-0">
