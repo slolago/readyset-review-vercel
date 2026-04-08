@@ -17,7 +17,7 @@
 **Plans:** 1 plan
 
 Plans:
-- [ ] 23-01-PLAN.md — Fix `stepFrame` and keyboard handler to call `setCurrentTime` directly after advancing, bypassing the 0.25s rAF threshold
+- [x] 23-01-PLAN.md — Fix `stepFrame` and keyboard handler to call `setCurrentTime` directly after advancing, bypassing the 0.25s rAF threshold
 
 **Success Criteria:**
 1. Pressing frame-step button or Shift+Arrow immediately updates the SMPTE frame digit ✓
