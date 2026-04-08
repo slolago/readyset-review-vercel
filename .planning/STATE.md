@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: — Video Review Polish
-status: Ready to plan
-stopped_at: Completed 26-file-info-tab 26-01-PLAN.md
-last_updated: "2026-04-08T00:50:40.644Z"
+status: Executing Phase 26
+stopped_at: ROADMAP.md + REQUIREMENTS.md created for v1.3
+last_updated: "2026-04-08T00:47:00.621Z"
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 3
   total_plans: 4
-  completed_plans: 4
+  completed_plans: 3
 ---
 
 # State
@@ -28,7 +28,7 @@ Planned — Milestone v1.3 roadmap complete (phases 23–28). Ready to plan Phas
 
 ## Last Session
 
-Stopped at: Completed 26-file-info-tab 26-01-PLAN.md
+Stopped at: ROADMAP.md + REQUIREMENTS.md created for v1.3
 
 ## Decisions
 
@@ -74,9 +74,6 @@ Stopped at: Completed 26-file-info-tab 26-01-PLAN.md
 - [Phase 20-01]: UserSearchCombobox passes selectedUser.email to existing collaborators POST API — no API contract change needed
 - [Phase 20-01]: Firestore prefix search requires 2+ characters; name query is case-sensitive (v1 limitation, nameLower field can be added later)
 - [Phase 21-admin-panel-polish]: Delete UserRoleSelect.tsx (dead code, stale 'admin'|'user' two-value type) rather than fix it
-- [Phase 26-file-info-tab]: Tab state (activeTab) lives inside CommentSidebar — no prop drilling needed
-- [Phase 26-file-info-tab]: FileInfoPanel uses dl/dt/dd semantic HTML for accessible metadata display
-- [Phase 26-file-info-tab]: FPS reads from (asset as any).fps — field not in Asset type, shows dash when absent
 
 ## Roadmap Evolution
 
@@ -121,4 +118,3 @@ Stopped at: Completed 26-file-info-tab 26-01-PLAN.md
 | Phase 20-collaborator-invite-autocomplete P01 | 2min | 2 tasks | 3 files |
 | Phase 21-admin-panel-polish P01 | 2min | 2 tasks | 4 files |
 | Phase 22-asset-download-button P01 | 1min | 2 tasks | 2 files |
-| Phase 26-file-info-tab P01 | 2min | 2 tasks | 2 files |
