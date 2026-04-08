@@ -55,25 +55,53 @@ function captureThumbnail(file: File): Promise<Blob | null> {
   });
 }
 
-function extractVideoMetadata(file: File): Promise<{ width: number; height: number; duration: number } | null> {
+function extractVideoMetadata(file: File): Promise<{ width: number; height: number; duration: number; frameRate?: number } | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement('video');
     video.muted = true;
     video.preload = 'metadata';
     let settled = false;
-    const done = (result: { width: number; height: number; duration: number } | null) => {
+    const done = (result: { width: number; height: number; duration: number; frameRate?: number } | null) => {
       if (settled) return;
       settled = true;
+      video.pause();
       video.src = '';
       URL.revokeObjectURL(url);
       resolve(result);
     };
+
     video.addEventListener('loadedmetadata', () => {
-      done({ width: video.videoWidth, height: video.videoHeight, duration: video.duration });
+      const base = { width: video.videoWidth, height: video.videoHeight, duration: video.duration };
+
+      // Measure frameRate by counting decoded frames over ~1 second using requestVideoFrameCallback
+      if (!('requestVideoFrameCallback' in video)) {
+        done(base);
+        return;
+      }
+
+      let frameCount = 0;
+      let startMediaTime: number | null = null;
+
+      const onFrame = (_now: DOMHighResTimeStamp, metadata: { mediaTime: number }) => {
+        if (startMediaTime === null) startMediaTime = metadata.mediaTime;
+        frameCount++;
+        const elapsed = metadata.mediaTime - startMediaTime;
+        if (elapsed >= 1.0 || frameCount >= 120) {
+          const fps = elapsed > 0 ? Math.round(frameCount / elapsed) : undefined;
+          done({ ...base, frameRate: fps });
+          return;
+        }
+        (video as any).requestVideoFrameCallback(onFrame);
+      };
+
+      (video as any).requestVideoFrameCallback(onFrame);
+      video.currentTime = 0;
+      video.play().catch(() => done(base));
     }, { once: true });
+
     video.addEventListener('error', () => done(null), { once: true });
-    setTimeout(() => done(null), 5000);
+    setTimeout(() => done(null), 8000);
     video.src = url;
   });
 }
@@ -263,7 +291,12 @@ export function useUpload() {
         },
         body: JSON.stringify({
           assetId,
-          ...(videoMeta ? { width: videoMeta.width, height: videoMeta.height, duration: videoMeta.duration } : {}),
+          ...(videoMeta ? {
+            width: videoMeta.width,
+            height: videoMeta.height,
+            duration: videoMeta.duration,
+            ...(videoMeta.frameRate !== undefined ? { frameRate: videoMeta.frameRate } : {}),
+          } : {}),
         }),
       });
 

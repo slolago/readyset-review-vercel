@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { assetId, width, height, duration, thumbnailGcsPath } = await request.json();
+    const { assetId, width, height, duration, frameRate, thumbnailGcsPath } = await request.json();
     if (!assetId) return NextResponse.json({ error: 'assetId required' }, { status: 400 });
 
     const db = getAdminDb();
@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     if (width) updates.width = width;
     if (height) updates.height = height;
     if (duration) updates.duration = duration;
+    if (frameRate) updates.frameRate = frameRate;
     if (thumbnailGcsPath) {
       updates.thumbnailUrl = getPublicUrl(thumbnailGcsPath);
       updates.thumbnailGcsPath = thumbnailGcsPath;
