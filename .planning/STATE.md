@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: — Video Review Polish
 status: Ready to plan
-stopped_at: Completed 26-file-info-tab 26-02-PLAN.md
-last_updated: "2026-04-08T12:23:08.094Z"
+stopped_at: Completed 28-version-stack-dnd 28-01-PLAN.md
+last_updated: "2026-04-08T13:21:10.379Z"
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 6
+  total_plans: 7
+  completed_plans: 7
 ---
 
 # State
@@ -28,7 +28,7 @@ Planned — Milestone v1.3 roadmap complete (phases 23–28). Ready to plan Phas
 
 ## Last Session
 
-Stopped at: Completed 26-file-info-tab 26-02-PLAN.md
+Stopped at: Completed 28-version-stack-dnd 28-01-PLAN.md
 
 ## Decisions
 
@@ -75,6 +75,7 @@ Stopped at: Completed 26-file-info-tab 26-02-PLAN.md
 - [Phase 20-01]: Firestore prefix search requires 2+ characters; name query is case-sensitive (v1 limitation, nameLower field can be added later)
 - [Phase 21-admin-panel-polish]: Delete UserRoleSelect.tsx (dead code, stale 'admin'|'user' two-value type) rather than fix it
 - [Phase 26-file-info-tab]: frameRate stored as optional number on Asset interface — absent for legacy assets; FPS row shows dash when not present
+- [Phase 28-version-stack-dnd]: Root assets without versionGroupId field included by falling back to asset.id — consistent with existing version group patterns
 
 ## Roadmap Evolution
 
@@ -120,3 +121,4 @@ Stopped at: Completed 26-file-info-tab 26-02-PLAN.md
 | Phase 21-admin-panel-polish P01 | 2min | 2 tasks | 4 files |
 | Phase 22-asset-download-button P01 | 1min | 2 tasks | 2 files |
 | Phase 26-file-info-tab P02 | 3min | 1 tasks | 2 files |
+| Phase 28-version-stack-dnd P01 | 1 min | 1 tasks | 1 files |
