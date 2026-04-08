@@ -79,7 +79,7 @@ Plans:
   2. Clicking "Move to..." opens the folder picker modal
   3. After confirming, the asset disappears from the source folder and appears in the destination folder
   4. If the asset belongs to a version group, all group members move together
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 29-01: Verify + wire move-to context menu option
