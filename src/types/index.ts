@@ -39,6 +39,7 @@ export interface Folder {
 
 export type AssetStatus = 'uploading' | 'ready';
 export type AssetType = 'video' | 'image';
+export type ReviewStatus = 'approved' | 'needs_revision' | 'in_review';
 
 export interface Asset {
   id: string;
@@ -62,6 +63,7 @@ export interface Asset {
   _versionCount?: number;
   _commentCount?: number;
   frameRate?: number;
+  reviewStatus?: ReviewStatus;
 }
 
 export interface AnnotationData {
