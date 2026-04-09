@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { assetId, targetFolderId, name } = await request.json();
+    const { assetId, targetFolderId, name, latestVersionOnly } = await request.json();
     if (!assetId) return NextResponse.json({ error: 'assetId required' }, { status: 400 });
 
     const db = getAdminDb();
@@ -34,12 +34,16 @@ export async function POST(request: NextRequest) {
     // Sort by version number ascending so ordering is preserved
     allVersions.sort((a: any, b: any) => (a.version || 1) - (b.version || 1));
 
+    const versionsToCopy = latestVersionOnly
+      ? [allVersions[allVersions.length - 1]]
+      : allVersions;
+
     // New versionGroupId for the entire copy-stack
     const newGroupId = db.collection('assets').doc().id;
 
     // Create copies of ALL versions in a single batch
     const batch = db.batch();
-    for (const ver of allVersions) {
+    for (const ver of versionsToCopy) {
       const newRef = db.collection('assets').doc();
       const copyData: any = {
         ...ver,
@@ -47,6 +51,7 @@ export async function POST(request: NextRequest) {
         // Only the asset matching the requested assetId gets the "Copy of" prefix (or name override)
         name: ver.id === assetId ? (name ?? `Copy of ${ver.name}`) : ver.name,
         versionGroupId: newGroupId,
+        version: versionsToCopy.length === 1 && latestVersionOnly ? 1 : ver.version,
         createdAt: Timestamp.now(),
         uploadedBy: user.id,
       };

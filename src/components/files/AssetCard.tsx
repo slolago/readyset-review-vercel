@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useRef, useCallback, useState, useEffect, memo } from 'react';
-import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil, Copy, CopyPlus, Home, Folder as FolderIcon, X, ExternalLink, Move as MoveIcon, Download, Link as LinkIcon, MessageSquare, CheckCircle2, AlertCircle, Unlink, GripVertical } from 'lucide-react';
+import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil, Copy, CopyPlus, Home, Folder as FolderIcon, X, ExternalLink, Move as MoveIcon, Download, Link as LinkIcon, MessageSquare, CheckCircle2, AlertCircle, Unlink, GripVertical, Info } from 'lucide-react';
 import { formatDuration, formatBytes, forceDownload } from '@/lib/utils';
 import type { Asset, Folder } from '@/types';
 import type { ReviewStatus } from '@/types';
@@ -108,13 +108,13 @@ export const AssetCard = memo(function AssetCard({
     setShowCopyToModal(true);
   };
 
-  const handleCopyTo = async (targetFolderId: string | null) => {
+  const handleCopyTo = async (targetFolderId: string | null, latestVersionOnly: boolean) => {
     try {
       const token = await getIdToken();
       const res = await fetch('/api/assets/copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ assetId: asset.id, targetFolderId }),
+        body: JSON.stringify({ assetId: asset.id, targetFolderId, latestVersionOnly }),
       });
       if (res.ok) {
         toast.success('Copied');
@@ -457,8 +457,9 @@ export const AssetCard = memo(function AssetCard({
       </div>
     </div>
       {showCopyToModal && (
-        <AssetFolderPickerModal
+        <SmartCopyModal
           folders={allFolders}
+          versionCount={versionCount}
           onPick={handleCopyTo}
           onClose={() => setShowCopyToModal(false)}
         />
@@ -728,17 +729,21 @@ function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: VersionSta
   );
 }
 
-// ── AssetFolderPickerModal ────────────────────────────────────────────────────
+// ── SmartCopyModal ────────────────────────────────────────────────────────────
 
-function AssetFolderPickerModal({
+function SmartCopyModal({
   folders,
+  versionCount,
   onPick,
   onClose,
 }: {
   folders: Folder[];
-  onPick: (folderId: string | null) => void;
+  versionCount: number;
+  onPick: (folderId: string | null, latestVersionOnly: boolean) => void;
   onClose: () => void;
 }) {
+  const [latestVersionOnly, setLatestVersionOnly] = useState(versionCount > 1);
+
   const buildTree = (parentId: string | null, depth: number): { folder: Folder; depth: number }[] => {
     const children = folders.filter((f) => (f.parentId ?? null) === parentId);
     const result: { folder: Folder; depth: number }[] = [];
@@ -765,9 +770,22 @@ function AssetFolderPickerModal({
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="max-h-72 overflow-y-auto py-2">
+
+        {versionCount > 1 && (
+          <div className="px-5 py-3 border-b border-frame-border flex items-center justify-between">
+            <span className="text-sm text-white">Latest version only</span>
+            <button
+              onClick={() => setLatestVersionOnly(!latestVersionOnly)}
+              className={`w-9 h-5 rounded-full transition-colors relative ${latestVersionOnly ? 'bg-frame-accent' : 'bg-frame-border'}`}
+            >
+              <span className={`block w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${latestVersionOnly ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        )}
+
+        <div className="max-h-56 overflow-y-auto py-2">
           <button
-            onClick={() => onPick(null)}
+            onClick={() => onPick(null, latestVersionOnly)}
             className="w-full flex items-center gap-2 px-5 py-2.5 text-sm text-frame-textSecondary hover:text-white hover:bg-frame-border/50 transition-colors text-left"
           >
             <Home className="w-4 h-4 flex-shrink-0" />
@@ -776,7 +794,7 @@ function AssetFolderPickerModal({
           {tree.map(({ folder, depth }) => (
             <button
               key={folder.id}
-              onClick={() => onPick(folder.id)}
+              onClick={() => onPick(folder.id, latestVersionOnly)}
               className="w-full flex items-center gap-2 px-5 py-2.5 text-sm text-frame-textSecondary hover:text-white hover:bg-frame-border/50 transition-colors text-left"
               style={{ paddingLeft: `${20 + depth * 16}px` }}
             >
@@ -784,6 +802,13 @@ function AssetFolderPickerModal({
               <span className="truncate">{folder.name}</span>
             </button>
           ))}
+        </div>
+
+        <div className="px-5 py-3 border-t border-frame-border">
+          <p className="text-xs text-frame-textMuted flex items-start gap-1.5">
+            <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            Comments are not copied to the destination folder.
+          </p>
         </div>
       </div>
     </div>
