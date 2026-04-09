@@ -94,6 +94,7 @@ export interface ReviewLink {
   token: string;
   projectId: string;
   folderId: string | null;
+  assetIds?: string[];
   name: string;
   createdBy: string;
   expiresAt: Timestamp | null;

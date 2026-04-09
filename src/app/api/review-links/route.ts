@@ -41,9 +41,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const { name, projectId, folderId, allowComments, password, expiresAt,
-            allowDownloads, allowApprovals, showAllVersions } = await request.json();
+            allowDownloads, allowApprovals, showAllVersions, assetIds } = await request.json();
 
     if (!name || !projectId) return NextResponse.json({ error: 'name and projectId required' }, { status: 400 });
+    if (assetIds && assetIds.length > 50) return NextResponse.json({ error: 'Maximum 50 assets per selection link' }, { status: 400 });
 
     const hasAccess = await canAccessProject(user.id, projectId);
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -56,7 +57,8 @@ export async function POST(request: NextRequest) {
       token,
       name,
       projectId,
-      folderId: folderId || null,
+      folderId: assetIds?.length ? null : (folderId || null),
+      assetIds: assetIds?.length ? assetIds : null,
       createdBy: user.id,
       allowComments: allowComments !== false,
       allowDownloads: allowDownloads === true,
