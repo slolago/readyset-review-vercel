@@ -336,6 +336,11 @@ export const AssetCard = memo(function AssetCard({
                   onClick: openCopyTo,
                 },
                 {
+                  label: 'Move to',
+                  icon: <MoveIcon className="w-4 h-4" />,
+                  onClick: () => onRequestMove?.(),
+                },
+                {
                   label: 'Duplicate',
                   icon: <CopyPlus className="w-4 h-4" />,
                   onClick: handleDuplicate,
