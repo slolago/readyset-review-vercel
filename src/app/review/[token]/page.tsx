@@ -348,24 +348,34 @@ export default function ReviewPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {data.assets.map((asset) => (
-                  <div key={asset.id} className="relative group">
-                    <AssetCard asset={asset} onClick={() => handleSelectAsset(asset)} hideActions />
-                    {data.reviewLink.allowDownloads && ((asset as any).downloadUrl ?? (asset as any).signedUrl) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const url = ((asset as any).downloadUrl ?? (asset as any).signedUrl) as string;
-                          forceDownload(url, asset.name);
-                        }}
-                        className="absolute bottom-14 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-frame-card/90 backdrop-blur-sm border border-frame-border rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 text-xs text-white hover:bg-frame-cardHover"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Download
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {data.assets.map((asset: any) =>
+                  asset._deleted ? (
+                    <div
+                      key={asset.id}
+                      className="aspect-video bg-frame-card border border-dashed border-frame-border/50 rounded-xl flex flex-col items-center justify-center gap-2 opacity-40"
+                    >
+                      <Film className="w-8 h-8 text-frame-textMuted" />
+                      <p className="text-xs text-frame-textMuted">Asset removed</p>
+                    </div>
+                  ) : (
+                    <div key={asset.id} className="relative group">
+                      <AssetCard asset={asset} onClick={() => handleSelectAsset(asset)} hideActions />
+                      {data.reviewLink.allowDownloads && ((asset as any).downloadUrl ?? (asset as any).signedUrl) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const url = ((asset as any).downloadUrl ?? (asset as any).signedUrl) as string;
+                            forceDownload(url, asset.name);
+                          }}
+                          className="absolute bottom-14 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-frame-card/90 backdrop-blur-sm border border-frame-border rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 text-xs text-white hover:bg-frame-cardHover"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download
+                        </button>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             )}
           </div>
