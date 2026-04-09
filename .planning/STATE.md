@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: — Review & Version Workflow
 status: verifying
-stopped_at: Completed 30-02-PLAN.md (asset-review-status viewer header)
-last_updated: "2026-04-09T03:16:00.897Z"
+stopped_at: Completed 31-01-PLAN.md (version-stack-management API routes)
+last_updated: "2026-04-09T03:31:48.265Z"
 last_activity: 2026-04-09
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 4
   percent: 0
 ---
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 
 | Phase 29-move-to-folder P01 | 20min | 2 tasks | 2 files |
 | Phase 30-asset-review-status P02 | 15 | 1 tasks | 5 files |
+| Phase 31-version-stack-management P01 | 10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,7 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 - [Phase 29-move-to-folder]: FolderCard hover Dropdown fixed beyond plan scope to give consistent move-to-folder surface across all card types
 - [Phase 30-asset-review-status]: Optimistic reviewStatus update via setActiveVersion spread avoids re-fetching signed URLs
 - [Phase 30-asset-review-status]: Tag icon used as viewer header status-setter trigger to keep header uncluttered
+- [Phase 31-version-stack-management]: Unstack uses db.batch() (reads done before write); Reorder uses db.runTransaction() to guard concurrent version number assignment
 
 ### Pending Todos
 
@@ -84,6 +86,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-09T03:16:00.888Z
-Stopped at: Completed 30-02-PLAN.md (asset-review-status viewer header)
+Last session: 2026-04-09T03:31:48.259Z
+Stopped at: Completed 31-01-PLAN.md (version-stack-management API routes)
 Resume file: None

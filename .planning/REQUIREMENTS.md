@@ -2,8 +2,8 @@
 
 ## Version Stack Management
 
-- [ ] **VSTK-01**: User can unstack a version from a group (removes it from the stack; it becomes a standalone asset)
-- [ ] **VSTK-02**: User can reorder versions within a stack (drag to reassign version numbers)
+- [x] **VSTK-01**: User can unstack a version from a group (removes it from the stack; it becomes a standalone asset)
+- [x] **VSTK-02**: User can reorder versions within a stack (drag to reassign version numbers)
 
 ## Asset Status
 
@@ -52,8 +52,8 @@
 | MOVE-01 | Phase 29 — move-to-folder | Pending |
 | STATUS-01 | Phase 30 — asset-review-status | Complete |
 | STATUS-02 | Phase 30 — asset-review-status | Complete |
-| VSTK-01 | Phase 31 — version-stack-management | Pending |
-| VSTK-02 | Phase 31 — version-stack-management | Pending |
+| VSTK-01 | Phase 31 — version-stack-management | Complete |
+| VSTK-02 | Phase 31 — version-stack-management | Complete |
 | REVIEW-01 | Phase 32 — smart-copy-options | Pending |
 | REVIEW-02 | Phase 32 — smart-copy-options | Pending |
 | REVIEW-03 | Phase 33 — selection-review-links | Pending |
