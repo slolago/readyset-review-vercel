@@ -12,6 +12,7 @@ import {
   Shield,
   LogOut,
   ChevronDown,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { ProjectTreeNav } from './ProjectTreeNav';
@@ -19,6 +20,7 @@ import { ProjectTreeNav } from './ProjectTreeNav';
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/projects', icon: FolderOpen, label: 'Projects' },
+  { href: '/review-links', icon: LinkIcon, label: 'Review Links' },
 ];
 
 export function Sidebar() {

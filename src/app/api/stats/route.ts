@@ -46,11 +46,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Count review links for user's projects
+    let reviewLinkCount = 0;
+    for (let i = 0; i < projectIds.length; i += 10) {
+      const chunk = projectIds.slice(i, i + 10);
+      try {
+        const rlSnap = await db.collection('reviewLinks')
+          .where('projectId', 'in', chunk)
+          .get();
+        reviewLinkCount += rlSnap.size;
+      } catch { /* non-fatal */ }
+    }
+
     return NextResponse.json({
       projectCount: userProjects.length,
       assetCount,
       collaboratorCount: collaboratorSet.size,
       storageBytes,
+      reviewLinkCount,
     });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });

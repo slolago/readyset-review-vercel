@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useProjects } from '@/hooks/useProject';
-import { Film, FolderOpen, HardDrive, Upload, Users, Clock, ArrowRight, Sparkles } from 'lucide-react';
+import { Film, FolderOpen, HardDrive, Upload, Users, Clock, ArrowRight, Sparkles, Link as LinkIcon } from 'lucide-react';
 import { formatRelativeTime, getProjectColor, formatBytes } from '@/lib/utils';
 import type { Project } from '@/types';
 
@@ -13,6 +13,7 @@ interface DashboardStats {
   assetCount: number;
   collaboratorCount: number;
   storageBytes: number;
+  reviewLinkCount?: number;
 }
 
 export default function DashboardPage() {
@@ -73,12 +74,12 @@ export default function DashboardPage() {
             color="blue"
           />
           <StatCard
-            icon={<Users className="w-5 h-5" />}
-            label="Collaborators"
-            value={statsLoading ? null : (stats?.collaboratorCount.toString() ?? '—')}
+            icon={<LinkIcon className="w-5 h-5" />}
+            label="Review Links"
+            value={statsLoading ? null : ((stats?.reviewLinkCount ?? 0).toString())}
             color="green"
-            href="/projects"
-            tooltip="Unique team members across all your projects"
+            href="/review-links"
+            tooltip="Share links across all your projects"
           />
           <StatCard
             icon={<HardDrive className="w-5 h-5" />}
