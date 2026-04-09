@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: — Review & Version Workflow
-status: executing
-stopped_at: "Roadmap created. Next step: /gsd:plan-phase 29"
-last_updated: "2026-04-09T00:33:55.691Z"
-last_activity: 2026-04-09 -- Phase 29 execution started
+status: verifying
+stopped_at: Completed 29-01-PLAN.md (move-to-folder)
+last_updated: "2026-04-09T02:54:05.193Z"
+last_activity: 2026-04-09
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 
 Phase: 29 (move-to-folder) — EXECUTING
 Plan: 1 of 1
-Status: Executing Phase 29
-Last activity: 2026-04-09 -- Phase 29 execution started
+Status: Phase complete — ready for verification
+Last activity: 2026-04-09
 
 Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 
@@ -51,6 +51,8 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 - v1.3: 9 plans across 6 phases
 - Trend: Stable
 
+| Phase 29-move-to-folder P01 | 20min | 2 tasks | 2 files |
+
 ## Accumulated Context
 
 ### Decisions
@@ -62,6 +64,8 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 - Selection review link asset cap = 50 max for v1.4
 - Atomic Firestore batch for version group merge (v1.3 pattern)
 - Dual MIME type on drag start (x-frame-move + x-frame-version-stack) for version stacking
+- [Phase 29-move-to-folder]: Move state lives in FolderBrowser only — AssetCard/FolderCard fire onRequestMove and own no move state
+- [Phase 29-move-to-folder]: FolderCard hover Dropdown fixed beyond plan scope to give consistent move-to-folder surface across all card types
 
 ### Pending Todos
 
@@ -77,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-08
-Stopped at: Roadmap created. Next step: /gsd:plan-phase 29
+Last session: 2026-04-09T02:54:05.188Z
+Stopped at: Completed 29-01-PLAN.md (move-to-folder)
 Resume file: None

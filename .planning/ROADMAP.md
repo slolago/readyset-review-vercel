@@ -82,7 +82,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 29-01: Verify + wire move-to context menu option
+- [x] 29-01: Verify + wire move-to context menu option
 
 #### Phase 30: asset-review-status
 **Goal**: Users can label assets with a QC review status and see those labels in the grid and viewer
@@ -175,7 +175,7 @@ Plans:
 | 26. file-info-tab | v1.3 | 2/2 | Complete | 2026-04-08 |
 | 27. asset-comparison | v1.3 | 1/1 | Complete | 2026-04-08 |
 | 28. version-stack-dnd | v1.3 | 2/2 | Complete | 2026-04-08 |
-| 29. move-to-folder | v1.4 | 0/1 | Not started | - |
+| 29. move-to-folder | v1.4 | 1/1 | Complete   | 2026-04-09 |
 | 30. asset-review-status | v1.4 | 0/2 | Not started | - |
 | 31. version-stack-management | v1.4 | 0/2 | Not started | - |
 | 32. smart-copy-options | v1.4 | 0/1 | Not started | - |
