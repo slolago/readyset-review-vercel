@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: — Review & Version Workflow
 status: verifying
-stopped_at: Completed 29-01-PLAN.md (move-to-folder)
-last_updated: "2026-04-09T02:54:05.193Z"
+stopped_at: Completed 30-01-PLAN.md (asset-review-status)
+last_updated: "2026-04-09T03:10:02.616Z"
 last_activity: 2026-04-09
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
   percent: 0
 ---
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 - Trend: Stable
 
 | Phase 29-move-to-folder P01 | 20min | 2 tasks | 2 files |
+| Phase 30-asset-review-status P01 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 - Dual MIME type on drag start (x-frame-move + x-frame-version-stack) for version stacking
 - [Phase 29-move-to-folder]: Move state lives in FolderBrowser only — AssetCard/FolderCard fire onRequestMove and own no move state
 - [Phase 29-move-to-folder]: FolderCard hover Dropdown fixed beyond plan scope to give consistent move-to-folder surface across all card types
+- [Phase 30-asset-review-status]: FieldValue.delete() guard in else branch only — folderId batch path untouched
+- [Phase 30-asset-review-status]: STATUS_META lookup table for badge metadata — easy to extend new statuses
 
 ### Pending Todos
 
@@ -81,6 +84,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-09T02:54:05.188Z
-Stopped at: Completed 29-01-PLAN.md (move-to-folder)
+Last session: 2026-04-09T03:10:02.611Z
+Stopped at: Completed 30-01-PLAN.md (asset-review-status)
 Resume file: None

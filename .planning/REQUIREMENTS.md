@@ -7,8 +7,8 @@
 
 ## Asset Status
 
-- [ ] **STATUS-01**: User can set a review status on an asset (approved / needs_revision / in_review)
-- [ ] **STATUS-02**: Review status badge is displayed on asset grid cards and in the asset viewer
+- [x] **STATUS-01**: User can set a review status on an asset (approved / needs_revision / in_review)
+- [x] **STATUS-02**: Review status badge is displayed on asset grid cards and in the asset viewer
 
 ## Review Link — Smart Copy
 
@@ -50,8 +50,8 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | MOVE-01 | Phase 29 — move-to-folder | Pending |
-| STATUS-01 | Phase 30 — asset-review-status | Pending |
-| STATUS-02 | Phase 30 — asset-review-status | Pending |
+| STATUS-01 | Phase 30 — asset-review-status | Complete |
+| STATUS-02 | Phase 30 — asset-review-status | Complete |
 | VSTK-01 | Phase 31 — version-stack-management | Pending |
 | VSTK-02 | Phase 31 — version-stack-management | Pending |
 | REVIEW-01 | Phase 32 — smart-copy-options | Pending |

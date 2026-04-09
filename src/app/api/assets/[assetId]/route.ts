@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { deleteFile, generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
+import { FieldValue } from 'firebase-admin/firestore';
 
 interface RouteParams {
   params: { assetId: string };
@@ -102,7 +103,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
       await batch.commit();
     } else {
-      await db.collection('assets').doc(params.assetId).update(updates);
+      const safeUpdates: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(updates)) {
+        safeUpdates[k] = v === null ? FieldValue.delete() : v;
+      }
+      await db.collection('assets').doc(params.assetId).update(safeUpdates);
     }
 
     return NextResponse.json({ success: true });

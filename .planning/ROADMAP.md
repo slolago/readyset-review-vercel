@@ -98,7 +98,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 30-01: ReviewStatus type + badge component + API null guard + AssetCard wiring
+- [x] 30-01: ReviewStatus type + badge component + API null guard + AssetCard wiring
 - [ ] 30-02: Viewer header badge display + status setter dropdown
 
 #### Phase 31: version-stack-management
@@ -176,7 +176,7 @@ Plans:
 | 27. asset-comparison | v1.3 | 1/1 | Complete | 2026-04-08 |
 | 28. version-stack-dnd | v1.3 | 2/2 | Complete | 2026-04-08 |
 | 29. move-to-folder | v1.4 | 1/1 | Complete   | 2026-04-09 |
-| 30. asset-review-status | v1.4 | 0/2 | Not started | - |
+| 30. asset-review-status | v1.4 | 1/2 | In Progress|  |
 | 31. version-stack-management | v1.4 | 0/2 | Not started | - |
 | 32. smart-copy-options | v1.4 | 0/1 | Not started | - |
 | 33. selection-review-links | v1.4 | 0/2 | Not started | - |
