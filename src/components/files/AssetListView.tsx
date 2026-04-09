@@ -1,15 +1,23 @@
 'use client';
 
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Film, Image as ImageIcon, ChevronUp, ChevronDown, Pencil, CopyPlus, Move, Download, Link as LinkIcon, Trash2, ExternalLink, Check } from 'lucide-react';
+import { Film, Image as ImageIcon, ChevronUp, ChevronDown, Pencil, CopyPlus, Move, Download, Link as LinkIcon, Trash2, ExternalLink, Check, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import { formatBytes, formatRelativeTime, forceDownload } from '@/lib/utils';
 import { useUserNames } from '@/hooks/useUserNames';
 import { useAuth } from '@/hooks/useAuth';
 import { ContextMenu } from '@/components/ui/ContextMenu';
-import type { MenuItem } from '@/components/ui/ContextMenu';
+import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
+import type { ReviewStatus } from '@/types';
 import toast from 'react-hot-toast';
 import type { Asset } from '@/types';
+
+const REVIEW_STATUS_OPTIONS: { value: ReviewStatus | null; label: string }[] = [
+  { value: 'approved', label: 'Approved' },
+  { value: 'in_review', label: 'In Review' },
+  { value: 'needs_revision', label: 'Needs Revision' },
+  { value: null, label: 'Clear status' },
+];
 
 interface AssetListViewProps {
   assets: Asset[];
@@ -132,7 +140,7 @@ export const AssetListView = memo(function AssetListView({
                 )}
               </button>
             </th>
-            <th className={headerCellClass}>Status</th>
+            <th className={headerCellClass}>Review</th>
             <th className={headerCellClass}>Comments</th>
             <th className={headerCellClass}>Size</th>
             <th className={headerCellClass}>
@@ -203,11 +211,41 @@ function AssetListRow({
 }: AssetListRowProps) {
   const { getIdToken } = useAuth();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const statusMenuRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedIds?.has(asset.id) ?? false;
   const isUploading = asset.status === 'uploading';
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailSignedUrl = (asset as any).thumbnailSignedUrl as string | undefined;
   const downloadUrl = (asset as any).downloadUrl as string | undefined;
+
+  // Close status menu on outside click
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
+        setStatusMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [statusMenuOpen]);
+
+  const handleSetStatus = async (reviewStatus: ReviewStatus | null) => {
+    setStatusMenuOpen(false);
+    try {
+      const token = await getIdToken();
+      await fetch(`/api/assets/${asset.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reviewStatus }),
+      });
+      toast.success(reviewStatus ? 'Status updated' : 'Status cleared');
+      onAssetDeleted?.(); // refetch
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
 
   const handleRename = async () => {
     const name = window.prompt('Rename asset:', asset.name);
@@ -318,17 +356,43 @@ function AssetListRow({
         <span className="font-medium text-white truncate block max-w-[240px]">{asset.name}</span>
       </td>
 
-      {/* Status */}
-      <td className="px-3 py-2">
-        {asset.status === 'ready' ? (
-          <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400 font-medium">
-            Ready
-          </span>
-        ) : (
-          <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400 font-medium">
-            Uploading
-          </span>
-        )}
+      {/* Review status — clickable dropdown */}
+      <td
+        className="px-3 py-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative" ref={statusMenuRef}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setStatusMenuOpen(v => !v); }}
+            className="flex items-center gap-1 group"
+            title="Set review status"
+          >
+            {asset.reviewStatus ? (
+              <ReviewStatusBadge status={asset.reviewStatus} />
+            ) : (
+              <span className="text-xs text-frame-textMuted group-hover:text-white transition-colors">—</span>
+            )}
+            <ChevronDownIcon className="w-3 h-3 text-frame-textMuted opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+          {statusMenuOpen && (
+            <div className="absolute left-0 top-full mt-1 z-50 bg-frame-card border border-frame-border rounded-xl shadow-2xl overflow-hidden min-w-[160px]">
+              {REVIEW_STATUS_OPTIONS.map(opt => (
+                <button
+                  key={String(opt.value)}
+                  onClick={() => handleSetStatus(opt.value)}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-frame-border/50 transition-colors flex items-center gap-2 ${
+                    opt.value === null ? 'text-frame-textMuted border-t border-frame-border/50 mt-1 pt-2' : 'text-white'
+                  }`}
+                >
+                  {opt.value && (
+                    <ReviewStatusBadge status={opt.value} />
+                  )}
+                  {opt.value === null && opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </td>
 
       {/* Comments */}
@@ -366,6 +430,10 @@ function AssetListRow({
           { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.(asset.id) },
           { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
           { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
+          { label: 'Approved', icon: <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
+          { label: 'In Review', icon: <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />, onClick: () => handleSetStatus('in_review') },
+          { label: 'Needs Revision', icon: <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />, onClick: () => handleSetStatus('needs_revision') },
+          { label: 'Clear status', icon: <span className="w-2 h-2 rounded-full bg-white/20 inline-block" />, onClick: () => handleSetStatus(null) },
           { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
         ]}
       />

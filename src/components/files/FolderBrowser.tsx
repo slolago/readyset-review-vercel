@@ -36,6 +36,7 @@ import {
   GitCompare,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
+import type { ReviewStatus } from '@/types';
 import { getProjectColor, formatBytes, forceDownload } from '@/lib/utils';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { ContextMenu } from '@/components/ui/ContextMenu';
@@ -341,6 +342,26 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
       await new Promise(r => setTimeout(r, 300));
     }
   }, [assets]);
+
+  const handleBulkSetStatus = async (reviewStatus: ReviewStatus | null) => {
+    try {
+      const token = await getIdToken();
+      const assetIds = Array.from(selectedIds).filter(id => assets.some(a => a.id === id));
+      await Promise.all(
+        assetIds.map(id =>
+          fetch(`/api/assets/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ reviewStatus }),
+          })
+        )
+      );
+      toast.success(reviewStatus ? `Status set for ${assetIds.length} asset(s)` : `Status cleared for ${assetIds.length} asset(s)`);
+      refetchAssets();
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
 
   const handleOpenMoveModal = async () => {
     const token = await getIdToken();
@@ -1023,6 +1044,20 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
               </button>
             );
           })()}
+          <Dropdown
+            trigger={
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-border hover:bg-frame-borderLight rounded-lg transition-colors">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Status
+              </button>
+            }
+            items={[
+              { label: 'Approved', onClick: () => handleBulkSetStatus('approved') },
+              { label: 'In Review', onClick: () => handleBulkSetStatus('in_review') },
+              { label: 'Needs Revision', onClick: () => handleBulkSetStatus('needs_revision') },
+              { label: 'Clear status', onClick: () => handleBulkSetStatus(null), divider: true },
+            ]}
+          />
           <button
             onClick={handleOpenMoveModal}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-border hover:bg-frame-borderLight rounded-lg transition-colors"

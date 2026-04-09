@@ -315,6 +315,13 @@ export const AssetCard = memo(function AssetCard({
           </div>
         </div>
 
+        {/* Review status badge — bottom-left of thumbnail */}
+        {asset.reviewStatus && (
+          <div className="absolute bottom-2 left-2">
+            <ReviewStatusBadge status={asset.reviewStatus} />
+          </div>
+        )}
+
         {/* Duration for videos */}
         {asset.type === 'video' && asset.duration && (
           <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded text-xs text-white flex items-center gap-1">
@@ -449,11 +456,6 @@ export const AssetCard = memo(function AssetCard({
             )}
           </div>
         </div>
-        {asset.reviewStatus && (
-          <div className="mt-1">
-            <ReviewStatusBadge status={asset.reviewStatus} />
-          </div>
-        )}
       </div>
     </div>
       {showCopyToModal && (
