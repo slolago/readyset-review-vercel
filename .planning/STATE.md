@@ -1,15 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.4
-milestone_name: Review & Version Workflow
-status: Ready to plan
-stopped_at: roadmap created — ready to plan Phase 29
-last_updated: "2026-04-08"
+milestone_name: — Review & Version Workflow
+status: executing
+stopped_at: "Roadmap created. Next step: /gsd:plan-phase 29"
+last_updated: "2026-04-09T00:33:55.691Z"
+last_activity: 2026-04-09 -- Phase 29 execution started
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 1
   completed_plans: 0
+  percent: 0
 ---
 
 # State
@@ -19,20 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management
-**Current focus:** v1.4 — Review & Version Workflow (Phase 29: move-to-folder)
+**Current focus:** Phase 29 — move-to-folder
 
 ## Current Position
 
-Phase: 29 of 34 (move-to-folder)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-04-08 — v1.4 roadmap created (phases 29–34)
+Phase: 29 (move-to-folder) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 29
+Last activity: 2026-04-09 -- Phase 29 execution started
 
 Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 9 (v1.3)
 - Average duration: unknown
 - Total execution time: unknown
@@ -44,6 +47,7 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 | v1.3 phases (23–28) | 9 | - | - |
 
 **Recent Trend:**
+
 - v1.3: 9 plans across 6 phases
 - Trend: Stable
 
