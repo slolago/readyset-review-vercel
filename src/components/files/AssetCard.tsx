@@ -2,12 +2,14 @@
 
 import Image from 'next/image';
 import { useRef, useCallback, useState, useEffect, memo } from 'react';
-import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil, Copy, CopyPlus, Home, Folder as FolderIcon, X, ExternalLink, Move as MoveIcon, Download, Link as LinkIcon, MessageSquare } from 'lucide-react';
+import { Play, Image as ImageIcon, Film, MoreHorizontal, Trash2, Clock, Upload, Layers, Check, Pencil, Copy, CopyPlus, Home, Folder as FolderIcon, X, ExternalLink, Move as MoveIcon, Download, Link as LinkIcon, MessageSquare, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatDuration, formatBytes, forceDownload } from '@/lib/utils';
 import type { Asset, Folder } from '@/types';
+import type { ReviewStatus } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { ContextMenu } from '@/components/ui/ContextMenu';
 import type { MenuItem } from '@/components/ui/ContextMenu';
+import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpload } from '@/hooks/useAssets';
 import toast from 'react-hot-toast';
@@ -190,6 +192,25 @@ export const AssetCard = memo(function AssetCard({
     toast.success('Link copied');
   };
 
+  const handleSetStatus = async (reviewStatus: ReviewStatus | null) => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/assets/${asset.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reviewStatus }),
+      });
+      if (res.ok) {
+        toast.success(reviewStatus ? 'Status updated' : 'Status cleared');
+        onDeleted?.();
+      } else {
+        toast.error('Failed to update status');
+      }
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
+
   const isUploading = asset.status === 'uploading';
 
   return (
@@ -361,6 +382,27 @@ export const AssetCard = memo(function AssetCard({
                   onClick: handleDownload,
                 },
                 {
+                  label: 'Approved',
+                  icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+                  onClick: () => handleSetStatus('approved'),
+                  divider: true,
+                },
+                {
+                  label: 'Needs Revision',
+                  icon: <AlertCircle className="w-4 h-4 text-yellow-400" />,
+                  onClick: () => handleSetStatus('needs_revision'),
+                },
+                {
+                  label: 'In Review',
+                  icon: <Clock className="w-4 h-4 text-blue-400" />,
+                  onClick: () => handleSetStatus('in_review'),
+                },
+                {
+                  label: 'Clear status',
+                  icon: <X className="w-4 h-4 text-frame-textMuted" />,
+                  onClick: () => handleSetStatus(null),
+                },
+                {
                   label: 'Delete',
                   icon: <Trash2 className="w-4 h-4" />,
                   onClick: handleDelete,
@@ -407,7 +449,11 @@ export const AssetCard = memo(function AssetCard({
             )}
           </div>
         </div>
-
+        {asset.reviewStatus && (
+          <div className="mt-1">
+            <ReviewStatusBadge status={asset.reviewStatus} />
+          </div>
+        )}
       </div>
     </div>
       {showCopyToModal && (
@@ -437,6 +483,10 @@ export const AssetCard = memo(function AssetCard({
             { label: 'Move to', icon: <MoveIcon className="w-4 h-4" />, onClick: () => onRequestMove?.() },
             { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
             { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
+            { label: 'Approved', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
+            { label: 'Needs Revision', icon: <AlertCircle className="w-4 h-4 text-yellow-400" />, onClick: () => handleSetStatus('needs_revision') },
+            { label: 'In Review', icon: <Clock className="w-4 h-4 text-blue-400" />, onClick: () => handleSetStatus('in_review') },
+            { label: 'Clear status', icon: <X className="w-4 h-4 text-frame-textMuted" />, onClick: () => handleSetStatus(null) },
             { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
           ]}
         />
