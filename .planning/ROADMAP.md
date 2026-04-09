@@ -178,6 +178,6 @@ Plans:
 | 29. move-to-folder | v1.4 | 1/1 | Complete   | 2026-04-09 |
 | 30. asset-review-status | v1.4 | 1/2 | In Progress|  |
 | 31. version-stack-management | v1.4 | 1/2 | In Progress|  |
-| 32. smart-copy-options | v1.4 | 0/1 | Not started | - |
+| 32. smart-copy-options | v1.4 | 0/1 | Planned    |  |
 | 33. selection-review-links | v1.4 | 0/2 | Not started | - |
 | 34. compare-view-audio-comments | v1.4 | 0/2 | Not started | - |
