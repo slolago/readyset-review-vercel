@@ -9,13 +9,18 @@ import { CommentSidebar } from '@/components/viewer/CommentSidebar';
 import { Spinner } from '@/components/ui/Spinner';
 import { useProject } from '@/hooks/useProject';
 import Link from 'next/link';
-import { ChevronLeft, Share2, Download } from 'lucide-react';
+import { ChevronLeft, Share2, Download, CheckCircle2, AlertCircle, Clock, X, Tag } from 'lucide-react';
 import { forceDownload } from '@/lib/utils';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { CreateReviewLinkModal } from '@/components/review/CreateReviewLinkModal';
 import { VersionSwitcher } from '@/components/viewer/VersionSwitcher';
 import { VersionComparison } from '@/components/viewer/VersionComparison';
 import type { Comment, Asset } from '@/types';
+import type { ReviewStatus } from '@/types';
+import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
+import { Dropdown } from '@/components/ui/Dropdown';
+import { useAuth } from '@/hooks/useAuth';
+import toast from 'react-hot-toast';
 
 export default function AssetViewerPage() {
   const params = useParams();
@@ -23,6 +28,7 @@ export default function AssetViewerPage() {
   const assetId = params.assetId as string;
   const { asset, versions, loading } = useAsset(assetId);
   const { project } = useProject(projectId);
+  const { getIdToken } = useAuth();
   const [activeVersion, setActiveVersion] = useState<Asset | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const displayAsset = activeVersion || asset;
@@ -129,6 +135,26 @@ export default function AssetViewerPage() {
     }
   }, [activeAnnotationCommentId]);
 
+  const handleSetStatus = async (reviewStatus: ReviewStatus | null) => {
+    if (!displayAsset) return;
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/assets/${displayAsset.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reviewStatus }),
+      });
+      if (res.ok) {
+        setActiveVersion((prev) => prev ? { ...prev, reviewStatus: reviewStatus ?? undefined } as Asset : prev);
+        toast.success(reviewStatus ? 'Status updated' : 'Status cleared');
+      } else {
+        toast.error('Failed to update status');
+      }
+    } catch {
+      toast.error('Failed to update status');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -167,6 +193,38 @@ export default function AssetViewerPage() {
           </Link>
           <span className="text-frame-border text-xs">/</span>
           <h1 className="text-sm font-semibold text-white truncate">{asset.name}</h1>
+          <ReviewStatusBadge status={displayAsset?.reviewStatus} />
+          <Dropdown
+            trigger={
+              <button className="flex items-center gap-1 text-frame-textSecondary hover:text-white transition-colors text-xs px-1.5 py-1 rounded-lg hover:bg-frame-cardHover flex-shrink-0" title="Set review status">
+                <Tag className="w-3 h-3" />
+              </button>
+            }
+            align="left"
+            items={[
+              {
+                label: 'Approved',
+                icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+                onClick: () => handleSetStatus('approved'),
+              },
+              {
+                label: 'Needs Revision',
+                icon: <AlertCircle className="w-4 h-4 text-yellow-400" />,
+                onClick: () => handleSetStatus('needs_revision'),
+              },
+              {
+                label: 'In Review',
+                icon: <Clock className="w-4 h-4 text-blue-400" />,
+                onClick: () => handleSetStatus('in_review'),
+              },
+              {
+                label: 'Clear status',
+                icon: <X className="w-4 h-4 text-frame-textMuted" />,
+                onClick: () => handleSetStatus(null),
+                divider: true,
+              },
+            ]}
+          />
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {versions.length > 1 && displayAsset && (

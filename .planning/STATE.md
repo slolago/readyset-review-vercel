@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: — Review & Version Workflow
-status: executing
-stopped_at: Completed 29-01-PLAN.md (move-to-folder)
-last_updated: "2026-04-09T03:05:58.656Z"
-last_activity: 2026-04-09 -- Phase 30 execution started
+status: verifying
+stopped_at: Completed 30-02-PLAN.md (asset-review-status viewer header)
+last_updated: "2026-04-09T03:16:00.897Z"
+last_activity: 2026-04-09
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management
-**Current focus:** Phase 30 — asset-review-status
+**Current focus:** Phase 29 — move-to-folder
 
 ## Current Position
 
-Phase: 30 (asset-review-status) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 30
-Last activity: 2026-04-09 -- Phase 30 execution started
+Phase: 29 (move-to-folder) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-04-09
 
 Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 - Trend: Stable
 
 | Phase 29-move-to-folder P01 | 20min | 2 tasks | 2 files |
+| Phase 30-asset-review-status P02 | 15 | 1 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Progress: [░░░░░░░░░░] 0% (0/6 phases complete)
 - Dual MIME type on drag start (x-frame-move + x-frame-version-stack) for version stacking
 - [Phase 29-move-to-folder]: Move state lives in FolderBrowser only — AssetCard/FolderCard fire onRequestMove and own no move state
 - [Phase 29-move-to-folder]: FolderCard hover Dropdown fixed beyond plan scope to give consistent move-to-folder surface across all card types
+- [Phase 30-asset-review-status]: Optimistic reviewStatus update via setActiveVersion spread avoids re-fetching signed URLs
+- [Phase 30-asset-review-status]: Tag icon used as viewer header status-setter trigger to keep header uncluttered
 
 ### Pending Todos
 
@@ -81,6 +84,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-09T02:54:05.188Z
-Stopped at: Completed 29-01-PLAN.md (move-to-folder)
+Last session: 2026-04-09T03:16:00.888Z
+Stopped at: Completed 30-02-PLAN.md (asset-review-status viewer header)
 Resume file: None

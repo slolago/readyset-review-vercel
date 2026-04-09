@@ -98,8 +98,8 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [x] 30-01: ReviewStatus type + badge component + API null guard + AssetCard wiring
-- [ ] 30-02: Viewer header badge display + status setter dropdown
+- [ ] 30-01: ReviewStatus type + badge component + API null guard + AssetCard wiring
+- [x] 30-02: Viewer header badge display + status setter dropdown
 
 #### Phase 31: version-stack-management
 **Goal**: Users have full control over version stacks — unstacking individual versions and reordering within a stack
