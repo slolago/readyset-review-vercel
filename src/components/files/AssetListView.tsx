@@ -425,7 +425,7 @@ function AssetListRow({
 
         {/* Name */}
         <td className="px-3 py-2">
-          <span className="font-medium text-white truncate block max-w-[240px]">{asset.name}</span>
+          <span className="font-medium text-white truncate block max-w-[240px]" title={asset.name}>{asset.name}</span>
         </td>
 
         {/* Review status — clickable dropdown */}
