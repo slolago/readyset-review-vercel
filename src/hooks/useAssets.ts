@@ -55,6 +55,22 @@ function captureThumbnail(file: File): Promise<Blob | null> {
   });
 }
 
+const STANDARD_FRAME_RATES = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60];
+const FPS_SNAP_TOLERANCE = 0.6;
+
+function snapToStandardFps(raw: number): number {
+  let closest = raw;
+  let minDelta = Infinity;
+  for (const std of STANDARD_FRAME_RATES) {
+    const delta = Math.abs(raw - std);
+    if (delta < minDelta) {
+      minDelta = delta;
+      closest = std;
+    }
+  }
+  return minDelta <= FPS_SNAP_TOLERANCE ? closest : raw;
+}
+
 function extractVideoMetadata(file: File): Promise<{ width: number; height: number; duration: number; frameRate?: number } | null> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
@@ -88,7 +104,8 @@ function extractVideoMetadata(file: File): Promise<{ width: number; height: numb
         frameCount++;
         const elapsed = metadata.mediaTime - startMediaTime;
         if (elapsed >= 1.0 || frameCount >= 120) {
-          const fps = elapsed > 0 ? Math.round(frameCount / elapsed) : undefined;
+          const rawFps = elapsed > 0 ? frameCount / elapsed : undefined;
+          const fps = rawFps !== undefined ? snapToStandardFps(rawFps) : undefined;
           done({ ...base, frameRate: fps });
           return;
         }

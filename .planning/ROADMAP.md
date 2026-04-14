@@ -181,7 +181,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 35-01: Add upload date/time to AssetCard info row
+- [x] 35-01: Add upload date/time to AssetCard info row
 
 #### Phase 36: list-filename-fullname
 **Goal**: Full filename is readable in list view — currently truncated with no hover tooltip
@@ -192,7 +192,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 36-01: Add title tooltip to filename cell in AssetListView
+- [x] 36-01: Add title tooltip to filename cell in AssetListView
 
 #### Phase 37: fps-accuracy
 **Goal**: Frame rate in the info tab reflects the file's true frame rate, not a rounded measurement artifact
@@ -286,8 +286,8 @@ Plans:
 | 32. smart-copy-options | v1.4 | 0/1 | Planned    |  |
 | 33. selection-review-links | v1.4 | 1/2 | In Progress|  |
 | 34. compare-view-audio-comments | v1.4 | 0/2 | Deferred → Phase 42 | - |
-| 35. grid-asset-timestamps | v1.5 | 0/1 | Not started | - |
-| 36. list-filename-fullname | v1.5 | 0/1 | Not started | - |
+| 35. grid-asset-timestamps | v1.5 | 1/1 | Complete | 2026-04-14 |
+| 36. list-filename-fullname | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 37. fps-accuracy | v1.5 | 0/1 | Not started | - |
 | 38. vu-meter-pregain | v1.5 | 0/1 | Not started | - |
 | 39. copy-naming | v1.5 | 0/1 | Not started | - |
