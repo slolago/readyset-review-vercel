@@ -194,6 +194,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           e.preventDefault();
           v.muted = !v.muted;
           setMuted(v.muted);
+          vuMeterRef.current?.setMuted(v.muted);
           break;
         case 'f':
         case 'F':
@@ -279,6 +280,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     const v = parseFloat(e.target.value);
     setVolume(v); setMuted(v === 0);
     if (videoRef.current) { videoRef.current.volume = v; videoRef.current.muted = v === 0; }
+    vuMeterRef.current?.setVolume(v);
+    vuMeterRef.current?.setMuted(v === 0);
   };
 
   const toggleMute = () => {
@@ -286,6 +289,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     if (!v) return;
     v.muted = !v.muted;
     setMuted(v.muted);
+    vuMeterRef.current?.setMuted(v.muted);
   };
 
   const setRate = (rate: number) => {

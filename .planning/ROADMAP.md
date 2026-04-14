@@ -205,7 +205,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 37-01: Snap raw rVFC measurement to nearest standard frame rate
+- [x] 37-01: Snap raw rVFC measurement to nearest standard frame rate
 
 #### Phase 38: vu-meter-pregain
 **Goal**: VU meter measures the source audio signal, not the post-volume signal — adjusting the volume slider must not change what the meter shows
@@ -217,7 +217,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 38-01: Rewire AnalyserNode to tap audio chain before GainNode
+- [x] 38-01: Rewire AnalyserNode to tap audio chain before GainNode
 
 #### Phase 39: copy-naming
 **Goal**: Copying an asset preserves its original name — no "copy of" prefix added
@@ -288,8 +288,8 @@ Plans:
 | 34. compare-view-audio-comments | v1.4 | 0/2 | Deferred → Phase 42 | - |
 | 35. grid-asset-timestamps | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 36. list-filename-fullname | v1.5 | 1/1 | Complete | 2026-04-14 |
-| 37. fps-accuracy | v1.5 | 0/1 | Not started | - |
-| 38. vu-meter-pregain | v1.5 | 0/1 | Not started | - |
+| 37. fps-accuracy | v1.5 | 1/1 | Complete | 2026-04-14 |
+| 38. vu-meter-pregain | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 39. copy-naming | v1.5 | 0/1 | Not started | - |
 | 40. review-link-show-all-versions | v1.5 | 0/1 | Not started | - |
 | 41. viewer-download-cta | v1.5 | 0/1 | Not started | - |

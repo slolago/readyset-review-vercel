@@ -5,9 +5,13 @@ import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle, memo }
 /**
  * Called from VideoPlayer's togglePlay — must run inside the user-gesture
  * call stack so the browser permits AudioContext.resume().
+ * setVolume / setMuted route volume control through the GainNode so the
+ * analyser always reads the pre-gain source signal.
  */
 export interface VUMeterHandle {
   resume: () => void;
+  setVolume: (v: number) => void;
+  setMuted: (m: boolean) => void;
 }
 
 interface VUMeterProps {
@@ -30,12 +34,15 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
   function VUMeter({ videoRef, isPlaying }, ref) {
     const canvasRef    = useRef<HTMLCanvasElement>(null);
     const ctxRef       = useRef<AudioContext | null>(null);
+    const gainNodeRef  = useRef<GainNode | null>(null);
     const analyserLRef = useRef<AnalyserNode | null>(null);
     const analyserRRef = useRef<AnalyserNode | null>(null);
     const rafRef       = useRef(0);
     const peaks        = useRef<[number, number]>([0, 0]);
     const peakTimes    = useRef<[number, number]>([0, 0]);
     const peakDisp     = useRef<[number, number]>([0, 0]);
+    const volumeRef    = useRef(1);
+    const mutedRef     = useRef(false);
 
     // ── resume() — call inside user-gesture so AudioContext is allowed ──
     const resume = useCallback(() => {
@@ -45,7 +52,21 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
       }
     }, []);
 
-    useImperativeHandle(ref, () => ({ resume }), [resume]);
+    const setVolume = useCallback((v: number) => {
+      volumeRef.current = v;
+      if (gainNodeRef.current) {
+        gainNodeRef.current.gain.value = mutedRef.current ? 0 : v;
+      }
+    }, []);
+
+    const setMuted = useCallback((m: boolean) => {
+      mutedRef.current = m;
+      if (gainNodeRef.current) {
+        gainNodeRef.current.gain.value = m ? 0 : volumeRef.current;
+      }
+    }, []);
+
+    useImperativeHandle(ref, () => ({ resume, setVolume, setMuted }), [resume, setVolume, setMuted]);
 
     // ── Wire Web Audio graph once, at mount, from the real video element ─
     useEffect(() => {
@@ -64,6 +85,7 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
         // play-button gesture handler so the browser permits it.
 
         const source   = ctx.createMediaElementSource(video);
+        const gainNode = ctx.createGain();
         const splitter = ctx.createChannelSplitter(2);
         const aL       = ctx.createAnalyser();
         const aR       = ctx.createAnalyser();
@@ -71,14 +93,27 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
         aL.fftSize = 256; aL.smoothingTimeConstant = 0.8;
         aR.fftSize = 256; aR.smoothingTimeConstant = 0.8;
 
-        // IMPORTANT: reconnect to destination so the user can still hear audio.
-        // createMediaElementSource hijacks the element's native output.
-        source.connect(ctx.destination);
+        gainNode.gain.value = volumeRef.current;
+
+        // Route playback through GainNode so the user can control volume.
+        // createMediaElementSource hijacks the element's native output, so
+        // we must reconnect through the graph to hear audio.
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        // Tap the source BEFORE the GainNode so the analyser always reads
+        // the pre-gain signal — volume slider and mute do not affect the meter.
         source.connect(splitter);
         splitter.connect(aL, 0);
         splitter.connect(aR, 1);
 
+        // Force the media element to always output at full level; volume and
+        // mute are now controlled by gainNode instead.
+        video.volume = 1;
+        video.muted  = false;
+
         ctxRef.current    = ctx;
+        gainNodeRef.current = gainNode;
         analyserLRef.current = aL;
         analyserRRef.current = aR;
       } catch {
@@ -90,7 +125,8 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
 
       return () => {
         ctx.close().catch(() => {});
-        ctxRef.current       = null;
+        ctxRef.current    = null;
+        gainNodeRef.current = null;
         analyserLRef.current = null;
         analyserRRef.current = null;
       };
