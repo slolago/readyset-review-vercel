@@ -253,7 +253,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 41-01: Add persistent download button to asset viewer player controls
+- [x] 41-01: Add persistent download button to asset viewer player controls
 
 #### Phase 42: compare-audio-comments
 **Goal**: Compare view lets users choose which side's audio they hear and shows that version's comments
@@ -292,5 +292,5 @@ Plans:
 | 38. vu-meter-pregain | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 39. copy-naming | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 40. review-link-show-all-versions | v1.5 | 1/1 | Complete | 2026-04-14 |
-| 41. viewer-download-cta | v1.5 | 0/1 | Not started | - |
+| 41. viewer-download-cta | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 42. compare-audio-comments | v1.5 | 0/2 | Not started | - |

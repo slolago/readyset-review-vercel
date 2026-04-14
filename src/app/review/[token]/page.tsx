@@ -296,6 +296,11 @@ export default function ReviewPage() {
                     onAnnotationCancel={handleAnnotationCancel}
                     onCommentClick={handleCommentClickFromTimeline}
                     onAnnotationStarted={() => window.dispatchEvent(new CustomEvent('focus-comment-input'))}
+                    downloadUrl={
+                      data.reviewLink.allowDownloads
+                        ? ((selectedAsset as any).downloadUrl ?? (selectedAsset as any).signedUrl)
+                        : undefined
+                    }
                   />
                 ) : (
                   <ImageViewer

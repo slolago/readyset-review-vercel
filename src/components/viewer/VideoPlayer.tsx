@@ -8,7 +8,8 @@ import { SafeZonesOverlay } from './SafeZonesOverlay';
 import { SafeZoneSelector } from './SafeZoneSelector';
 import { VUMeter, type VUMeterHandle } from './VUMeter';
 import { formatDuration } from '@/lib/utils';
-import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize, Download } from 'lucide-react';
+import { forceDownload } from '@/lib/utils';
 
 interface VideoPlayerProps {
   asset: Asset;
@@ -23,6 +24,8 @@ interface VideoPlayerProps {
   onCommentClick?: (comment: Comment) => void;
   // Called when annotation mode starts so the sidebar can focus the textarea
   onAnnotationStarted?: () => void;
+  /** When provided, an always-visible Download button appears in the player controls. */
+  downloadUrl?: string;
 }
 
 export interface VideoPlayerHandle {
@@ -40,7 +43,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   asset, comments, onTimeUpdate, onUserInteraction,
   isAnnotationMode, displayShapes,
   onRequestAnnotation, onAnnotationCapture, onAnnotationCancel,
-  onCommentClick, onAnnotationStarted,
+  onCommentClick, onAnnotationStarted, downloadUrl,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -567,6 +570,18 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               <option key={r} value={r} className="bg-[#111] text-white">{r}x</option>
             ))}
           </select>
+
+          {/* Download — visible when downloadUrl is provided */}
+          {downloadUrl && (
+            <button
+              onClick={() => forceDownload(downloadUrl, asset.name)}
+              title="Download"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/70 hover:text-white border border-white/10 hover:border-white/30 rounded-lg transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download
+            </button>
+          )}
 
           {/* Fullscreen */}
           <button
