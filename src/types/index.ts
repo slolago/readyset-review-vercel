@@ -125,6 +125,18 @@ export interface UploadCompleteRequest {
   duration?: number;
 }
 
+export interface SafeZone {
+  id: string;
+  name: string;
+  ratio: string;       // "9:16" | "16:9" | "4:5" | "1:1" | custom
+  imageUrl: string;    // "/safezones/..." for built-in, "/api/safe-zones/{id}/image" for custom
+  gcsPath?: string;    // null for built-in, set for custom
+  isBuiltIn: boolean;
+  order: number;
+  createdAt?: Timestamp;
+  createdBy?: string | null;
+}
+
 // UI types
 export type AnnotationTool = 'select' | 'rectangle' | 'circle' | 'arrow' | 'freehand' | 'text';
 export type AnnotationColor = 'red' | 'yellow' | 'blue' | 'green' | 'white';

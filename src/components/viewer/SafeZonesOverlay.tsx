@@ -2,14 +2,15 @@
 
 interface SafeZonesOverlayProps {
   videoRect: { x: number; y: number; w: number; h: number };
-  safeZone: string; // filename like "001-9x16-HotZone-for-TikTok.png"
+  /** Full image URL — either "/safezones/..." for built-in or "/api/safe-zones/{id}/image" for custom. */
+  imageUrl: string;
   opacity?: number; // 0–1, defaults to 1
 }
 
-export function SafeZonesOverlay({ safeZone, opacity = 1 }: SafeZonesOverlayProps) {
+export function SafeZonesOverlay({ imageUrl, opacity = 1 }: SafeZonesOverlayProps) {
   return (
     <img
-      src={`/safezones/${safeZone}`}
+      src={imageUrl}
       alt=""
       style={{
         width: '100%',

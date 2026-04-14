@@ -7,7 +7,8 @@ import { UserTable } from '@/components/admin/UserTable';
 import { ProjectsTable } from '@/components/admin/ProjectsTable';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import type { User } from '@/types';
-import { Shield, UserPlus, Users, FolderOpen } from 'lucide-react';
+import { Shield, UserPlus, Users, FolderOpen, LayoutGrid } from 'lucide-react';
+import { SafeZonesManager } from '@/components/admin/SafeZonesManager';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 
@@ -17,7 +18,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'projects'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'projects' | 'safezones'>('users');
   const [projects, setProjects] = useState<any[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
 
@@ -167,6 +168,7 @@ export default function AdminPage() {
         {([
           { key: 'users' as const, label: 'Users', icon: Users },
           { key: 'projects' as const, label: 'All Projects', icon: FolderOpen },
+          { key: 'safezones' as const, label: 'Safe Zones', icon: LayoutGrid },
         ]).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -216,6 +218,20 @@ export default function AdminPage() {
             )}
           </div>
           <ProjectsTable projects={projects} loading={projectsLoading} />
+        </div>
+      )}
+
+      {activeTab === 'safezones' && (
+        <div className="bg-frame-card border border-frame-border rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-frame-border">
+            <h2 className="font-semibold text-white">Safe Zones</h2>
+            <p className="text-frame-textSecondary text-xs mt-0.5">
+              Manage overlay images shown in the video player
+            </p>
+          </div>
+          <div className="p-6">
+            <SafeZonesManager getIdToken={getIdToken} />
+          </div>
         </div>
       )}
 

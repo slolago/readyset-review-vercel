@@ -369,7 +369,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         {/* Safe zones overlay */}
         {activeSafeZone && videoRect.w > 0 && (
           <div style={{ position: 'absolute', left: videoRect.x, top: videoRect.y, width: videoRect.w, height: videoRect.h, pointerEvents: 'none', zIndex: 5 }}>
-            <SafeZonesOverlay videoRect={videoRect} safeZone={activeSafeZone} opacity={safeZoneOpacity} />
+            <SafeZonesOverlay videoRect={videoRect} imageUrl={activeSafeZone} opacity={safeZoneOpacity} />
           </div>
         )}
 
