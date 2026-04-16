@@ -308,8 +308,12 @@ Plans:
   3. A URL typed in a comment renders as a clickable link and does not overflow the comment box
   4. A user can set an in-point and out-point on a comment, and the timeline shows a highlighted range instead of a single marker
   5. Clicking a range comment on the timeline seeks to the in-point
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 44-01-PLAN.md — Resolved checkmark, author edit mode, clickable links (CMT-01, CMT-02, CMT-03)
+- [ ] 44-02-PLAN.md — Range comments with in/out points and timeline bar (CMT-04)
 
 ### Phase 45: annotation-bugs
 **Goal**: Annotation drawings behave predictably — they clear on version switch and the arrow tool does not steal freehand drawing interactions
