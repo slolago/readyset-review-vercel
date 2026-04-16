@@ -67,7 +67,36 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           })
         )
       ).filter(Boolean);
-      // Selection links skip version-grouping — return exactly the assets the user selected
+      // If showAllVersions, expand selection to include all versions in each asset's group
+      if (link.showAllVersions) {
+        const groupIds = new Set<string>();
+        for (const a of assets) {
+          if (a.versionGroupId) groupIds.add(a.versionGroupId);
+        }
+        if (groupIds.size > 0) {
+          const groupAssets = await Promise.all(
+            Array.from(groupIds).map(async (gid) => {
+              const snap = await db.collection('assets')
+                .where('versionGroupId', '==', gid)
+                .where('status', '==', 'ready')
+                .get();
+              return Promise.all(snap.docs.map(async (d) => {
+                const a = { id: d.id, ...d.data() } as any;
+                if (a.gcsPath) { try { a.signedUrl = await generateReadSignedUrl(a.gcsPath); } catch {} }
+                if (a.thumbnailGcsPath) { try { a.thumbnailSignedUrl = await generateReadSignedUrl(a.thumbnailGcsPath); } catch {} }
+                if (a.gcsPath && link.allowDownloads) { try { a.downloadUrl = await generateDownloadSignedUrl(a.gcsPath, a.name); } catch {} }
+                return a;
+              }));
+            })
+          );
+          const existing = new Set(assets.map((a: any) => a.id));
+          for (const group of groupAssets) {
+            for (const a of group) {
+              if (!existing.has(a.id)) { assets.push(a); existing.add(a.id); }
+            }
+          }
+        }
+      }
       // folders stays []
     } else {
       // Existing folder/project-scoped path

@@ -986,6 +986,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
             onToggleSelect={toggleSelect}
             onAssetDragStart={handleItemDragStart}
             onRequestMove={handleRequestMoveItem}
+            onCreateReviewLink={(assetId) => { setSelectionReviewIds([assetId]); setShowReviewModal(true); }}
             dragOverAssetId={dragOverAssetId}
             onAssetDragOver={handleAssetDragOver}
             onAssetDragLeave={handleAssetDragLeave}
@@ -1325,7 +1326,8 @@ const FolderCard = React.memo(function FolderCard({
           ? 'border-frame-accent ring-1 ring-frame-accent'
           : 'border-frame-border hover:border-frame-borderLight'
       }`}
-      onClick={() => {
+      onClick={(e) => {
+        if (e.button !== 0) return; // ignore right-click
         const url = `/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`;
         router.push(url);
       }}

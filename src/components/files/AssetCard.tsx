@@ -24,6 +24,7 @@ interface AssetCardProps {
   onCopied?: () => void;
   onDuplicated?: () => void;
   onRequestMove?: () => void;
+  onCreateReviewLink?: () => void;
   isSelected?: boolean;
   onToggleSelect?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.DragEvent) => void;
@@ -36,7 +37,7 @@ interface AssetCardProps {
 
 export const AssetCard = memo(function AssetCard({
   asset, onClick, onDeleted, onVersionUploaded, onCopied, onDuplicated,
-  onRequestMove, isSelected, onToggleSelect, onDragStart, hideActions,
+  onRequestMove, onCreateReviewLink, isSelected, onToggleSelect, onDragStart, hideActions,
   onDragOver, onDragLeave, onDrop, isDropTarget
 }: AssetCardProps) {
   const { getIdToken } = useAuth();
@@ -55,6 +56,8 @@ export const AssetCard = memo(function AssetCard({
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
   const downloadUrl = (asset as any).downloadUrl as string | undefined;
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [isHoverScrubbing, setIsHoverScrubbing] = useState(false);
+  const hoverVideoRef = useRef<HTMLVideoElement>(null);
 
   // When a video element loads its metadata, seek to a non-black frame
   const handleVideoMetadata = useCallback(() => {
@@ -62,6 +65,14 @@ export const AssetCard = memo(function AssetCard({
     if (!vid) return;
     const seekTo = Math.min((vid.duration || 0) * 0.1, 2) || 1;
     vid.currentTime = seekTo;
+  }, []);
+
+  const handleHoverScrub = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const vid = hoverVideoRef.current;
+    if (!vid || !vid.duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    vid.currentTime = pct * vid.duration;
   }, []);
 
   const handleRename = () => {
@@ -254,7 +265,12 @@ export const AssetCard = memo(function AssetCard({
       }`}
     >
       {/* Thumbnail */}
-      <div className="relative aspect-video bg-black overflow-hidden">
+      <div
+        className="relative aspect-video bg-black overflow-hidden"
+        onMouseEnter={asset.type === 'video' && signedUrl ? () => setIsHoverScrubbing(true) : undefined}
+        onMouseLeave={asset.type === 'video' && signedUrl ? () => setIsHoverScrubbing(false) : undefined}
+        onMouseMove={asset.type === 'video' && isHoverScrubbing ? handleHoverScrub : undefined}
+      >
         {asset.type === 'image' && signedUrl ? (
           <Image
             src={signedUrl}
@@ -286,6 +302,19 @@ export const AssetCard = memo(function AssetCard({
               <ImageIcon className="w-10 h-10 text-frame-textMuted" />
             )}
           </div>
+        )}
+
+        {/* Hover scrub video overlay */}
+        {asset.type === 'video' && signedUrl && isHoverScrubbing && (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video
+            ref={hoverVideoRef}
+            src={signedUrl}
+            preload="metadata"
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover z-[1]"
+          />
         )}
 
         {/* Selection checkbox */}
@@ -508,6 +537,7 @@ export const AssetCard = memo(function AssetCard({
             { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
             { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
             { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
+            ...(onCreateReviewLink ? [{ label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink }] : []),
             { label: 'Approved', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
             { label: 'Needs Revision', icon: <AlertCircle className="w-4 h-4 text-yellow-400" />, onClick: () => handleSetStatus('needs_revision') },
             { label: 'In Review', icon: <Clock className="w-4 h-4 text-blue-400" />, onClick: () => handleSetStatus('in_review') },
