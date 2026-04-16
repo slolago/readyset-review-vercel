@@ -40,6 +40,8 @@ export function useComments(assetId?: string, reviewToken?: string) {
     commentData: {
       text: string;
       timestamp?: number;
+      inPoint?: number;
+      outPoint?: number;
       annotation?: { shapes: string; frameTime?: number };
       parentId?: string | null;
       authorName?: string;
@@ -104,5 +106,26 @@ export function useComments(assetId?: string, reviewToken?: string) {
     }
   };
 
-  return { comments, loading, addComment, resolveComment, deleteComment, refetch: fetchComments };
+  const editComment = async (commentId: string, text: string): Promise<boolean> => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) return false;
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, text } : c))
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return { comments, loading, addComment, resolveComment, deleteComment, editComment, refetch: fetchComments };
 }

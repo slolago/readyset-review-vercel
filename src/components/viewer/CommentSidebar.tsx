@@ -29,6 +29,8 @@ interface CommentSidebarProps {
     data: {
       text: string;
       timestamp?: number;
+      inPoint?: number;
+      outPoint?: number;
       annotation?: { shapes: string; frameTime?: number };
       parentId?: string | null;
       authorName?: string;
@@ -39,6 +41,7 @@ interface CommentSidebarProps {
   ) => Promise<boolean>;
   onResolveComment: (id: string, resolved: boolean) => Promise<boolean>;
   onDeleteComment: (id: string) => Promise<boolean>;
+  onEditComment?: (id: string, newText: string) => Promise<boolean>;
   onSeek?: (time: number) => void;
   readOnly?: boolean;
   guestName?: string;
@@ -49,7 +52,7 @@ export function CommentSidebar({
   isAnnotationMode, pendingAnnotation,
   onRequestAnnotation, onCaptureAnnotation, onClearAnnotation,
   activeAnnotationCommentId, selectedCommentId, onShowAnnotation, onHideAnnotation,
-  onAddComment, onResolveComment, onDeleteComment, onSeek,
+  onAddComment, onResolveComment, onDeleteComment, onEditComment, onSeek,
   onSelectComment,
   readOnly = false, guestName,
 }: CommentSidebarProps) {
@@ -60,6 +63,8 @@ export function CommentSidebar({
   const [showResolved, setShowResolved] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'info'>('comments');
   const [submitting, setSubmitting] = useState(false);
+  const [inPoint, setInPoint] = useState<number | undefined>(undefined);
+  const [outPoint, setOutPoint] = useState<number | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +107,11 @@ export function CommentSidebar({
         parentId: replyTo || null,
       };
 
-      if (includeTimestamp && asset.type === 'video') {
+      if (inPoint !== undefined && outPoint !== undefined) {
+        commentData.inPoint = inPoint;
+        commentData.outPoint = outPoint;
+        commentData.timestamp = inPoint;
+      } else if (includeTimestamp && asset.type === 'video') {
         commentData.timestamp = currentTime;
       }
 
@@ -123,6 +132,8 @@ export function CommentSidebar({
         setText('');
         onClearAnnotation();
         setReplyTo(null);
+        setInPoint(undefined);
+        setOutPoint(undefined);
       } else {
         toast.error('Failed to post comment');
       }
@@ -203,6 +214,7 @@ export function CommentSidebar({
                 replies={getReplies(comment.id)}
                 onResolve={readOnly ? undefined : onResolveComment}
                 onDelete={readOnly ? undefined : onDeleteComment}
+                onEdit={readOnly ? undefined : onEditComment}
                 onSeek={(t) => onSeek?.(t)}
                 onReply={readOnly ? undefined : (id) => setReplyTo(id)}
                 onAnnotationClick={handleAnnotationClick}
@@ -279,6 +291,44 @@ export function CommentSidebar({
                   <Clock className="w-3 h-3" />
                   {includeTimestamp ? formatTimestamp(currentTime) : 'No time'}
                 </button>
+              )}
+              {asset.type === 'video' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setInPoint(currentTime)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
+                      inPoint !== undefined ? 'bg-frame-accent/15 text-frame-accent' : 'text-frame-textMuted hover:text-white'
+                    }`}
+                    title="Set in-point"
+                  >
+                    <span className="font-mono text-[10px]">IN</span>
+                    {inPoint !== undefined && <span className="font-mono text-[10px]">{formatTimestamp(inPoint)}</span>}
+                  </button>
+                  {inPoint !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() => setOutPoint(currentTime)}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
+                        outPoint !== undefined ? 'bg-frame-accent/15 text-frame-accent' : 'text-frame-textMuted hover:text-white'
+                      }`}
+                      title="Set out-point"
+                    >
+                      <span className="font-mono text-[10px]">OUT</span>
+                      {outPoint !== undefined && <span className="font-mono text-[10px]">{formatTimestamp(outPoint)}</span>}
+                    </button>
+                  )}
+                  {(inPoint !== undefined || outPoint !== undefined) && (
+                    <button
+                      type="button"
+                      onClick={() => { setInPoint(undefined); setOutPoint(undefined); }}
+                      className="text-frame-textMuted hover:text-red-400 text-xs px-1"
+                      title="Clear range"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </>
               )}
               <button
                 type="button"

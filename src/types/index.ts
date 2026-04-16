@@ -83,6 +83,8 @@ export interface Comment {
   authorEmail?: string;
   text: string;
   timestamp?: number; // video seconds
+  inPoint?: number;   // range start in video seconds
+  outPoint?: number;  // range end in video seconds
   annotation?: AnnotationData;
   resolved: boolean;
   parentId: string | null;

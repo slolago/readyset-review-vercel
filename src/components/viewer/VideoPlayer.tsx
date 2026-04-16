@@ -324,8 +324,12 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const displayTime = (t: number) => timecodeMode === 'smpte' ? formatSMPTE(t) : formatDuration(t);
 
   const timedComments = comments
-    .filter((c) => c.timestamp !== undefined)
+    .filter((c) => c.timestamp !== undefined && !c.outPoint)
     .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+
+  const rangeComments = comments
+    .filter((c) => c.inPoint !== undefined && c.outPoint !== undefined)
+    .sort((a, b) => (a.inPoint ?? 0) - (b.inPoint ?? 0));
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -414,8 +418,22 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         {/* Timeline */}
         <div className="relative">
           {/* Comment markers */}
-          {duration > 0 && timedComments.length > 0 && (
+          {duration > 0 && (timedComments.length > 0 || rangeComments.length > 0) && (
             <div className="relative h-4 mb-0.5">
+              {rangeComments.map((c) => {
+                const startPct = ((c.inPoint ?? 0) / duration) * 100;
+                const endPct = ((c.outPoint ?? 0) / duration) * 100;
+                const widthPct = endPct - startPct;
+                return (
+                  <button
+                    key={`range-${c.id}`}
+                    style={{ left: `${startPct}%`, width: `${widthPct}%` }}
+                    className="absolute top-1 h-2 rounded-full bg-frame-accent/50 border border-frame-accent/80 hover:bg-frame-accent/70 transition-colors cursor-pointer"
+                    onClick={() => onCommentClick?.(c)}
+                    title={`${c.authorName}: ${c.text.slice(0, 60)}`}
+                  />
+                );
+              })}
               {timedComments.map((c) => {
                 const pct = ((c.timestamp ?? 0) / duration) * 100;
                 const hasAnnotation = !!(c.annotation?.shapes && c.annotation.shapes !== '[]');

@@ -32,7 +32,7 @@ export default function AssetViewerPage() {
   const [activeVersion, setActiveVersion] = useState<Asset | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const displayAsset = activeVersion || asset;
-  const { comments, addComment, resolveComment, deleteComment } = useComments(displayAsset?.id);
+  const { comments, addComment, resolveComment, deleteComment, editComment } = useComments(displayAsset?.id);
   const [currentTime, setCurrentTime] = useState(0);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const videoRef = useRef<VideoPlayerHandle>(null);
@@ -312,6 +312,7 @@ export default function AssetViewerPage() {
           onAddComment={addComment}
           onResolveComment={resolveComment}
           onDeleteComment={deleteComment}
+          onEditComment={editComment}
           onSeek={handleSeek}
           onSelectComment={setSelectedCommentId}
         />

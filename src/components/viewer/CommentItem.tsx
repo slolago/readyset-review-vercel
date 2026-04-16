@@ -2,17 +2,37 @@
 
 import { useState } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
 import { formatRelativeTime, formatDuration } from '@/lib/utils';
 import type { Comment } from '@/types';
-import { CheckCircle, Trash2, Reply, CornerDownRight, Pencil } from 'lucide-react';
+import { CheckCircle, CheckCircle2, Trash2, Reply, CornerDownRight, Pencil } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+
+function renderCommentText(text: string): React.ReactNode {
+  const urlRegex = /https?:\/\/[^\s<>"]+/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = urlRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    parts.push(
+      <a key={match.index} href={match[0]} target="_blank" rel="noopener noreferrer"
+         className="text-frame-accent underline hover:text-frame-accentHover break-all"
+         onClick={(e) => e.stopPropagation()}>
+        {match[0]}
+      </a>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
 
 interface CommentItemProps {
   comment: Comment;
   replies?: Comment[];
   onResolve?: (id: string, resolved: boolean) => void;
   onDelete?: (id: string) => void;
+  onEdit?: (id: string, newText: string) => void;
   onSeek?: (time: number) => void;
   onReply?: (parentId: string) => void;
   onAnnotationClick?: (comment: Comment) => void;
@@ -27,6 +47,7 @@ export function CommentItem({
   replies = [],
   onResolve,
   onDelete,
+  onEdit,
   onSeek,
   onReply,
   onAnnotationClick,
@@ -37,6 +58,15 @@ export function CommentItem({
 }: CommentItemProps) {
   const { user } = useAuth();
   const [showReplies, setShowReplies] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(comment.text);
+
+  const handleSaveEdit = () => {
+    if (editText.trim() && editText.trim() !== comment.text) {
+      onEdit?.(comment.id, editText.trim());
+    }
+    setIsEditing(false);
+  };
 
   const createdAt = comment.createdAt?.toDate?.() || new Date();
   const canDelete = !readOnly && (user?.id === comment.authorId || user?.role === 'admin' || user?.role === 'manager' || user?.role === 'editor');
@@ -79,14 +109,35 @@ export function CommentItem({
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Avatar name={comment.authorName} size="sm" className="flex-shrink-0" />
             <span className="text-xs font-medium text-white">{comment.authorName}</span>
-            {comment.resolved && <Badge variant="success" size="sm">Resolved</Badge>}
+            {comment.resolved && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />}
             <span className="text-[10px] text-frame-textMuted ml-auto">{formatRelativeTime(createdAt)}</span>
           </div>
 
           {/* Text */}
-          <p className="text-sm text-frame-textSecondary leading-relaxed whitespace-pre-wrap">
-            {comment.text}
-          </p>
+          {isEditing ? (
+            <div>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); }
+                  if (e.key === 'Escape') setIsEditing(false);
+                }}
+                rows={3}
+                className="w-full bg-frame-bg border border-frame-border rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-frame-accent"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+              <div className="flex gap-2 mt-1.5">
+                <button onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }} className="px-3 py-1 bg-frame-accent text-white text-xs rounded-lg hover:bg-frame-accentHover">Save</button>
+                <button onClick={(e) => { e.stopPropagation(); setIsEditing(false); }} className="px-3 py-1 text-frame-textMuted text-xs hover:text-white">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-frame-textSecondary leading-relaxed whitespace-pre-wrap break-words">
+              {renderCommentText(comment.text)}
+            </p>
+          )}
 
           {/* Annotation button */}
           {hasAnnotation && (
@@ -120,6 +171,15 @@ export function CommentItem({
                 >
                   <CheckCircle className="w-3.5 h-3.5" />
                   {comment.resolved ? 'Reopen' : 'Resolve'}
+                </button>
+              )}
+              {onEdit && !comment.resolved && user?.id === comment.authorId && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditText(comment.text); }}
+                  className="flex items-center gap-1 text-xs text-frame-textMuted hover:text-white transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
                 </button>
               )}
               {onReply && !comment.parentId && (
@@ -161,6 +221,7 @@ export function CommentItem({
                   comment={reply}
                   onResolve={onResolve}
                   onDelete={onDelete}
+                  onEdit={onEdit}
                   onSeek={onSeek}
                   readOnly={readOnly}
                 />
