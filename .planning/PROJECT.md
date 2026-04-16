@@ -10,19 +10,26 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Current Milestone: v1.5 Polish & Production Accuracy
+## Current Milestone: v1.6 Polish & UX Refinement
 
-**Goal:** Close the gap between "mostly working" and production-ready — accurate FPS + VU measurements, full UI legibility (grid timestamps, list filenames), no naming friction on copy, all review link features working as spec'd, and the compare view completing with audio switching and comment panels.
+**Goal:** Address user-reported bugs and UX gaps — fix broken interactions (compare slider, resolved comments, annotations leaking, context menus) and add missing capabilities (comment editing, range comments, clickable links, hover preview, version dates).
 
 **Target features:**
-- Grid card upload date/time — distinguish versions after unstacking (all show V1, date is the differentiator)
-- List view full filename on hover — no more truncation without tooltip
-- FPS accuracy — snap rVFC measurement to nearest standard frame rate (CTV spec compliance)
-- VU meter pre-gain — measure source signal, not post-volume output
-- Copy naming — remove "copy of" prefix so CFFs don't need manual renaming
-- Review link show-all-versions fix — toggle was broken, viewer showed only one version
-- Viewer download CTA — always-visible download button in player (not hover-only)
-- Compare view audio switching + comments — click to choose audio side; see that version's comments
+- FPS detection fix — still showing 31fps on new uploads
+- Show-all-versions fix — single-video mode only shows 1 version; folder mode flattens structure
+- Resolved comments — show checkmark instead of disappearing
+- Annotation cleanup — drawings should not persist when switching versions
+- Arrow tool fix — should not conflict with freehand selection/movement
+- Compare slider fix — freezes / plays only one video
+- Context menu fix — right-click "review link" opens folder instead of showing menu
+- Comment links — render as clickable + fix overflow
+- Version selector dates — show upload date/time in dropdown
+- Comment editing — only by original author
+- VU meter width — widen for number legibility
+- Compare audio indicator — clear audio source indicator + easy switching
+- Range comments — in-out markers on timeline (not just single timecode)
+- Video hover preview — cursor scrubbing over thumbnails
+- Review links on videos — not just folders
 
 ## Current State (v1.4 — shipped 2026-04-14)
 
@@ -74,17 +81,23 @@ Fast, accurate video review — frame-level precision, rich metadata, and fluid 
 - ✓ Collaborator invite autocomplete — v1.2
 - ✓ Asset download button in viewer — v1.2
 
-### Active (v1.5)
+### Active (v1.6)
 
-- [ ] GRID-01: Upload date/time on grid cards (version disambiguation post-unstack)
-- [ ] LIST-01: Full filename visible on hover in list view
-- [ ] FPS-01: FPS snapped to nearest standard rate (CTV accuracy)
-- [ ] VU-01: VU meter measures pre-gain source signal
-- [ ] COPY-01: Copy preserves original asset name (no "copy of" prefix)
-- [ ] RVLINK-01: Show-all-versions toggle on review links works correctly
-- [ ] RVLINK-02: Persistent download button in video player view
-- [ ] COMPARE-01: Compare view audio switch by clicking version label
-- [ ] COMPARE-02: Compare view shows active version's comments
+- [ ] FPS-02: FPS detection produces correct rate on new uploads (not 31fps)
+- [ ] RVLINK-03: Show-all-versions works for single-video and folder review links
+- [ ] CMT-01: Resolved comments show checkmark instead of disappearing
+- [ ] CMT-02: Comment editing allowed for original author only
+- [ ] CMT-03: Links in comments are clickable and don't overflow the box
+- [ ] CMT-04: Range comments with in-out markers on timeline
+- [ ] ANNOT-01: Annotation drawings clear when switching between versions
+- [ ] ANNOT-02: Arrow tool does not conflict with freehand selection
+- [ ] COMPARE-03: Compare slider works reliably (no freeze, plays both videos)
+- [ ] COMPARE-04: Compare view shows clear audio source indicator + easy switching
+- [ ] VER-01: Version selector dropdown shows upload date/time per version
+- [ ] VU-02: VU meter wider for number legibility
+- [ ] CTX-01: Right-click "review link" shows context menu (doesn't open folder)
+- [ ] HOVER-01: Video hover preview — cursor scrubbing over thumbnails
+- [ ] RVLINK-04: Review links can be created on individual videos (not just folders)
 
 ### Out of Scope
 
@@ -113,4 +126,23 @@ Fast, accurate video review — frame-level precision, rich metadata, and fluid 
 
 ---
 
-*Last updated: 2026-04-08 — v1.4 milestone started*
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
+---
+
+*Last updated: 2026-04-16 — v1.6 milestone started*

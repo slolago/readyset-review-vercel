@@ -1,43 +1,44 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: — Polish & Production Accuracy
-status: complete
-stopped_at: All 8 phases shipped
-last_updated: "2026-04-14T00:00:00.000Z"
-last_activity: 2026-04-14
+milestone: v1.6
+milestone_name: — Polish & UX Refinement
+status: active
+stopped_at: Defining requirements
+last_updated: "2026-04-16T00:00:00.000Z"
+last_activity: 2026-04-16
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-14)
+See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management
-**Current focus:** v1.5 COMPLETE — all 8 phases shipped
+**Current focus:** v1.6 Polish & UX Refinement — defining requirements
 
 ## Current Position
 
-Phase: 42 (compare-audio-comments) — COMPLETE
-Plan: 9 of 9
-Status: All phases done
-Last activity: 2026-04-14
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-16 — Milestone v1.6 started
 
-Progress: [██████████] 100% (8/8 phases complete)
+Progress: [░░░░░░░░░░] 0% (0/0 phases)
 
 ## Performance Metrics
 
 **Velocity:**
 
 - v1.3: 9 plans across 6 phases
-- v1.4: 7 plans across 5 phases (phase 34 deferred)
+- v1.4: 7 plans across 5 phases
+- v1.5: 9 plans across 8 phases
 - Trend: Stable
 
 ## Accumulated Context
@@ -49,10 +50,10 @@ Progress: [██████████] 100% (8/8 phases complete)
 - SmartCopyModal and VersionStackModal extracted to shared files in v1.4 audit
 - Atomic Firestore batch for version group merge (established v1.3)
 - Dual MIME type on drag start for version stacking (established v1.3)
-- FPS stored as frameRate on Asset, measured via requestVideoFrameCallback — v1.5 will snap to standard rates
+- FPS stored as frameRate on Asset, measured via requestVideoFrameCallback — v1.5 snaps to standard rates
 - VU meter AnalyserNode must tap BEFORE GainNode to measure source signal
-- Copy API currently prepends "copy of" — must be removed in Phase 39
 - showAllVersions stored on ReviewLink doc — bug is in the GET /review-links/[token] render path
+- Video.js does not reset audio track on src() change — use player.muted() for per-side audio toggle
 
 ### Pending Todos
 
@@ -60,13 +61,12 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 37 (FPS): requestVideoFrameCallback timing jitter can cause off-by-one; standard rate snap table: [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60]
-- Phase 38 (VU meter): Web Audio API chain order — AnalyserNode must connect to source node directly, parallel to GainNode
-- Phase 40 (show-all-versions): Need to trace showAllVersions from ReviewLink doc through GET /api/review-links/[token] → render — likely the version grouping logic ignores the flag
-- Phase 42 (compare): Video.js does not reset audio track on src() change — use player.muted() for per-side audio toggle
+- FPS: requestVideoFrameCallback still producing 31fps for some uploads — need to investigate root cause beyond snap table
+- Compare slider: Video.js player sync issues when using split/overlay mode
+- Resolved comments: current implementation removes from DOM instead of visual toggle
 
 ## Session Continuity
 
-Last session: 2026-04-14
-Stopped at: Milestone v1.5 initialized
+Last session: 2026-04-16
+Stopped at: Milestone v1.6 initialized — defining requirements
 Resume file: None
