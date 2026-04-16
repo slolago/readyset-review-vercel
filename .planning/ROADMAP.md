@@ -5,7 +5,8 @@
 - ✅ **v1.2 — Feature Expansion** - Phases 1–22 (shipped 2026-04-07)
 - ✅ **v1.3 — Video Review Polish** - Phases 23–28 (shipped 2026-04-08)
 - ✅ **v1.4 — Review & Version Workflow** - Phases 29–33 (shipped 2026-04-14)
-- 🚧 **v1.5 — Polish & Production Accuracy** - Phases 35–42 (in progress)
+- ✅ **v1.5 — Polish & Production Accuracy** - Phases 35–42 (shipped 2026-04-14)
+- 🚧 **v1.6 — Polish & UX Refinement** - Phases 43–47 (in progress)
 
 ## Phases
 
@@ -67,11 +68,10 @@ Plans:
 
 </details>
 
-### 🚧 v1.4 — Review & Version Workflow (In Progress)
+<details>
+<summary>✅ v1.4 — Review & Version Workflow (Phases 29–34) - SHIPPED 2026-04-14</summary>
 
-**Milestone Goal:** Sharper version control, asset approval statuses, and smarter review link creation for production QC pipelines.
-
-#### Phase 29: move-to-folder
+### Phase 29: move-to-folder
 **Goal**: Users can relocate assets between folders using a context menu
 **Depends on**: Phase 28
 **Requirements**: MOVE-01
@@ -85,7 +85,7 @@ Plans:
 Plans:
 - [x] 29-01: Verify + wire move-to context menu option
 
-#### Phase 30: asset-review-status
+### Phase 30: asset-review-status
 **Goal**: Users can label assets with a QC review status and see those labels in the grid and viewer
 **Depends on**: Phase 29
 **Requirements**: STATUS-01, STATUS-02
@@ -99,10 +99,10 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 30-01: ReviewStatus type + badge component + API null guard + AssetCard wiring
+- [x] 30-01: ReviewStatus type + badge component + API null guard + AssetCard wiring
 - [x] 30-02: Viewer header badge display + status setter dropdown
 
-#### Phase 31: version-stack-management
+### Phase 31: version-stack-management
 **Goal**: Users have full control over version stacks — unstacking individual versions and reordering within a stack
 **Depends on**: Phase 30
 **Requirements**: VSTK-01, VSTK-02
@@ -115,10 +115,10 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 31-01: POST /api/assets/unstack-version + POST /api/assets/reorder-versions
+- [x] 31-01: POST /api/assets/unstack-version + POST /api/assets/reorder-versions
 - [x] 31-02: VersionStackModal unstack button + drag-to-reorder UI
 
-#### Phase 32: smart-copy-options
+### Phase 32: smart-copy-options
 **Goal**: Copying to a review folder gives users control over which version is copied and whether comments travel with it
 **Depends on**: Phase 31
 **Requirements**: REVIEW-01, REVIEW-02
@@ -130,9 +130,9 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 32-01: SmartCopyModal + latestVersionOnly param on copy API
+- [x] 32-01: SmartCopyModal + latestVersionOnly param on copy API
 
-#### Phase 33: selection-review-links
+### Phase 33: selection-review-links
 **Goal**: Users can generate a review link scoped to a specific set of manually selected assets rather than an entire folder
 **Depends on**: Phase 32
 **Requirements**: REVIEW-03
@@ -146,10 +146,10 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 33-01: assetIds schema on ReviewLink + API branch + CreateReviewLinkModal prop
+- [x] 33-01: assetIds schema on ReviewLink + API branch + CreateReviewLinkModal prop
 - [x] 33-02: Selection toolbar action + review link page guard (no folder browser, delete placeholder)
 
-#### Phase 34: compare-view-audio-comments
+### Phase 34: compare-view-audio-comments
 **Goal**: The compare view lets users control audio per side and shows the active version's comments
 **Depends on**: Phase 33
 **Requirements**: COMPARE-01, COMPARE-02
@@ -163,14 +163,15 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 34-01: Per-side audio state refactor (mutedA/mutedB + activeSide) in VersionComparison
-- [ ] 34-02: CompareCommentPanel component wired to activeSide
+- [x] 34-01: Per-side audio state refactor (mutedA/mutedB + activeSide) in VersionComparison
+- [x] 34-02: CompareCommentPanel component wired to activeSide
 
-### 🚧 v1.5 — Polish & Production Accuracy (In Progress)
+</details>
 
-**Milestone Goal:** Close the gap between "mostly working" and production-ready — accurate measurements (FPS, VU), full UI legibility (grid timestamps, list filenames), no naming friction on copy, all review link features working as spec'd, and the long-deferred compare view completing with audio switching and comment panels.
+<details>
+<summary>✅ v1.5 — Polish & Production Accuracy (Phases 35–42) - SHIPPED 2026-04-14</summary>
 
-#### Phase 35: grid-asset-timestamps
+### Phase 35: grid-asset-timestamps
 **Goal**: Upload date and time is visible on grid cards — critical for distinguishing versions after unstacking when all siblings show V1
 **Requirements**: GRID-01
 **Success Criteria** (what must be TRUE):
@@ -183,7 +184,7 @@ Plans:
 Plans:
 - [x] 35-01: Add upload date/time to AssetCard info row
 
-#### Phase 36: list-filename-fullname
+### Phase 36: list-filename-fullname
 **Goal**: Full filename is readable in list view — currently truncated with no hover tooltip
 **Requirements**: LIST-01
 **Success Criteria** (what must be TRUE):
@@ -194,7 +195,7 @@ Plans:
 Plans:
 - [x] 36-01: Add title tooltip to filename cell in AssetListView
 
-#### Phase 37: fps-accuracy
+### Phase 37: fps-accuracy
 **Goal**: Frame rate in the info tab reflects the file's true frame rate, not a rounded measurement artifact
 **Requirements**: FPS-01
 **Success Criteria** (what must be TRUE):
@@ -207,7 +208,7 @@ Plans:
 Plans:
 - [x] 37-01: Snap raw rVFC measurement to nearest standard frame rate
 
-#### Phase 38: vu-meter-pregain
+### Phase 38: vu-meter-pregain
 **Goal**: VU meter measures the source audio signal, not the post-volume signal — adjusting the volume slider must not change what the meter shows
 **Requirements**: VU-01
 **Success Criteria** (what must be TRUE):
@@ -219,7 +220,7 @@ Plans:
 Plans:
 - [x] 38-01: Rewire AnalyserNode to tap audio chain before GainNode
 
-#### Phase 39: copy-naming
+### Phase 39: copy-naming
 **Goal**: Copying an asset preserves its original name — no "copy of" prefix added
 **Requirements**: COPY-01
 **Success Criteria** (what must be TRUE):
@@ -231,7 +232,7 @@ Plans:
 Plans:
 - [x] 39-01: Remove "copy of" prefix from copy API
 
-#### Phase 40: review-link-show-all-versions
+### Phase 40: review-link-show-all-versions
 **Goal**: The "Show all versions" toggle on review link creation actually shows all versions on the review page
 **Requirements**: RVLINK-01
 **Success Criteria** (what must be TRUE):
@@ -243,7 +244,7 @@ Plans:
 Plans:
 - [x] 40-01: Debug and fix showAllVersions propagation through review link GET and render
 
-#### Phase 41: viewer-download-cta
+### Phase 41: viewer-download-cta
 **Goal**: A prominent download button is visible in the full video player without requiring hover on the thumbnail
 **Requirements**: RVLINK-02
 **Success Criteria** (what must be TRUE):
@@ -255,7 +256,7 @@ Plans:
 Plans:
 - [x] 41-01: Add persistent download button to asset viewer player controls
 
-#### Phase 42: compare-audio-comments
+### Phase 42: compare-audio-comments
 **Goal**: Compare view lets users choose which side's audio they hear and shows that version's comments
 **Requirements**: COMPARE-01, COMPARE-02
 **Success Criteria** (what must be TRUE):
@@ -270,6 +271,77 @@ Plans:
 - [x] 42-01: Per-side audio state refactor + active-side click handler in AssetCompareModal
 - [x] 42-02: CompareCommentPanel component wired to activeSide
 
+</details>
+
+### 🚧 v1.6 — Polish & UX Refinement (In Progress)
+
+**Milestone Goal:** Address user-reported bugs and UX gaps — fix broken interactions, restore accurate measurements, and add missing capabilities (comment editing, range comments, hover preview, video review links).
+
+- [ ] **Phase 43: quick-fixes** - FPS upload bug, version dropdown dates, VU meter width
+- [ ] **Phase 44: comment-system** - Resolved state, author editing, link rendering, range comments
+- [ ] **Phase 45: annotation-bugs** - Version switch clears drawings, arrow tool conflict
+- [ ] **Phase 46: compare-player** - Compare slider reliability, audio indicator + switching
+- [ ] **Phase 47: review-links-hover** - Context menu bug, show-all-versions, video review links, hover preview
+
+## Phase Details
+
+### Phase 43: quick-fixes
+**Goal**: Three small independent bugs are fixed — FPS is correct on new uploads, version selector shows dates, and VU meter numbers are legible
+**Depends on**: Phase 42
+**Requirements**: BUG-01, VER-01, PLAY-03
+**Success Criteria** (what must be TRUE):
+  1. Uploading a 30fps video shows 30fps in the info tab immediately after processing (not 31fps)
+  2. The version selector dropdown shows an upload date/time alongside each version label (e.g., "V3 — Apr 14, 3:42 PM")
+  3. The VU meter is wide enough that dB numbers (e.g., "-18") are fully readable without truncation
+**Plans**: TBD
+
+### Phase 44: comment-system
+**Goal**: The comment panel behaves correctly — resolved comments stay visible, authors can edit their own, links are clickable, and users can mark a time range
+**Depends on**: Phase 43
+**Requirements**: CMT-01, CMT-02, CMT-03, CMT-04
+**Success Criteria** (what must be TRUE):
+  1. Resolving a comment shows a checkmark on that comment rather than removing it from the list
+  2. A user can click "Edit" on their own comment, change the text, and save — the option is not present on others' comments
+  3. A URL typed in a comment renders as a clickable link and does not overflow the comment box
+  4. A user can set an in-point and out-point on a comment, and the timeline shows a highlighted range instead of a single marker
+  5. Clicking a range comment on the timeline seeks to the in-point
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 45: annotation-bugs
+**Goal**: Annotation drawings behave predictably — they clear on version switch and the arrow tool does not steal freehand drawing interactions
+**Depends on**: Phase 44
+**Requirements**: BUG-03, BUG-04
+**Success Criteria** (what must be TRUE):
+  1. Switching from version V2 to V1 in the viewer clears all drawings from V2 — no annotations persist across versions
+  2. Selecting the arrow tool and clicking on the canvas moves/selects existing objects without triggering freehand strokes
+  3. Selecting the freehand pen tool draws normally with no interference from arrow tool behavior
+**Plans**: TBD
+
+### Phase 46: compare-player
+**Goal**: The compare view plays both videos reliably and clearly communicates which side's audio is active
+**Depends on**: Phase 45
+**Requirements**: BUG-05, PLAY-01, PLAY-02
+**Success Criteria** (what must be TRUE):
+  1. Pressing play in the compare view plays both videos simultaneously without either freezing or falling out of sync
+  2. A visible indicator (badge, icon, or highlight) shows which side's audio is currently active
+  3. Clicking the audio toggle switches the active audio source and the indicator updates immediately
+  4. The compare slider (overlay mode) can be dragged while both videos are playing without either video pausing
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 47: review-links-hover
+**Goal**: Review link creation and browsing work correctly for individual videos, the context menu appears on right-click, show-all-versions is reliable, and hovering over thumbnails scrubs frames
+**Depends on**: Phase 46
+**Requirements**: BUG-02, RVLINK-01, RVLINK-02, PLAY-04
+**Success Criteria** (what must be TRUE):
+  1. Right-clicking a folder asset labeled "review link" shows the context menu instead of navigating into the folder
+  2. A user can create a review link on a single video asset (not just a folder), and the link opens that video in the review player
+  3. Opening a review link with "Show all versions" enabled displays every version in the stack as a separate card
+  4. Hovering the cursor over a video thumbnail in the grid scrubs through the video frames at the cursor's horizontal position
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -281,10 +353,10 @@ Plans:
 | 27. asset-comparison | v1.3 | 1/1 | Complete | 2026-04-08 |
 | 28. version-stack-dnd | v1.3 | 2/2 | Complete | 2026-04-08 |
 | 29. move-to-folder | v1.4 | 1/1 | Complete   | 2026-04-09 |
-| 30. asset-review-status | v1.4 | 1/2 | In Progress|  |
-| 31. version-stack-management | v1.4 | 1/2 | In Progress|  |
-| 32. smart-copy-options | v1.4 | 0/1 | Planned    |  |
-| 33. selection-review-links | v1.4 | 1/2 | In Progress|  |
+| 30. asset-review-status | v1.4 | 2/2 | Complete | 2026-04-14 |
+| 31. version-stack-management | v1.4 | 2/2 | Complete | 2026-04-14 |
+| 32. smart-copy-options | v1.4 | 1/1 | Complete | 2026-04-14 |
+| 33. selection-review-links | v1.4 | 2/2 | Complete | 2026-04-14 |
 | 34. compare-view-audio-comments | v1.4 | 0/2 | Deferred → Phase 42 | - |
 | 35. grid-asset-timestamps | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 36. list-filename-fullname | v1.5 | 1/1 | Complete | 2026-04-14 |
@@ -294,3 +366,8 @@ Plans:
 | 40. review-link-show-all-versions | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 41. viewer-download-cta | v1.5 | 1/1 | Complete | 2026-04-14 |
 | 42. compare-audio-comments | v1.5 | 2/2 | Complete | 2026-04-14 |
+| 43. quick-fixes | v1.6 | 0/? | Not started | - |
+| 44. comment-system | v1.6 | 0/? | Not started | - |
+| 45. annotation-bugs | v1.6 | 0/? | Not started | - |
+| 46. compare-player | v1.6 | 0/? | Not started | - |
+| 47. review-links-hover | v1.6 | 0/? | Not started | - |

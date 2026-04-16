@@ -63,13 +63,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| BUG-01 | Phase 43 | Pending |
+| VER-01 | Phase 43 | Pending |
+| PLAY-03 | Phase 43 | Pending |
+| CMT-01 | Phase 44 | Pending |
+| CMT-02 | Phase 44 | Pending |
+| CMT-03 | Phase 44 | Pending |
+| CMT-04 | Phase 44 | Pending |
+| BUG-03 | Phase 45 | Pending |
+| BUG-04 | Phase 45 | Pending |
+| BUG-05 | Phase 46 | Pending |
+| PLAY-01 | Phase 46 | Pending |
+| PLAY-02 | Phase 46 | Pending |
+| BUG-02 | Phase 47 | Pending |
+| RVLINK-01 | Phase 47 | Pending |
+| RVLINK-02 | Phase 47 | Pending |
+| PLAY-04 | Phase 47 | Pending |
 
 **Coverage:**
 - v1.6 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️
+- Mapped to phases: 16
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-16*
-*Last updated: 2026-04-16 after initial definition*
+*Last updated: 2026-04-16 — traceability populated by roadmapper (phases 43–47)*

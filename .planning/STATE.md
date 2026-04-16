@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.6
-milestone_name: — Polish & UX Refinement
+milestone_name: Polish & UX Refinement
 status: active
-stopped_at: Defining requirements
+stopped_at: Roadmap created — ready for Phase 43
 last_updated: "2026-04-16T00:00:00.000Z"
 last_activity: 2026-04-16
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management
-**Current focus:** v1.6 Polish & UX Refinement — defining requirements
+**Current focus:** v1.6 Polish & UX Refinement — Phase 43 (quick-fixes) up next
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 43 (quick-fixes) — Not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-16 — Milestone v1.6 started
+Status: Roadmap created, ready to plan Phase 43
+Last activity: 2026-04-16 — Roadmap written for v1.6 (phases 43–47)
 
-Progress: [░░░░░░░░░░] 0% (0/0 phases)
+Progress: [░░░░░░░░░░] 0% (0/5 phases)
 
 ## Performance Metrics
 
@@ -61,12 +61,12 @@ None.
 
 ### Blockers/Concerns
 
-- FPS: requestVideoFrameCallback still producing 31fps for some uploads — need to investigate root cause beyond snap table
-- Compare slider: Video.js player sync issues when using split/overlay mode
-- Resolved comments: current implementation removes from DOM instead of visual toggle
+- BUG-01: FPS still producing 31fps on some uploads — snap table (Phase 37) works in viewer but issue may be at upload-time measurement; investigate whether rVFC fires enough frames before storing frameRate
+- BUG-05: Compare slider freezes — likely Video.js sync issue; both players need a single shared timeupdate driver
+- ANNOT-02: Arrow tool event handling conflicts with Fabric.js freehand mode — may need tool-mode mutex in canvas manager
 
 ## Session Continuity
 
 Last session: 2026-04-16
-Stopped at: Milestone v1.6 initialized — defining requirements
+Stopped at: Roadmap created — 5 phases (43–47), 16/16 requirements mapped
 Resume file: None
