@@ -56,8 +56,10 @@ export const AssetCard = memo(function AssetCard({
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
   const downloadUrl = (asset as any).downloadUrl as string | undefined;
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [isHoverScrubbing, setIsHoverScrubbing] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const [scrubReady, setScrubReady] = useState(false);
   const hoverVideoRef = useRef<HTMLVideoElement>(null);
+  const lastSeekRef = useRef(0);
 
   // When a video element loads its metadata, seek to a non-black frame
   const handleVideoMetadata = useCallback(() => {
@@ -69,11 +71,14 @@ export const AssetCard = memo(function AssetCard({
 
   const handleHoverScrub = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const vid = hoverVideoRef.current;
-    if (!vid || !vid.duration) return;
+    if (!vid || !vid.duration || !scrubReady) return;
+    const now = performance.now();
+    if (now - lastSeekRef.current < 100) return; // throttle: max 10 seeks/sec
+    lastSeekRef.current = now;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     vid.currentTime = pct * vid.duration;
-  }, []);
+  }, [scrubReady]);
 
   const handleRename = () => {
     setRenameValue(asset.name);
@@ -267,9 +272,9 @@ export const AssetCard = memo(function AssetCard({
       {/* Thumbnail */}
       <div
         className="relative aspect-video bg-black overflow-hidden"
-        onMouseEnter={asset.type === 'video' && signedUrl ? () => setIsHoverScrubbing(true) : undefined}
-        onMouseLeave={asset.type === 'video' && signedUrl ? () => setIsHoverScrubbing(false) : undefined}
-        onMouseMove={asset.type === 'video' && isHoverScrubbing ? handleHoverScrub : undefined}
+        onMouseEnter={asset.type === 'video' && signedUrl ? () => setIsHovering(true) : undefined}
+        onMouseLeave={asset.type === 'video' && signedUrl ? () => setIsHovering(false) : undefined}
+        onMouseMove={asset.type === 'video' && isHovering ? handleHoverScrub : undefined}
       >
         {asset.type === 'image' && signedUrl ? (
           <Image
@@ -304,16 +309,19 @@ export const AssetCard = memo(function AssetCard({
           </div>
         )}
 
-        {/* Hover scrub video overlay */}
-        {asset.type === 'video' && signedUrl && isHoverScrubbing && (
+        {/* Hover scrub video — src only set on first hover to avoid loading all grid videos */}
+        {asset.type === 'video' && (
           // eslint-disable-next-line jsx-a11y/media-has-caption
           <video
             ref={hoverVideoRef}
-            src={signedUrl}
+            src={isHovering || scrubReady ? signedUrl : undefined}
             preload="metadata"
             muted
             playsInline
-            className="absolute inset-0 w-full h-full object-cover z-[1]"
+            onLoadedMetadata={() => setScrubReady(true)}
+            className={`absolute inset-0 w-full h-full object-cover z-[1] transition-opacity duration-150 ${
+              isHovering && scrubReady ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
           />
         )}
 
