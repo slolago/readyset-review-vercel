@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronDown, Columns2, SplitSquareHorizontal } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronDown, Columns2, SplitSquareHorizontal, AudioLines } from 'lucide-react';
 import { formatDuration } from '@/lib/utils';
 import type { Asset } from '@/types';
 
@@ -29,6 +29,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [activeSide, setActiveSide] = useState<'A' | 'B'>('A');
   const [muted, setMuted] = useState(false);
 
   const isVideo = assetA?.type === 'video';
@@ -61,8 +62,13 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     const vA = videoARef.current;
     const vB = videoBRef.current;
     if (!vA || !vB) return;
-    if (vA.paused) { vA.play(); vB.play(); setIsPlaying(true); }
-    else { vA.pause(); vB.pause(); setIsPlaying(false); }
+    if (vA.paused) {
+      vB.currentTime = vA.currentTime;
+      Promise.all([vA.play(), vB.play()]).catch(() => {});
+      setIsPlaying(true);
+    } else {
+      vA.pause(); vB.pause(); setIsPlaying(false);
+    }
   }, []);
 
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +135,20 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
 
   // Version picker button — floats as overlay, no layout impact
   const VersionLabel = ({ side, asset }: { side: 'A' | 'B'; asset: Asset }) => (
-    <div className="relative" data-picker>
+    <div className="relative flex items-center gap-1.5" data-picker>
+      {isVideo && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setActiveSide(side); }}
+          className={`flex items-center justify-center w-6 h-6 rounded transition-colors ${
+            activeSide === side && !muted
+              ? 'bg-frame-accent text-white'
+              : 'bg-black/60 text-white/40 hover:text-white'
+          }`}
+          title={activeSide === side ? 'Audio active' : 'Switch audio here'}
+        >
+          <AudioLines className="w-3.5 h-3.5" />
+        </button>
+      )}
       <button
         data-picker
         onClick={() => setPickerSide((p) => (p === side ? null : side))}
@@ -202,10 +221,10 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
               <>
                 <video key={`b-${selectedIdB}-slider`} ref={videoBRef} src={urlB}
                   className="absolute inset-0 w-full h-full object-contain"
-                  style={{ clipPath: clipB }} muted playsInline preload="auto" />
+                  style={{ clipPath: clipB }} muted={activeSide !== 'B' || muted} playsInline preload="auto" />
                 <video key={`a-${selectedIdA}-slider`} ref={videoARef} src={urlA}
                   className="absolute inset-0 w-full h-full object-contain"
-                  style={{ clipPath: clipA }} muted={muted} playsInline preload="auto" />
+                  style={{ clipPath: clipA }} muted={activeSide !== 'A' || muted} playsInline preload="auto" />
               </>
             ) : (
               <>
@@ -248,7 +267,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
               {isVideo ? (
                 <video key={`a-${selectedIdA}-sbs`} ref={videoARef} src={urlA}
                   className="max-w-full max-h-full object-contain"
-                  muted={muted} playsInline preload="auto"
+                  muted={activeSide !== 'A' || muted} playsInline preload="auto"
                   onTimeUpdate={() => { if (videoARef.current) { setCurrentTime(videoARef.current.currentTime); syncVideos(); } }}
                   onLoadedMetadata={() => { if (videoARef.current) setDuration(videoARef.current.duration); }}
                   onEnded={() => setIsPlaying(false)}
@@ -267,7 +286,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
               {isVideo ? (
                 <video key={`b-${selectedIdB}-sbs`} ref={videoBRef} src={urlB}
                   className="max-w-full max-h-full object-contain"
-                  muted playsInline preload="auto"
+                  muted={activeSide !== 'B' || muted} playsInline preload="auto"
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -287,7 +306,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
           <span className="text-xs text-white/60 font-mono w-12 text-right flex-shrink-0">{formatDuration(currentTime)}</span>
           <input type="range" min={0} max={duration || 0} step={0.01} value={currentTime} onChange={handleSeek} className="flex-1 h-1 accent-frame-accent" />
           <span className="text-xs text-white/60 font-mono w-12 flex-shrink-0">{formatDuration(duration)}</span>
-          <button onClick={() => { const n = !muted; setMuted(n); if (videoARef.current) videoARef.current.muted = n; }} className="text-white/60 hover:text-white transition-colors">
+          <button onClick={() => setMuted((m) => !m)} className="text-white/60 hover:text-white transition-colors">
             {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
         </div>
