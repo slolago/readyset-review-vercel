@@ -53,10 +53,10 @@ function getDb(analyser: AnalyserNode | null): number {
   return rms > 0 ? Math.max(MIN_DB, 20 * Math.log10(rms)) : MIN_DB;
 }
 
-// ── Canvas layout (pixels, at canvas resolution 56 × dynamic) ────────────────
-const LABEL_W = 20; // label column width (right-aligned text)
-const SEP_W   = 1;  // separator between labels and bars
-const BAR_GAP = 3;  // gap between L and R bars
+// ── Canvas layout (pixels, at canvas resolution 144 × 600) ──────────────────
+const LABEL_W = 40; // label column width (right-aligned text)
+const SEP_W   = 2;  // separator between labels and bars
+const BAR_GAP = 4;  // gap between L and R bars
 const L_X     = LABEL_W + SEP_W;
 
 export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
@@ -229,8 +229,8 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
       <div className="flex-1 flex items-stretch py-2 px-1">
         <canvas
           ref={canvasRef}
-          width={72}
-          height={300}
+          width={144}
+          height={600}
           style={{ width: '100%', height: '100%', display: 'block' }}
         />
       </div>
@@ -257,15 +257,15 @@ function drawStatic(c: CanvasRenderingContext2D, w: number, h: number) {
   c.fillRect(rX,  0, barW, h);
 
   // Channel labels "L" / "R" at very top
-  c.fillStyle = 'rgba(255,255,255,0.28)';
-  c.font = '5px sans-serif';
+  c.fillStyle = 'rgba(255,255,255,0.35)';
+  c.font = 'bold 11px sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'top';
-  c.fillText('L', L_X + barW / 2, 1);
-  c.fillText('R', rX  + barW / 2, 1);
+  c.fillText('L', L_X + barW / 2, 2);
+  c.fillText('R', rX  + barW / 2, 2);
 
   // dB tick marks and labels
-  c.font = '5.5px monospace';
+  c.font = '11px monospace';
   c.textAlign = 'right';
   c.textBaseline = 'middle';
 
@@ -278,12 +278,12 @@ function drawStatic(c: CanvasRenderingContext2D, w: number, h: number) {
                   db >= -6 ? 'rgba(249,115,22,0.65)' :
                   db >= -20 ? 'rgba(234,179,8,0.6)' :
                   'rgba(255,255,255,0.38)';
-    c.fillText(label, LABEL_W - 2, y);
+    c.fillText(label, LABEL_W - 4, y);
 
     // Tick lines across both bars
     c.fillStyle = db === 0
-      ? 'rgba(239,68,68,0.20)'
-      : 'rgba(255,255,255,0.09)';
+      ? 'rgba(239,68,68,0.25)'
+      : 'rgba(255,255,255,0.10)';
     c.fillRect(L_X, y - 0.5, barW, 1);
     c.fillRect(rX,  y - 0.5, barW, 1);
   }
@@ -326,6 +326,6 @@ function drawBar(
       : peakDb >= -6
       ? '#f97316'
       : 'rgba(255,255,255,0.75)';
-    c.fillRect(x, pkY, barW, 2);
+    c.fillRect(x, pkY, barW, 3);
   }
 }
