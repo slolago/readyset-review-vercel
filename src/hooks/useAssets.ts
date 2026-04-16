@@ -100,7 +100,11 @@ function extractVideoMetadata(file: File): Promise<{ width: number; height: numb
       let startMediaTime: number | null = null;
 
       const onFrame = (_now: DOMHighResTimeStamp, metadata: { mediaTime: number }) => {
-        if (startMediaTime === null) startMediaTime = metadata.mediaTime;
+        if (startMediaTime === null) {
+          startMediaTime = metadata.mediaTime;
+          (video as any).requestVideoFrameCallback(onFrame);
+          return;
+        }
         frameCount++;
         const elapsed = metadata.mediaTime - startMediaTime;
         if (elapsed >= 1.0 || frameCount >= 120) {

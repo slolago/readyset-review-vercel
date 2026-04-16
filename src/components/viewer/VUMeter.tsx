@@ -54,7 +54,7 @@ function getDb(analyser: AnalyserNode | null): number {
 }
 
 // ── Canvas layout (pixels, at canvas resolution 56 × dynamic) ────────────────
-const LABEL_W = 14; // label column width (right-aligned text)
+const LABEL_W = 20; // label column width (right-aligned text)
 const SEP_W   = 1;  // separator between labels and bars
 const BAR_GAP = 3;  // gap between L and R bars
 const L_X     = LABEL_W + SEP_W;
@@ -229,7 +229,7 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
       <div className="flex-1 flex items-stretch py-2 px-1">
         <canvas
           ref={canvasRef}
-          width={56}
+          width={72}
           height={300}
           style={{ width: '100%', height: '100%', display: 'block' }}
         />

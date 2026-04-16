@@ -12,6 +12,24 @@ interface VersionSwitcherProps {
   onToggleCompare: () => void;
 }
 
+function formatVersionDate(ts: unknown): string {
+  if (!ts) return '';
+  try {
+    const date =
+      typeof (ts as { toDate?: () => Date }).toDate === 'function'
+        ? (ts as { toDate: () => Date }).toDate()
+        : new Date(((ts as { seconds: number }).seconds ?? 0) * 1000);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
 export function VersionSwitcher({
   versions,
   activeVersionId,
@@ -62,7 +80,12 @@ export function VersionSwitcher({
                   v.id === activeVersionId && !compareMode ? 'text-frame-accent font-semibold' : 'text-white'
                 }`}
               >
-                <span className="truncate">V{v.version} — {v.name}</span>
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="truncate font-medium">V{v.version} — {v.name}</span>
+                  {formatVersionDate(v.createdAt) && (
+                    <span className="text-frame-textMuted text-[10px]">{formatVersionDate(v.createdAt)}</span>
+                  )}
+                </div>
                 {v.id === activeVersionId && !compareMode && (
                   <Check className="w-3.5 h-3.5 flex-shrink-0" />
                 )}
