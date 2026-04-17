@@ -56,13 +56,16 @@ export function CreateReviewLinkModal({
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to create review link');
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || `Failed to create review link (${res.status})`);
+      }
       const data = await res.json();
       const url = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/review/${data.link.token}`;
       setCreatedLink(url);
       toast.success('Review link created!');
     } catch (err) {
-      toast.error('Failed to create review link');
+      toast.error((err as Error).message || 'Failed to create review link');
     } finally {
       setLoading(false);
     }
