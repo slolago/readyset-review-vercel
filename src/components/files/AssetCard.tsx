@@ -126,10 +126,11 @@ export const AssetCard = memo(function AssetCard({
         toast.success('Renamed');
         onDeleted?.(); // reuse the refresh callback to trigger parent refetch
       } else {
-        toast.error('Rename failed');
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Rename failed: ${data.error}` : 'Rename failed');
       }
-    } catch {
-      toast.error('Rename failed');
+    } catch (err) {
+      toast.error(`Rename failed: ${(err as Error).message || 'network error'}`);
     } finally {
       setIsRenaming(false);
     }
@@ -161,10 +162,11 @@ export const AssetCard = memo(function AssetCard({
         toast.success('Copied');
         onCopied?.();
       } else {
-        toast.error('Copy failed');
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Copy failed: ${data.error}` : 'Copy failed');
       }
-    } catch {
-      toast.error('Copy failed');
+    } catch (err) {
+      toast.error(`Copy failed: ${(err as Error).message || 'network error'}`);
     } finally {
       setShowCopyToModal(false);
     }
@@ -182,10 +184,11 @@ export const AssetCard = memo(function AssetCard({
         toast.success('Duplicated');
         onDuplicated?.();
       } else {
-        toast.error('Duplicate failed');
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Duplicate failed: ${data.error}` : 'Duplicate failed');
       }
-    } catch {
-      toast.error('Duplicate failed');
+    } catch (err) {
+      toast.error(`Duplicate failed: ${(err as Error).message || 'network error'}`);
     }
   };
 
@@ -205,7 +208,7 @@ export const AssetCard = memo(function AssetCard({
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this asset?')) return;
+    if (!confirm(`Delete "${asset.name}"?\n\nThis will permanently remove the asset${(asset as any)._versionCount > 1 ? ` and all ${(asset as any)._versionCount} versions in its stack` : ''}. This cannot be undone.`)) return;
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/assets/${asset.id}`, {
@@ -213,11 +216,14 @@ export const AssetCard = memo(function AssetCard({
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        toast.success('Asset deleted');
+        toast.success(`Deleted "${asset.name}"`);
         onDeleted?.();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Delete failed: ${data.error}` : 'Failed to delete');
       }
-    } catch {
-      toast.error('Failed to delete');
+    } catch (err) {
+      toast.error(`Failed to delete: ${(err as Error).message || 'network error'}`);
     }
   };
 

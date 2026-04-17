@@ -43,14 +43,21 @@ export function Dropdown({ trigger, items, align = 'right', className }: Dropdow
       }
     };
     const handleClose = () => setOpen(false);
+    // Only close on scroll if it's happening OUTSIDE the dropdown itself.
+    // Scrolling inside a long dropdown menu should not dismiss it.
+    const handleScroll = (e: Event) => {
+      const target = e.target as Node;
+      const insidePanel = panelRef.current?.contains(target) ?? false;
+      if (!insidePanel) setOpen(false);
+    };
 
     document.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('scroll', handleClose, { capture: true });
+    window.addEventListener('scroll', handleScroll, { capture: true });
     window.addEventListener('resize', handleClose);
 
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('scroll', handleClose, { capture: true } as EventListenerOptions);
+      window.removeEventListener('scroll', handleScroll, { capture: true } as EventListenerOptions);
       window.removeEventListener('resize', handleClose);
     };
   }, []);

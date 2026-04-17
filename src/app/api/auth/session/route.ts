@@ -50,17 +50,25 @@ export async function POST(request: NextRequest) {
         };
         await userRef.set(userData);
       } else {
-        // Brand-new user — first ever becomes admin
-        const usersSnap = await db.collection('users').limit(2).get();
-        const isFirstUser = usersSnap.empty;
-        userData = {
-          email: userEmail,
-          name: name || decoded.name || userEmail || 'User',
-          avatar: avatar || decoded.picture || '',
-          role: isFirstUser ? 'admin' : 'viewer',
-          createdAt: Timestamp.now(),
-        };
-        await userRef.set(userData);
+        // Brand-new user — first ever becomes admin. Use a transaction with
+        // a guard doc so two concurrent signups can't both claim admin.
+        const guardRef = db.collection('_system').doc('first-admin');
+        userData = await db.runTransaction(async (tx) => {
+          const guard = await tx.get(guardRef);
+          const isFirstUser = !guard.exists;
+          const data = {
+            email: userEmail,
+            name: name || decoded.name || userEmail || 'User',
+            avatar: avatar || decoded.picture || '',
+            role: isFirstUser ? 'admin' : 'viewer',
+            createdAt: Timestamp.now(),
+          };
+          if (isFirstUser) {
+            tx.set(guardRef, { claimedBy: decoded.uid, claimedAt: Timestamp.now() });
+          }
+          tx.set(userRef, data);
+          return data;
+        });
       }
     } else {
       userData = userDoc.data()!;

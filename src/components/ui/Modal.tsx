@@ -62,16 +62,27 @@ export function Modal({
         {/* Subtle gradient top accent */}
         <div className="absolute top-0 left-0 right-0 h-px bg-rs-gradient rounded-t-2xl opacity-60" />
 
-        {title && (
+        {title ? (
           <div className="flex items-center justify-between px-6 py-4 border-b border-frame-border">
             <h2 className="text-base font-semibold text-white">{title}</h2>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="text-frame-textMuted hover:text-white transition-colors p-1.5 rounded-lg hover:bg-frame-cardHover"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
+        ) : (
+          // No title — always render an absolutely-positioned close button
+          // so users can dismiss without relying on ESC or backdrop click
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-3 right-3 z-10 text-frame-textMuted hover:text-white transition-colors p-1.5 rounded-lg hover:bg-frame-cardHover"
+          >
+            <X className="w-4 h-4" />
+          </button>
         )}
         <div className="p-6">{children}</div>
       </div>

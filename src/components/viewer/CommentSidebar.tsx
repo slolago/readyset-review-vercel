@@ -134,6 +134,8 @@ export function CommentSidebar({
         setReplyTo(null);
         setInPoint(undefined);
         setOutPoint(undefined);
+        // Re-focus so user can type another comment immediately
+        textareaRef.current?.focus();
       } else {
         toast.error('Failed to post comment');
       }

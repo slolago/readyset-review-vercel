@@ -27,22 +27,27 @@ export async function GET() {
     const snap = await db.collection('safeZones').orderBy('order', 'asc').get();
 
     if (snap.empty) {
-      // Auto-seed built-in zones
-      const batch = db.batch();
-      for (const z of BUILT_IN_ZONES) {
-        const ref = db.collection('safeZones').doc();
-        batch.set(ref, {
-          name: z.name,
-          ratio: z.ratio,
-          imageUrl: `/safezones/${z.file}`,
-          gcsPath: null,
-          isBuiltIn: true,
-          order: z.order,
-          createdAt: Timestamp.now(),
-          createdBy: null,
-        });
-      }
-      await batch.commit();
+      // Auto-seed built-in zones — use a guard doc inside a transaction so
+      // concurrent requests on cold start don't create duplicate zones.
+      const guardRef = db.collection('_system').doc('safe-zones-seed');
+      await db.runTransaction(async (tx) => {
+        const guard = await tx.get(guardRef);
+        if (guard.exists) return; // another request already seeded
+        tx.set(guardRef, { seededAt: Timestamp.now() });
+        for (const z of BUILT_IN_ZONES) {
+          const ref = db.collection('safeZones').doc();
+          tx.set(ref, {
+            name: z.name,
+            ratio: z.ratio,
+            imageUrl: `/safezones/${z.file}`,
+            gcsPath: null,
+            isBuiltIn: true,
+            order: z.order,
+            createdAt: Timestamp.now(),
+            createdBy: null,
+          });
+        }
+      });
 
       const fresh = await db.collection('safeZones').orderBy('order', 'asc').get();
       return NextResponse.json({ zones: fresh.docs.map((d) => ({ id: d.id, ...d.data() })) });
