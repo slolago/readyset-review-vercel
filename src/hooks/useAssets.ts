@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './useAuth';
 import type { Asset, UploadItem } from '@/types';
 import { generateId } from '@/lib/utils';
@@ -199,11 +199,22 @@ export function useAsset(assetId?: string) {
 export function useUpload() {
   const { getIdToken } = useAuth();
   const [uploads, setUploads] = useState<UploadItem[]>([]);
+  // In-flight XHR refs keyed by upload id so we can abort mid-transfer
+  const xhrRefs = useRef<Map<string, XMLHttpRequest>>(new Map());
 
   const updateUpload = (id: string, updates: Partial<UploadItem>) => {
     setUploads((prev) =>
       prev.map((u) => (u.id === id ? { ...u, ...updates } : u))
     );
+  };
+
+  const cancelUpload = (uploadId: string) => {
+    const xhr = xhrRefs.current.get(uploadId);
+    if (xhr) {
+      xhr.abort();
+      xhrRefs.current.delete(uploadId);
+    }
+    updateUpload(uploadId, { status: 'cancelled', error: 'Cancelled by user' });
   };
 
   const uploadFile = async (
@@ -280,9 +291,10 @@ export function useUpload() {
         // runs after the upload-complete step below so the video file is already in GCS)
       }
 
-      // Step 2: Upload to GCS
+      // Step 2: Upload to GCS — track xhr so user can cancel mid-transfer
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        xhrRefs.current.set(uploadId, xhr);
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             const progress = Math.round((e.loaded / e.total) * 100);
@@ -290,6 +302,7 @@ export function useUpload() {
           }
         });
         xhr.addEventListener('load', () => {
+          xhrRefs.current.delete(uploadId);
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
@@ -298,8 +311,13 @@ export function useUpload() {
           }
         });
         xhr.addEventListener('error', (e) => {
+          xhrRefs.current.delete(uploadId);
           console.error(`[upload] GCS network error for "${file.name}":`, e);
           reject(new Error('Network error — check CORS config on GCS bucket'));
+        });
+        xhr.addEventListener('abort', () => {
+          xhrRefs.current.delete(uploadId);
+          reject(new Error('Upload cancelled'));
         });
         xhr.open('PUT', signedUrl);
         xhr.setRequestHeader('Content-Type', file.type);
@@ -337,10 +355,13 @@ export function useUpload() {
 
       return assetId;
     } catch (err) {
-      updateUpload(uploadId, {
-        status: 'error',
-        error: err instanceof Error ? err.message : 'Upload failed',
-      });
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      // Don't overwrite a cancellation status set by cancelUpload
+      setUploads((prev) => prev.map((u) => {
+        if (u.id !== uploadId) return u;
+        if (u.status === 'cancelled') return u;
+        return { ...u, status: 'error', error: message };
+      }));
       return null;
     }
   };
@@ -349,5 +370,5 @@ export function useUpload() {
     setUploads((prev) => prev.filter((u) => u.status === 'uploading' || u.status === 'pending'));
   };
 
-  return { uploads, uploadFile, clearCompleted };
+  return { uploads, uploadFile, clearCompleted, cancelUpload };
 }

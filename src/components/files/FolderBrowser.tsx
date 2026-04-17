@@ -57,7 +57,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   const router = useRouter();
   const { project, loading: projectLoading, refetch: refetchProject } = useProject(projectId);
   const { assets, loading: assetsLoading, refetch: refetchAssets } = useAssets(projectId, folderId);
-  const { uploads, uploadFile, clearCompleted } = useUpload();
+  const { uploads, uploadFile, clearCompleted, cancelUpload } = useUpload();
 
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [currentFolder, setCurrentFolder] = useState<FolderType | null>(null);
@@ -1292,7 +1292,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           </div>
           <div className="divide-y divide-frame-border max-h-52 overflow-y-auto">
             {uploads.map((upload) => (
-              <UploadProgressItem key={upload.id} item={upload} />
+              <UploadProgressItem key={upload.id} item={upload} onCancel={cancelUpload} />
             ))}
           </div>
         </div>
@@ -1634,11 +1634,11 @@ function MoveModal({
 
 // ── UploadProgressItem ───────────────────────────────────────────────────────
 
-function UploadProgressItem({ item }: { item: UploadItem }) {
+function UploadProgressItem({ item, onCancel }: { item: UploadItem; onCancel?: (id: string) => void }) {
   return (
     <div className="px-4 py-3 flex items-center gap-3">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white truncate">{item.file.name}</p>
+        <p className="text-sm text-white truncate" title={item.file.name}>{item.file.name}</p>
         <p className="text-xs text-frame-textMuted">{formatBytes(item.file.size)}</p>
         {item.status === 'uploading' && (
           <div className="mt-1.5 bg-frame-bg rounded-full h-1">
@@ -1646,13 +1646,26 @@ function UploadProgressItem({ item }: { item: UploadItem }) {
           </div>
         )}
         {item.status === 'error' && <p className="text-xs text-red-400 mt-0.5">{item.error}</p>}
+        {item.status === 'cancelled' && <p className="text-xs text-frame-textMuted mt-0.5">Cancelled</p>}
       </div>
-      <div className="flex-shrink-0">
-        {item.status === 'uploading' && (
-          <span className="text-xs text-frame-textSecondary tabular-nums">{item.progress}%</span>
+      <div className="flex-shrink-0 flex items-center gap-1">
+        {(item.status === 'uploading' || item.status === 'pending') && (
+          <>
+            <span className="text-xs text-frame-textSecondary tabular-nums">{item.progress}%</span>
+            {onCancel && (
+              <button
+                onClick={() => onCancel(item.id)}
+                title="Cancel upload"
+                className="text-frame-textMuted hover:text-red-400 transition-colors p-1"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </>
         )}
         {item.status === 'complete' && <CheckCircle className="w-4 h-4 text-frame-green" />}
         {item.status === 'error' && <AlertCircle className="w-4 h-4 text-red-400" />}
+        {item.status === 'cancelled' && <X className="w-4 h-4 text-frame-textMuted" />}
       </div>
     </div>
   );

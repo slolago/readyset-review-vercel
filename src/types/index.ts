@@ -153,7 +153,7 @@ export interface UploadItem {
   id: string;
   file: File;
   progress: number;
-  status: 'pending' | 'uploading' | 'complete' | 'error';
+  status: 'pending' | 'uploading' | 'complete' | 'error' | 'cancelled';
   assetId?: string;
   error?: string;
 }
