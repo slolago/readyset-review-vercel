@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useProject } from '@/hooks/useProject';
@@ -34,6 +34,7 @@ import {
   LayoutList,
   Download,
   GitCompare,
+  ArrowUpDown,
 } from 'lucide-react';
 import type { Folder as FolderType, UploadItem } from '@/types';
 import type { ReviewStatus } from '@/types';
@@ -106,6 +107,48 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
     const stored = localStorage.getItem(viewModeKey) as 'grid' | 'list' | null;
     if (stored) setViewMode(stored);
   }, [viewModeKey]);
+
+  // Sort state — global (not per folder), persisted across sessions
+  const SORT_KEY_STORAGE = 'files-sort';
+  type SortKey = 'name-asc' | 'name-desc' | 'date-asc' | 'date-desc';
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    if (typeof window === 'undefined') return 'date-desc';
+    return (localStorage.getItem(SORT_KEY_STORAGE) as SortKey) ?? 'date-desc';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem(SORT_KEY_STORAGE, sortKey);
+  }, [sortKey]);
+
+  // Sort helpers — treat folders and assets separately so folders always
+  // group at the top of the grid view (standard file manager convention).
+  const getMillis = (v: unknown): number => {
+    if (!v) return 0;
+    if (typeof (v as { toMillis?: () => number }).toMillis === 'function') {
+      return (v as { toMillis: () => number }).toMillis();
+    }
+    if (typeof (v as { _seconds?: number })._seconds === 'number') {
+      return (v as { _seconds: number })._seconds * 1000;
+    }
+    return 0;
+  };
+  const sortedFolders = useMemo(() => {
+    const arr = [...folders];
+    switch (sortKey) {
+      case 'name-asc': return arr.sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc': return arr.sort((a, b) => b.name.localeCompare(a.name));
+      case 'date-asc': return arr.sort((a, b) => getMillis(a.createdAt) - getMillis(b.createdAt));
+      case 'date-desc': return arr.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
+    }
+  }, [folders, sortKey]);
+  const sortedAssets = useMemo(() => {
+    const arr = [...assets];
+    switch (sortKey) {
+      case 'name-asc': return arr.sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc': return arr.sort((a, b) => b.name.localeCompare(a.name));
+      case 'date-asc': return arr.sort((a, b) => getMillis(a.createdAt) - getMillis(b.createdAt));
+      case 'date-desc': return arr.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
+    }
+  }, [assets, sortKey]);
 
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
@@ -878,6 +921,29 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
               <LayoutList className="w-4 h-4" />
             </button>
           </div>
+          {/* Sort dropdown */}
+          <Dropdown
+            trigger={
+              <button
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-frame-border text-frame-textSecondary hover:text-white hover:border-frame-borderLight transition-colors"
+                title="Sort files"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                {{
+                  'name-asc': 'Name A–Z',
+                  'name-desc': 'Name Z–A',
+                  'date-asc': 'Oldest first',
+                  'date-desc': 'Newest first',
+                }[sortKey]}
+              </button>
+            }
+            items={[
+              { label: 'Newest first', icon: <ArrowUpDown className="w-4 h-4" />, onClick: () => setSortKey('date-desc') },
+              { label: 'Oldest first', icon: <ArrowUpDown className="w-4 h-4" />, onClick: () => setSortKey('date-asc') },
+              { label: 'Name A–Z', icon: <ArrowUpDown className="w-4 h-4" />, onClick: () => setSortKey('name-asc') },
+              { label: 'Name Z–A', icon: <ArrowUpDown className="w-4 h-4" />, onClick: () => setSortKey('name-desc') },
+            ]}
+          />
           <Button variant="ghost" size="sm" onClick={() => setShowCollaborators(true)} icon={<Users className="w-4 h-4" />}>
             Team
           </Button>
@@ -967,7 +1033,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
               Folders ({folders.length})
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-              {folders.map((folder) => (
+              {sortedFolders.map((folder) => (
                 <FolderCard
                   key={folder.id}
                   folder={folder}
@@ -1035,7 +1101,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           </div>
         ) : viewMode === 'list' ? (
           <AssetListView
-            assets={assets}
+            assets={sortedAssets}
             projectId={projectId}
             onAssetDeleted={refetchAssets}
             onVersionUploaded={refetchAssets}
@@ -1049,7 +1115,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           />
         ) : (
           <AssetGrid
-            assets={assets}
+            assets={sortedAssets}
             projectId={projectId}
             onAssetDeleted={refetchAssets}
             onVersionUploaded={refetchAssets}
