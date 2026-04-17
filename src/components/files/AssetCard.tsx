@@ -59,7 +59,10 @@ export const AssetCard = memo(function AssetCard({
   const [isHovering, setIsHovering] = useState(false);
   const [scrubPct, setScrubPct] = useState(0);
   const [spriteLoaded, setSpriteLoaded] = useState(false);
-  const spriteUrl = (asset as any).spriteSignedUrl as string | undefined;
+  const [lazySpriteUrl, setLazySpriteUrl] = useState<string | null>(null);
+  const [generatingSprite, setGeneratingSprite] = useState(false);
+  const serverSpriteUrl = (asset as any).spriteSignedUrl as string | undefined;
+  const spriteUrl = serverSpriteUrl || lazySpriteUrl;
 
   // When a video element loads its metadata, seek to a non-black frame
   const handleVideoMetadata = useCallback(() => {
@@ -74,6 +77,24 @@ export const AssetCard = memo(function AssetCard({
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     setScrubPct(pct);
   }, []);
+
+  const ensureSprite = useCallback(async () => {
+    if (spriteUrl || generatingSprite || asset.type !== 'video') return;
+    setGeneratingSprite(true);
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/assets/${asset.id}/generate-sprite`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.spriteStripUrl) setLazySpriteUrl(data.spriteStripUrl);
+      }
+    } catch {} finally {
+      setGeneratingSprite(false);
+    }
+  }, [spriteUrl, generatingSprite, asset.type, asset.id, getIdToken]);
 
   const handleRename = () => {
     setRenameValue(asset.name);
@@ -267,8 +288,8 @@ export const AssetCard = memo(function AssetCard({
       {/* Thumbnail */}
       <div
         className="relative aspect-video bg-black overflow-hidden"
-        onMouseEnter={asset.type === 'video' && spriteUrl && spriteLoaded ? () => { setIsHovering(true); setScrubPct(0); } : undefined}
-        onMouseLeave={asset.type === 'video' && spriteUrl ? () => setIsHovering(false) : undefined}
+        onMouseEnter={asset.type === 'video' && signedUrl ? () => { setIsHovering(true); setScrubPct(0); ensureSprite(); } : undefined}
+        onMouseLeave={asset.type === 'video' && signedUrl ? () => setIsHovering(false) : undefined}
         onMouseMove={asset.type === 'video' && isHovering && spriteLoaded ? handleHoverScrub : undefined}
       >
         {asset.type === 'image' && signedUrl ? (

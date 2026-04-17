@@ -55,65 +55,6 @@ function captureThumbnail(file: File): Promise<Blob | null> {
   });
 }
 
-const SPRITE_FRAMES = 20;
-const SPRITE_FRAME_W = 160;
-
-function generateSpriteStrip(file: File): Promise<Blob | null> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'auto'; // need full decode access
-
-    let settled = false;
-    const done = (blob: Blob | null) => {
-      if (settled) return;
-      settled = true;
-      video.src = '';
-      URL.revokeObjectURL(url);
-      resolve(blob);
-    };
-
-    video.addEventListener('loadedmetadata', () => {
-      const duration = video.duration;
-      if (!duration || duration < 1) { done(null); return; }
-
-      const vw = video.videoWidth || 640;
-      const vh = video.videoHeight || 360;
-      const frameH = Math.round(SPRITE_FRAME_W * (vh / vw));
-      const canvas = document.createElement('canvas');
-      canvas.width = SPRITE_FRAME_W * SPRITE_FRAMES;
-      canvas.height = frameH;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { done(null); return; }
-
-      let captured = 0;
-      const captureNext = () => {
-        if (captured >= SPRITE_FRAMES) {
-          canvas.toBlob((blob) => done(blob), 'image/jpeg', 0.65);
-          return;
-        }
-        // Spread frames across duration (skip first/last 2%)
-        const t = duration * (0.02 + (captured / (SPRITE_FRAMES - 1)) * 0.96);
-        video.currentTime = t;
-      };
-
-      video.addEventListener('seeked', () => {
-        ctx.drawImage(video, captured * SPRITE_FRAME_W, 0, SPRITE_FRAME_W, frameH);
-        captured++;
-        captureNext();
-      });
-
-      captureNext();
-    }, { once: true });
-
-    video.addEventListener('error', () => done(null), { once: true });
-    setTimeout(() => done(null), 30000); // 30s timeout for sprite gen
-    video.src = url;
-  });
-}
-
 const STANDARD_FRAME_RATES = [23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60];
 const FPS_SNAP_TOLERANCE = 0.6;
 
@@ -335,23 +276,8 @@ export function useUpload() {
           console.warn('[thumbnail] captureThumbnail returned null — no thumbnail will be stored');
         }
 
-        // Generate sprite strip in background (non-blocking)
-        generateSpriteStrip(file).then(async (spriteBlob) => {
-          if (!spriteBlob) return;
-          try {
-            const spriteForm = new FormData();
-            spriteForm.append('assetId', assetId);
-            spriteForm.append('thumbnail', spriteBlob, 'sprite-strip.jpg');
-            spriteForm.append('type', 'sprite');
-            await fetch('/api/upload/thumbnail', {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
-              body: spriteForm,
-            });
-          } catch (err) {
-            console.warn('[sprite] upload error (non-fatal):', err);
-          }
-        }).catch(() => {});
+        // Trigger server-side sprite generation (non-blocking — fire-and-forget
+        // runs after the upload-complete step below so the video file is already in GCS)
       }
 
       // Step 2: Upload to GCS
@@ -400,6 +326,15 @@ export function useUpload() {
 
       if (!completeRes.ok) throw new Error('Failed to complete upload');
       updateUpload(uploadId, { status: 'complete', progress: 100 });
+
+      // Step 4 (fire-and-forget): Trigger server-side sprite strip generation for videos
+      if (file.type.startsWith('video/')) {
+        fetch(`/api/assets/${assetId}/generate-sprite`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
+
       return assetId;
     } catch (err) {
       updateUpload(uploadId, {

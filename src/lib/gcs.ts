@@ -111,3 +111,10 @@ export async function uploadBuffer(
   const file = bucket.file(gcsPath);
   await file.save(buffer, { contentType, resumable: false });
 }
+
+export async function downloadToFile(gcsPath: string, localPath: string): Promise<void> {
+  const storage = getStorage();
+  const bucket = storage.bucket(BUCKET_NAME);
+  const file = bucket.file(gcsPath);
+  await file.download({ destination: localPath });
+}
