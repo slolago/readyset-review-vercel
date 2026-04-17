@@ -313,14 +313,18 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
 
   // ── Batch actions ────────────────────────────────────────────────────────
   const handleDeleteSelected = async () => {
-    if (!confirm(`Delete ${selectedIds.size} item(s)?`)) return;
+    const ids = Array.from(selectedIds);
+    const assetIds = ids.filter((id) => assets.some((a) => a.id === id));
+    const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
+    const parts: string[] = [];
+    if (assetIds.length) parts.push(`${assetIds.length} asset${assetIds.length === 1 ? '' : 's'}`);
+    if (folderIds.length) parts.push(`${folderIds.length} folder${folderIds.length === 1 ? '' : 's'}`);
+    const summary = parts.join(' and ');
+    if (!confirm(`Delete ${summary}?\n\n${folderIds.length ? 'Sub-folders will be deleted; their assets moved to project root. ' : ''}This cannot be undone.`)) return;
     try {
       const token = await getIdToken();
-      const ids = Array.from(selectedIds);
-      const assetIds = ids.filter((id) => assets.some((a) => a.id === id));
-      const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
 
-      await Promise.all([
+      const results = await Promise.allSettled([
         ...assetIds.map((id) =>
           fetch(`/api/assets/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
         ),
@@ -329,7 +333,14 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
         ),
       ]);
 
-      toast.success(`Deleted ${selectedIds.size} item(s)`);
+      const failed = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+      if (failed.length === 0) {
+        toast.success(`Deleted ${summary}`);
+      } else if (failed.length === results.length) {
+        toast.error(`Failed to delete any items`);
+      } else {
+        toast.error(`Deleted ${results.length - failed.length} of ${results.length} — ${failed.length} failed`);
+      }
       setSelectedIds(new Set());
       refetchAssets();
       fetchFolders();
@@ -611,7 +622,9 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   };
 
   const handleDeleteFolder = async (deleteFolderId: string) => {
-    if (!confirm('Delete this folder?')) return;
+    const folder = folders.find((f) => f.id === deleteFolderId);
+    const folderName = folder?.name ?? 'folder';
+    if (!confirm(`Delete "${folderName}"?\n\nAll sub-folders will be deleted. Assets inside will be moved to the project root. This cannot be undone.`)) return;
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/folders/${deleteFolderId}`, {
@@ -619,11 +632,15 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        toast.success('Folder deleted');
+        toast.success(`Deleted "${folderName}"`);
         fetchFolders();
+        refetchAssets();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Delete failed: ${data.error}` : 'Failed to delete folder');
       }
-    } catch {
-      toast.error('Failed to delete folder');
+    } catch (err) {
+      toast.error(`Failed to delete: ${(err as Error).message || 'network error'}`);
     }
   };
 

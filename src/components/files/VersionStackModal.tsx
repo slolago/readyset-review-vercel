@@ -50,7 +50,7 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
   };
 
   const handleDelete = async (version: Asset) => {
-    if (!confirm(`Delete version V${version.version}?`)) return;
+    if (!confirm(`Delete version V${version.version} of "${version.name}"?\n\nThis cannot be undone.`)) return;
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/assets/${version.id}`, {
@@ -58,7 +58,7 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        toast.success('Version deleted');
+        toast.success(`Deleted V${version.version}`);
         const remaining = versions.filter((v) => v.id !== version.id);
         setVersions(remaining);
         if (remaining.length === 0 || version.id === asset.id) {
@@ -66,7 +66,8 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
           onClose();
         }
       } else {
-        toast.error('Delete failed');
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Delete failed: ${data.error}` : 'Delete failed');
       }
     } catch {
       toast.error('Delete failed');

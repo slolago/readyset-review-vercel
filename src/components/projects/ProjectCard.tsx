@@ -20,7 +20,15 @@ export function ProjectCard({ project, onDeleted }: ProjectCardProps) {
   const updatedAt = project.updatedAt?.toDate?.() || new Date();
 
   const handleDelete = async () => {
-    if (!confirm('Delete this project? This cannot be undone.')) return;
+    // Require typing the project name to delete — it's a destructive action
+    // that cascades to all folders, assets, comments, and review links
+    const confirmText = prompt(
+      `This will permanently delete "${project.name}" and ALL its folders, assets, comments, and review links.\n\nType the project name to confirm:`
+    );
+    if (confirmText !== project.name) {
+      if (confirmText !== null) toast.error('Name did not match — nothing was deleted');
+      return;
+    }
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/projects/${project.id}`, {
@@ -28,13 +36,14 @@ export function ProjectCard({ project, onDeleted }: ProjectCardProps) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        toast.success('Project deleted');
+        toast.success(`Deleted "${project.name}"`);
         onDeleted?.();
       } else {
-        toast.error('Failed to delete project');
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Delete failed: ${data.error}` : 'Failed to delete project');
       }
-    } catch {
-      toast.error('Failed to delete project');
+    } catch (err) {
+      toast.error(`Failed to delete: ${(err as Error).message || 'network error'}`);
     }
   };
 

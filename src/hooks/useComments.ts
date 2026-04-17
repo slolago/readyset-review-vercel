@@ -9,7 +9,7 @@ export function useComments(assetId?: string, reviewToken?: string) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchComments = useCallback(async () => {
+  const fetchComments = useCallback(async (signal?: AbortSignal) => {
     if (!assetId) return;
     setLoading(true);
     try {
@@ -20,20 +20,26 @@ export function useComments(assetId?: string, reviewToken?: string) {
         const token = await getIdToken();
         if (token) headers['Authorization'] = `Bearer ${token}`;
       }
-      const res = await fetch(`/api/comments?${params}`, { headers });
+      const res = await fetch(`/api/comments?${params}`, { headers, signal });
+      if (signal?.aborted) return;
       if (res.ok) {
         const data = await res.json();
         setComments(data.comments);
       }
     } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return;
       console.error('Failed to fetch comments:', err);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [assetId, reviewToken, getIdToken]);
 
   useEffect(() => {
-    fetchComments();
+    // Abort in-flight request if assetId changes — prevents setState on
+    // unmounted component and ensures stale responses don't overwrite new data.
+    const ctrl = new AbortController();
+    fetchComments(ctrl.signal);
+    return () => ctrl.abort();
   }, [fetchComments]);
 
   const addComment = async (
@@ -127,5 +133,13 @@ export function useComments(assetId?: string, reviewToken?: string) {
     }
   };
 
-  return { comments, loading, addComment, resolveComment, deleteComment, editComment, refetch: fetchComments };
+  return {
+    comments,
+    loading,
+    addComment,
+    resolveComment,
+    deleteComment,
+    editComment,
+    refetch: () => fetchComments(),
+  };
 }

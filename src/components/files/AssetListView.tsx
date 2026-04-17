@@ -347,15 +347,21 @@ function AssetListRow({
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this asset?')) return;
+    if (!confirm(`Delete "${asset.name}"?\n\nThis cannot be undone.`)) return;
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/assets/${asset.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) { toast.success('Asset deleted'); onAssetDeleted?.(); }
-    } catch { toast.error('Failed to delete'); }
+      if (res.ok) {
+        toast.success(`Deleted "${asset.name}"`);
+        onAssetDeleted?.();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Delete failed: ${data.error}` : 'Failed to delete');
+      }
+    } catch (err) { toast.error(`Failed to delete: ${(err as Error).message || 'network error'}`); }
   };
 
   const handleDownload = () => {
