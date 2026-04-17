@@ -302,7 +302,7 @@ export function CommentSidebar({
                     className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
                       inPoint !== undefined ? 'bg-frame-accent/15 text-frame-accent' : 'text-frame-textMuted hover:text-white'
                     }`}
-                    title="Set in-point"
+                    title="Mark range start at current time"
                   >
                     <span className="font-mono text-[10px]">IN</span>
                     {inPoint !== undefined && <span className="font-mono text-[10px]">{formatTimestamp(inPoint)}</span>}
@@ -314,7 +314,7 @@ export function CommentSidebar({
                       className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
                         outPoint !== undefined ? 'bg-frame-accent/15 text-frame-accent' : 'text-frame-textMuted hover:text-white'
                       }`}
-                      title="Set out-point"
+                      title="Mark range end at current time"
                     >
                       <span className="font-mono text-[10px]">OUT</span>
                       {outPoint !== undefined && <span className="font-mono text-[10px]">{formatTimestamp(outPoint)}</span>}

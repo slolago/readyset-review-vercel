@@ -233,7 +233,14 @@ export default function AssetViewerPage() {
               activeVersionId={displayAsset.id}
               onSelectVersion={(v) => { setActiveVersion(v); setCompareMode(false); setDisplayShapes(null); setActiveAnnotationCommentId(null); setIsAnnotationMode(false); }}
               compareMode={compareMode}
-              onToggleCompare={() => setCompareMode((v) => !v)}
+              onToggleCompare={() => {
+                setCompareMode((v) => !v);
+                // Compare mode renders differently — clear any annotation overlay
+                // so it doesn't stay pinned to the wrong coordinates
+                setDisplayShapes(null);
+                setActiveAnnotationCommentId(null);
+                setIsAnnotationMode(false);
+              }}
             />
           )}
           {displayAsset?.status === 'ready' && (
