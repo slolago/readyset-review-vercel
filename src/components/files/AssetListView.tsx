@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Film, Image as ImageIcon, ChevronUp, ChevronDown, Pencil, Copy, CopyPlus,
   Move, Download, Link as LinkIcon, Trash2, ExternalLink, Check,
-  ChevronDown as ChevronDownIcon, Upload, Layers, MessageSquare,
+  ChevronDown as ChevronDownIcon, Upload, Layers,
 } from 'lucide-react';
 import { formatBytes, formatRelativeTime, forceDownload } from '@/lib/utils';
 import { useUserNames } from '@/hooks/useUserNames';
@@ -150,6 +150,7 @@ export const AssetListView = memo(function AssetListView({
             </th>
             <th className={headerCellClass}>Review</th>
             <th className={headerCellClass}>Comments</th>
+            <th className={headerCellClass}>Versions</th>
             <th className={headerCellClass}>Size</th>
             <th className={headerCellClass}>
               <button
@@ -480,18 +481,21 @@ function AssetListRow({
 
         {/* Comments */}
         <td className="px-3 py-2">
-          {(() => {
-            const count = ((asset as any)._commentCount as number | undefined) ?? 0;
-            if (count === 0) {
-              return <span className="text-frame-textMuted text-xs">—</span>;
-            }
-            return (
-              <span className="flex items-center gap-1 text-xs text-frame-accent font-medium">
-                <MessageSquare className="w-3.5 h-3.5" />
-                {count > 99 ? '99+' : count}
-              </span>
-            );
-          })()}
+          <span className="text-frame-textMuted">
+            {(asset as any)._commentCount ?? 0}
+          </span>
+        </td>
+
+        {/* Versions */}
+        <td className="px-3 py-2">
+          {versionCount > 1 ? (
+            <span className="inline-flex items-center gap-1 text-xs text-frame-textSecondary">
+              <Layers className="w-3.5 h-3.5" />
+              {versionCount}
+            </span>
+          ) : (
+            <span className="text-frame-textMuted">—</span>
+          )}
         </td>
 
         {/* Size */}
