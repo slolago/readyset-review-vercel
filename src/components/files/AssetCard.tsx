@@ -92,8 +92,9 @@ export const AssetCard = memo(function AssetCard({
         if (data.spriteStripUrl) setLazySpriteUrl(data.spriteStripUrl);
         else console.warn('[sprite] no URL in response', data);
       } else {
-        const text = await res.text();
-        console.warn('[sprite] generation failed', res.status, text);
+        // Read as JSON to get structured diagnostic info (error + steps + stderr)
+        const data = await res.json().catch(() => null);
+        console.warn('[sprite] generation failed', res.status, data ?? '(no body)');
       }
     } catch (err) {
       console.warn('[sprite] request error', err);

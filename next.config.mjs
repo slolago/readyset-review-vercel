@@ -21,9 +21,12 @@ const nextConfig = {
     ],
   },
   experimental: {
-    serverComponentsExternalPackages: ['firebase-admin', '@google-cloud/storage', 'fluent-ffmpeg', 'ffmpeg-static'],
+    serverComponentsExternalPackages: ['firebase-admin', '@google-cloud/storage', 'fluent-ffmpeg', 'ffmpeg-static', '@ffmpeg-installer/ffmpeg'],
     outputFileTracingIncludes: {
-      '/api/assets/*/generate-sprite': ['./node_modules/ffmpeg-static/**'],
+      '/api/assets/*/generate-sprite': [
+        './node_modules/ffmpeg-static/**',
+        './node_modules/@ffmpeg-installer/**',
+      ],
     },
   },
 };
