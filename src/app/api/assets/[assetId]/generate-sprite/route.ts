@@ -7,6 +7,7 @@ import os from 'os';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
+import ffmpegPath from 'ffmpeg-static';
 
 // Force Node.js runtime (ffmpeg needs fs/child_process, not edge)
 export const runtime = 'nodejs';
@@ -21,8 +22,6 @@ interface RouteParams {
 
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ffmpegPath = require('ffmpeg-static') as string;
     if (!ffmpegPath) {
       reject(new Error('ffmpeg-static not available'));
       return;
@@ -115,8 +114,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
 async function probeDuration(videoPath: string): Promise<number | null> {
   return new Promise((resolve) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ffmpegPath = require('ffmpeg-static') as string;
+    if (!ffmpegPath) { resolve(null); return; }
     const proc = spawn(ffmpegPath, ['-i', videoPath]);
     let stderr = '';
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
