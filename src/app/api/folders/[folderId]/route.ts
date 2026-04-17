@@ -66,10 +66,29 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const hasAccess = await canAccessProject(user.id, folder.projectId);
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const updates = await request.json();
+    const rawUpdates = await request.json();
+    // Whitelist: only name and parentId can be changed. Never allow mutating
+    // projectId, path, createdAt, createdBy — those would break the folder tree.
+    const ALLOWED = ['name', 'parentId'];
+    const updates: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rawUpdates)) {
+      if (ALLOWED.includes(k)) updates[k] = v;
+    }
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
+    }
+    // If parentId changes, verify the new parent belongs to the same project
+    if (typeof updates.parentId === 'string') {
+      const newParent = await db.collection('folders').doc(updates.parentId as string).get();
+      if (!newParent.exists) return NextResponse.json({ error: 'Parent folder not found' }, { status: 400 });
+      if ((newParent.data() as any).projectId !== folder.projectId) {
+        return NextResponse.json({ error: 'Cannot move folder to a different project' }, { status: 400 });
+      }
+    }
     await db.collection('folders').doc(params.folderId).update(updates);
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error('Folder update error:', err);
     return NextResponse.json({ error: 'Failed to update folder' }, { status: 500 });
   }
 }
@@ -88,9 +107,40 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (!roleAtLeast(user, 'manager')) return NextResponse.json({ error: 'Forbidden: manager role required' }, { status: 403 });
 
-    await db.collection('folders').doc(params.folderId).delete();
-    return NextResponse.json({ success: true });
-  } catch {
+    // Cascade: collect all descendant folder IDs via BFS so we can batch delete.
+    // Assets inside these folders are re-parented to null (preserved as unfiled)
+    // — deleting thousands of GCS blobs on cascade is risky and irreversible.
+    const toDelete: string[] = [params.folderId];
+    const queue: string[] = [params.folderId];
+    while (queue.length > 0) {
+      const parentId = queue.shift()!;
+      const children = await db.collection('folders').where('parentId', '==', parentId).get();
+      for (const child of children.docs) {
+        toDelete.push(child.id);
+        queue.push(child.id);
+      }
+    }
+
+    const BATCH_LIMIT = 400;
+    // Re-parent all assets in these folders to null
+    for (const fid of toDelete) {
+      const assetsSnap = await db.collection('assets').where('folderId', '==', fid).get();
+      for (let i = 0; i < assetsSnap.docs.length; i += BATCH_LIMIT) {
+        const batch = db.batch();
+        assetsSnap.docs.slice(i, i + BATCH_LIMIT).forEach((d) => batch.update(d.ref, { folderId: null }));
+        await batch.commit();
+      }
+    }
+    // Delete folders (batched)
+    for (let i = 0; i < toDelete.length; i += BATCH_LIMIT) {
+      const batch = db.batch();
+      toDelete.slice(i, i + BATCH_LIMIT).forEach((id) => batch.delete(db.collection('folders').doc(id)));
+      await batch.commit();
+    }
+
+    return NextResponse.json({ success: true, foldersDeleted: toDelete.length });
+  } catch (err) {
+    console.error('Folder delete error:', err);
     return NextResponse.json({ error: 'Failed to delete folder' }, { status: 500 });
   }
 }

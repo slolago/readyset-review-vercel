@@ -28,7 +28,12 @@ export async function GET(request: NextRequest) {
       .orderBy('createdAt', 'desc')
       .get();
 
-    const links = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // Strip password field — only indicate whether one is set
+    const links = snap.docs.map((d) => {
+      const data = d.data() as Record<string, unknown>;
+      const { password, ...safe } = data;
+      return { id: d.id, ...safe, hasPassword: !!password };
+    });
     return NextResponse.json({ links });
   } catch {
     return NextResponse.json({ error: 'Failed to fetch review links' }, { status: 500 });
@@ -71,8 +76,10 @@ export async function POST(request: NextRequest) {
 
     await db.collection('reviewLinks').doc(token).set(data);
     const doc = await db.collection('reviewLinks').doc(token).get();
+    const docData = doc.data() as Record<string, unknown>;
+    const { password: _pw, ...safeData } = docData;
 
-    return NextResponse.json({ link: { id: token, ...doc.data() } }, { status: 201 });
+    return NextResponse.json({ link: { id: token, ...safeData, hasPassword: !!_pw } }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Failed to create review link' }, { status: 500 });
   }

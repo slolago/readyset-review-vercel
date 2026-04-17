@@ -25,15 +25,25 @@ export async function GET(request: NextRequest) {
         .filter((c: any) => c.reviewLinkId === reviewLinkId)
         .sort((a: any, b: any) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
       return NextResponse.json({ comments });
-    } else {
-      // Require auth
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      try {
-        await getAdminAuth().verifyIdToken(authHeader.slice(7));
-      } catch {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    }
+
+    // Auth path — require project access for the asset being queried
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let userId: string;
+    try {
+      const decoded = await getAdminAuth().verifyIdToken(authHeader.slice(7));
+      userId = decoded.uid;
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Fetch asset to verify project membership
+    const assetDoc = await db.collection('assets').doc(assetId).get();
+    if (!assetDoc.exists) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+    const asset = assetDoc.data() as any;
+    if (!(await canAccessProject(userId, asset.projectId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const snap = await db.collection('comments')
@@ -44,7 +54,8 @@ export async function GET(request: NextRequest) {
       .map((d) => ({ id: d.id, ...d.data() } as any))
       .sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
     return NextResponse.json({ comments });
-  } catch {
+  } catch (err) {
+    console.error('Comment fetch error:', err);
     return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
   }
 }
@@ -53,10 +64,18 @@ export async function POST(request: NextRequest) {
   try {
     const db = getAdminDb();
     const body = await request.json();
-    const { assetId, projectId, text, timestamp, annotation, parentId, authorName, authorEmail, reviewLinkId } = body;
+    const { assetId, projectId, text, timestamp, inPoint, outPoint, annotation, parentId, authorName, authorEmail, reviewLinkId } = body;
 
     if (!assetId || !projectId || !text) {
       return NextResponse.json({ error: 'assetId, projectId, text required' }, { status: 400 });
+    }
+
+    // Verify the asset exists and its projectId matches what the client claims
+    const assetDoc = await db.collection('assets').doc(assetId).get();
+    if (!assetDoc.exists) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+    const asset = assetDoc.data() as any;
+    if (asset.projectId !== projectId) {
+      return NextResponse.json({ error: 'projectId mismatch' }, { status: 400 });
     }
 
     let authorId: string | null = null;
@@ -71,13 +90,24 @@ export async function POST(request: NextRequest) {
         if (userDoc.exists) {
           resolvedAuthorName = (userDoc.data() as any).name || resolvedAuthorName;
         }
-      } catch {
-        // Guest comment if token invalid
+      } catch (err) {
+        console.warn('Comment POST — token verify failed:', (err as Error).message);
       }
     }
 
-    // If not auth and no review token, reject
-    if (!authorId && !reviewLinkId) {
+    // Authenticated users need project access; guests need a valid reviewLinkId
+    if (authorId) {
+      if (!(await canAccessProject(authorId, projectId))) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } else if (reviewLinkId) {
+      const linkDoc = await db.collection('reviewLinks').doc(reviewLinkId).get();
+      if (!linkDoc.exists) return NextResponse.json({ error: 'Invalid review link' }, { status: 403 });
+      const link = linkDoc.data() as any;
+      if (link.projectId !== projectId) {
+        return NextResponse.json({ error: 'Review link does not match project' }, { status: 403 });
+      }
+    } else {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -95,6 +125,8 @@ export async function POST(request: NextRequest) {
     if (authorEmail) commentData.authorEmail = authorEmail;
     if (reviewLinkId) commentData.reviewLinkId = reviewLinkId;
     if (timestamp !== undefined) commentData.timestamp = timestamp;
+    if (inPoint !== undefined) commentData.inPoint = inPoint;
+    if (outPoint !== undefined) commentData.outPoint = outPoint;
     if (annotation) commentData.annotation = annotation;
 
     const ref = await db.collection('comments').add(commentData);
