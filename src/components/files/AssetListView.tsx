@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Film, Image as ImageIcon, ChevronUp, ChevronDown, Pencil, Copy, CopyPlus,
   Move, Download, Link as LinkIcon, Trash2, ExternalLink, Check,
-  ChevronDown as ChevronDownIcon, Upload, Layers,
+  ChevronDown as ChevronDownIcon, Upload, Layers, MessageSquare,
 } from 'lucide-react';
 import { formatBytes, formatRelativeTime, forceDownload } from '@/lib/utils';
 import { useUserNames } from '@/hooks/useUserNames';
@@ -480,9 +480,18 @@ function AssetListRow({
 
         {/* Comments */}
         <td className="px-3 py-2">
-          <span className="text-frame-textMuted">
-            {(asset as any)._commentCount ?? 0}
-          </span>
+          {(() => {
+            const count = ((asset as any)._commentCount as number | undefined) ?? 0;
+            if (count === 0) {
+              return <span className="text-frame-textMuted text-xs">—</span>;
+            }
+            return (
+              <span className="flex items-center gap-1 text-xs text-frame-accent font-medium">
+                <MessageSquare className="w-3.5 h-3.5" />
+                {count > 99 ? '99+' : count}
+              </span>
+            );
+          })()}
         </td>
 
         {/* Size */}
