@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { downloadToFile, uploadBuffer, getPublicUrl } from '@/lib/gcs';
+import { downloadToFile, uploadBuffer, getPublicUrl, generateReadSignedUrl } from '@/lib/gcs';
 import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
@@ -51,9 +51,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Not a video asset' }, { status: 400 });
   }
 
-  // Skip if sprite already exists
+  // Skip if sprite already exists — return signed URL so client can load it
   if (asset.spriteStripGcsPath) {
-    return NextResponse.json({ spriteStripUrl: asset.spriteStripUrl, cached: true });
+    const signedUrl = await generateReadSignedUrl(asset.spriteStripGcsPath, 720);
+    return NextResponse.json({ spriteStripUrl: signedUrl, cached: true });
   }
 
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `sprite-${assetId}-`));
@@ -96,13 +97,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const spriteGcsPath = `projects/${asset.projectId}/assets/${assetId}/sprite-strip.jpg`;
     await uploadBuffer(spriteGcsPath, spriteBuffer, 'image/jpeg');
 
-    const spriteUrl = getPublicUrl(spriteGcsPath);
+    const publicUrl = getPublicUrl(spriteGcsPath);
     await db.collection('assets').doc(assetId).update({
-      spriteStripUrl: spriteUrl,
+      spriteStripUrl: publicUrl,
       spriteStripGcsPath: spriteGcsPath,
     });
 
-    return NextResponse.json({ spriteStripUrl: spriteUrl, spriteStripGcsPath: spriteGcsPath });
+    // Return signed URL so the browser can load it immediately
+    const signedUrl = await generateReadSignedUrl(spriteGcsPath, 720);
+    return NextResponse.json({ spriteStripUrl: signedUrl, spriteStripGcsPath: spriteGcsPath });
   } catch (err) {
     console.error('[generate-sprite] error:', err);
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

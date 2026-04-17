@@ -90,8 +90,14 @@ export const AssetCard = memo(function AssetCard({
       if (res.ok) {
         const data = await res.json();
         if (data.spriteStripUrl) setLazySpriteUrl(data.spriteStripUrl);
+        else console.warn('[sprite] no URL in response', data);
+      } else {
+        const text = await res.text();
+        console.warn('[sprite] generation failed', res.status, text);
       }
-    } catch {} finally {
+    } catch (err) {
+      console.warn('[sprite] request error', err);
+    } finally {
       setGeneratingSprite(false);
     }
   }, [spriteUrl, generatingSprite, asset.type, asset.id, getIdToken]);
