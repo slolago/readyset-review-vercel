@@ -53,6 +53,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const animRef    = useRef<number>(0);
 
   const [playing, setPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -350,11 +352,40 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           crossOrigin="anonymous"
           className="w-full h-full object-contain"
           playsInline preload="auto"
-          onLoadedMetadata={(e) => { setDuration(e.currentTarget.duration); computeVideoRect(); }}
-          onPlay={() => setPlaying(true)}
+          onLoadedMetadata={(e) => { setDuration(e.currentTarget.duration); computeVideoRect(); setLoadError(null); }}
+          onPlay={() => { setPlaying(true); setBuffering(false); }}
+          onPlaying={() => setBuffering(false)}
           onPause={() => setPlaying(false)}
           onEnded={() => setPlaying(false)}
+          onWaiting={() => setBuffering(true)}
+          onStalled={() => setBuffering(true)}
+          onCanPlay={() => setBuffering(false)}
+          onError={() => setLoadError('Could not load video. The link may have expired.')}
         />
+
+        {/* Buffering spinner */}
+        {buffering && !loadError && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <div className="bg-black/60 backdrop-blur-sm rounded-full p-3">
+              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          </div>
+        )}
+
+        {/* Error fallback */}
+        {loadError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-10">
+            <div className="text-center max-w-sm px-6">
+              <p className="text-white text-sm mb-3">{loadError}</p>
+              <button
+                onClick={() => { setLoadError(null); videoRef.current?.load(); }}
+                className="px-4 py-2 bg-frame-accent hover:bg-frame-accentHover text-white text-sm rounded-lg transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Annotation canvas overlay */}
         {(isAnnotationMode || (displayShapes && displayShapes !== '[]')) && videoRect.w > 0 && (
