@@ -13,44 +13,22 @@ interface VersionComparisonProps {
 }
 
 export function VersionComparison({ versions }: VersionComparisonProps) {
-  // Persist last-chosen pair per version-group. Only restored if side B still
-  // equals the current latest version — that way, uploading a new version
-  // automatically resets the default to "latest vs previous" instead of sticking
-  // to a stale pair from before the upload.
+  // Always default to "latest vs previous" — the most common comparison. No
+  // localStorage persistence: stale saved pairs were confusing users (if v3
+  // was uploaded, they'd still open on v1/v2 from a previous session).
+  // Assumes versions[] is sorted ascending by version number (API guarantees this).
   const latestId = versions[versions.length - 1]?.id ?? '';
   const previousId = versions[versions.length - 2]?.id ?? '';
-  const groupKey = versions[0] ? (versions[0].versionGroupId || versions[0].id) : 'unknown';
-  const storageKey = `compare-versions-${groupKey}`;
-  const loadSaved = (): { a: string; b: string } | null => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  };
-  const saved = loadSaved();
-  const savedIsFresh =
-    saved?.b === latestId &&
-    versions.some((v) => v.id === saved?.a) &&
-    versions.some((v) => v.id === saved?.b);
-  const initialA = savedIsFresh && saved ? saved.a : previousId;
-  const initialB = savedIsFresh && saved ? saved.b : latestId;
-  const [selectedIdA, setSelectedIdA] = useState(initialA);
-  const [selectedIdB, setSelectedIdB] = useState(initialB);
+  const [selectedIdA, setSelectedIdA] = useState(previousId);
+  const [selectedIdB, setSelectedIdB] = useState(latestId);
 
-  // If the versions list grew (new upload) after mount, snap to latest-vs-previous
-  // so the user doesn't stay stuck on an outdated pair.
+  // If the versions list changes while mounted (new upload), snap to the new
+  // latest-vs-previous pair.
   useEffect(() => {
-    if (latestId && selectedIdB !== latestId && !versions.some((v) => v.id === selectedIdB)) {
-      setSelectedIdA(previousId);
-      setSelectedIdB(latestId);
-    }
-  }, [latestId, previousId, versions, selectedIdB]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try { localStorage.setItem(storageKey, JSON.stringify({ a: selectedIdA, b: selectedIdB })); } catch {}
-  }, [selectedIdA, selectedIdB, storageKey]);
+    if (!latestId) return;
+    setSelectedIdB((cur) => (versions.some((v) => v.id === cur) ? cur : latestId));
+    setSelectedIdA((cur) => (versions.some((v) => v.id === cur) ? cur : previousId));
+  }, [versions, latestId, previousId]);
   const [viewMode, setViewMode] = useState<ViewMode>('slider');
   const [pickerSide, setPickerSide] = useState<'A' | 'B' | null>(null);
 
@@ -60,6 +38,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const [sliderPos, setSliderPos] = useState(0.5);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
@@ -67,8 +46,14 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [activeSide, setActiveSide] = useState<'A' | 'B'>('A');
+  const [activeSide, setActiveSide] = useState<'A' | 'B'>('B'); // default: listen to the latest
   const [muted, setMuted] = useState(false);
+
+  // Track the natural dimensions of video A so both videos can share a single
+  // letterbox/pillarbox rect. This keeps the slider split visually consistent
+  // even when the two versions have different aspect ratios.
+  const [dimsA, setDimsA] = useState<{ w: number; h: number } | null>(null);
+  const [dimsB, setDimsB] = useState<{ w: number; h: number } | null>(null);
 
   // Keep VU meter gain in sync with mute state (the meter owns volume — video.muted is ignored)
   useEffect(() => { vuRef.current?.setMuted(muted); }, [muted]);
@@ -143,7 +128,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   useEffect(() => {
     if (!isDragging) return;
     const onMove = (e: MouseEvent) => {
-      const r = containerRef.current?.getBoundingClientRect();
+      const r = frameRef.current?.getBoundingClientRect();
       if (!r) return;
       setSliderPos(Math.max(0.02, Math.min(0.98, (e.clientX - r.left) / r.width)));
     };
@@ -157,14 +142,14 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     setIsDragging(true);
-    const r = containerRef.current?.getBoundingClientRect();
+    const r = frameRef.current?.getBoundingClientRect();
     if (!r) return;
     setSliderPos(Math.max(0.02, Math.min(0.98, (e.touches[0].clientX - r.left) / r.width)));
   }, []);
   useEffect(() => {
     if (!isDragging) return;
     const onMove = (e: TouchEvent) => {
-      const r = containerRef.current?.getBoundingClientRect();
+      const r = frameRef.current?.getBoundingClientRect();
       if (!r) return;
       setSliderPos(Math.max(0.02, Math.min(0.98, (e.touches[0].clientX - r.left) / r.width)));
     };
@@ -253,87 +238,112 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     </div>
   );
 
-  // Stable positioning: media elements live at a fixed spot in the DOM so the
-  // VUMeter's MediaElementAudioSourceNode stays connected across src changes +
-  // viewMode toggles.
-  //   - Slider mode: both fill the container, clip-path reveals left/right halves.
-  //   - Side-by-side mode: each element occupies half the container (left:0-right:50%
-  //     and left:50%-right:0), no clip-path — object-contain fits the full frame
-  //     within each half.
-  // NOTE: relying on inline left/right/top/bottom, NOT w-full/h-full, so the
-  // positional constraints actually apply in both modes.
+  // Share a single letterbox/pillarbox frame between both videos. The frame's
+  // aspect ratio comes from the LARGER of the two natural aspect ratios (or a
+  // sane default until metadata loads) — this guarantees both videos fit inside
+  // the same visible rect, so the slider split and side-by-side layout line up
+  // properly even when V1 and V3 have different native dimensions.
+  const aspectA = dimsA ? dimsA.w / dimsA.h : null;
+  const aspectB = dimsB ? dimsB.w / dimsB.h : null;
+  const sharedAspect =
+    aspectA && aspectB ? Math.max(aspectA, aspectB) : aspectA ?? aspectB ?? 16 / 9;
+
   const videoStyleA: React.CSSProperties = viewMode === 'slider'
-    ? { top: 0, bottom: 0, left: 0, right: 0, clipPath: clipA }
-    : { top: 0, bottom: 0, left: 0, right: '50%', clipPath: 'none' };
+    ? { position: 'absolute', inset: 0, clipPath: clipA }
+    : { position: 'absolute', top: 0, bottom: 0, left: 0, right: '50%' };
   const videoStyleB: React.CSSProperties = viewMode === 'slider'
-    ? { top: 0, bottom: 0, left: 0, right: 0, clipPath: clipB }
-    : { top: 0, bottom: 0, left: '50%', right: 0, clipPath: 'none' };
+    ? { position: 'absolute', inset: 0, clipPath: clipB }
+    : { position: 'absolute', top: 0, bottom: 0, left: '50%', right: 0 };
+
+  const handleMetaA = () => {
+    const v = videoARef.current;
+    if (v?.videoWidth) setDimsA({ w: v.videoWidth, h: v.videoHeight });
+    if (v) setDuration(v.duration || 0);
+  };
+  const handleMetaB = () => {
+    const v = videoBRef.current;
+    if (v?.videoWidth) setDimsB({ w: v.videoWidth, h: v.videoHeight });
+  };
 
   return (
     <div className="flex flex-col h-full w-full bg-black">
       <div className="flex-1 min-h-0 flex">
-      <div className="relative flex-1 min-h-0 overflow-hidden select-none" ref={containerRef}>
+      <div className="relative flex-1 min-h-0 overflow-hidden select-none flex items-center justify-center" ref={containerRef}>
         <ViewToggle />
 
-        {/* Media — always rendered in the same position so refs stay stable.
-            Mode switches only re-style, never remount.
-            Audio source selection: video.muted gates each video's audio independently.
-            When a video is muted, its MediaElementSource emits silence (per Web Audio spec),
-            so the user hears only the active side. The VUMeter's gain nodes all stay at
-            volume=1; we don't gate audibility through them. */}
-        {isVideo ? (
-          <>
-            <video
-              ref={videoBRef}
-              src={urlB}
-              className="absolute object-contain"
-              style={videoStyleB}
-              muted={activeSide !== 'B' || muted}
-              playsInline
-              preload="auto"
-            />
-            <video
-              ref={videoARef}
-              src={urlA}
-              className="absolute object-contain"
-              style={videoStyleA}
-              muted={activeSide !== 'A' || muted}
-              playsInline
-              preload="auto"
-            />
-          </>
-        ) : (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={urlB} alt={`V${assetB?.version}`} className="absolute object-contain" style={videoStyleB} draggable={false} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={urlA} alt={`V${assetA?.version}`} className="absolute object-contain" style={videoStyleA} draggable={false} />
-          </>
-        )}
+        {/* Shared frame — sized to fit the container while matching sharedAspect.
+            Both videos render absolutely inside, guaranteeing the same visible rect. */}
+        <div
+          ref={frameRef}
+          className="relative"
+          style={{
+            aspectRatio: `${sharedAspect}`,
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: viewMode === 'side-by-side' ? '100%' : undefined,
+            height: viewMode === 'side-by-side' ? '100%' : undefined,
+          }}
+        >
+          {/* Media — always rendered in the same position so refs stay stable.
+              Audio source selection: video.muted gates each video's audio independently.
+              When a video is muted, its MediaElementSource emits silence, so the user
+              hears only the active side. VUMeter gain nodes stay at volume=1. */}
+          {isVideo ? (
+            <>
+              <video
+                ref={videoBRef}
+                src={urlB}
+                className="object-contain w-full h-full"
+                style={videoStyleB}
+                muted={activeSide !== 'B' || muted}
+                playsInline
+                preload="auto"
+                onLoadedMetadata={handleMetaB}
+              />
+              <video
+                ref={videoARef}
+                src={urlA}
+                className="object-contain w-full h-full"
+                style={videoStyleA}
+                muted={activeSide !== 'A' || muted}
+                playsInline
+                preload="auto"
+                onLoadedMetadata={handleMetaA}
+              />
+            </>
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={urlB} alt={`V${assetB?.version}`} className="object-contain w-full h-full" style={videoStyleB} draggable={false} onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth) setDimsB({ w: t.naturalWidth, h: t.naturalHeight }); }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={urlA} alt={`V${assetA?.version}`} className="object-contain w-full h-full" style={videoStyleA} draggable={false} onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth) setDimsA({ w: t.naturalWidth, h: t.naturalHeight }); }} />
+            </>
+          )}
 
-        {/* Slider handle — only in slider mode */}
-        {viewMode === 'slider' && (
-          <>
-            <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none" style={{ left: `${sliderPos * 100}%` }} />
-            <div
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 bg-white rounded-full shadow-xl flex items-center justify-center cursor-ew-resize z-10"
-              style={{ left: `${sliderPos * 100}%` }}
-              onMouseDown={handleMouseDown} onTouchStart={handleTouchStart}
-            >
-              <div className="flex gap-0.5">
-                <div className="w-0.5 h-4 bg-gray-400 rounded" />
-                <div className="w-0.5 h-4 bg-gray-400 rounded" />
+          {/* Slider handle — only in slider mode, positioned over the shared frame */}
+          {viewMode === 'slider' && (
+            <>
+              <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none" style={{ left: `${sliderPos * 100}%` }} />
+              <div
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 bg-white rounded-full shadow-xl flex items-center justify-center cursor-ew-resize z-10"
+                style={{ left: `${sliderPos * 100}%` }}
+                onMouseDown={handleMouseDown} onTouchStart={handleTouchStart}
+              >
+                <div className="flex gap-0.5">
+                  <div className="w-0.5 h-4 bg-gray-400 rounded" />
+                  <div className="w-0.5 h-4 bg-gray-400 rounded" />
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
 
-        {/* Vertical divider line for side-by-side */}
-        {viewMode === 'side-by-side' && (
-          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-white/10 pointer-events-none" />
-        )}
+          {/* Vertical divider for side-by-side */}
+          {viewMode === 'side-by-side' && (
+            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-white/15 pointer-events-none" />
+          )}
+        </div>
 
-        {/* Labels */}
+        {/* Labels — placed over the container (outside the shared frame) */}
         <div className="absolute top-14 left-3 z-10 pointer-events-auto">
           {assetA && <VersionLabel side="A" asset={assetA} />}
         </div>
