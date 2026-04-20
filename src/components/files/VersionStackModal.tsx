@@ -85,12 +85,15 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
       if (res.ok) {
         toast.success(`V${version.version} unstacked`);
         const remaining = versions.filter((v) => v.id !== version.id);
-        setVersions(remaining);
+        setVersions(remaining); // optimistic UI feedback
+        // Always refetch — after a root-detach the server re-roots remaining
+        // members onto a new versionGroupId, so local cache is stale.
         if (version.id === asset.id || remaining.length <= 1) {
           onDeleted?.();
           onClose();
         } else {
           onDeleted?.();
+          await fetchVersions();
         }
       } else {
         const data = await res.json();
@@ -117,11 +120,13 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
       });
       if (!res.ok) {
         toast.error('Reorder failed');
-        fetchVersions();
       }
+      // Always re-sync from server — optimistic state may diverge if server
+      // rejected partial input or applied a re-root.
+      await fetchVersions();
     } catch {
       toast.error('Reorder failed');
-      fetchVersions();
+      await fetchVersions();
     }
   };
 
@@ -206,7 +211,7 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
                     <button
                       onClick={() => handleUnstack(version)}
                       className="flex-shrink-0 text-frame-textMuted hover:text-white transition-colors"
-                      title={`Unstack V${idx + 1}`}
+                      title={`Unstack V${idx + 1} — leaves comments and review links intact`}
                     >
                       <Unlink className="w-4 h-4" />
                     </button>
