@@ -23,9 +23,10 @@ interface ProjectsTableProps {
   projects: AdminProject[];
   loading: boolean;
   onChanged?: () => void;
+  onInspectPermissions?: (projectId: string) => void;
 }
 
-export function ProjectsTable({ projects, loading, onChanged }: ProjectsTableProps) {
+export function ProjectsTable({ projects, loading, onChanged, onInspectPermissions }: ProjectsTableProps) {
   const { getIdToken } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [transferring, setTransferring] = useState<string | null>(null);
@@ -85,7 +86,17 @@ export function ProjectsTable({ projects, loading, onChanged }: ProjectsTablePro
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: project.color }} />
                     <div>
-                      <p className="text-sm font-medium text-white">{project.name}</p>
+                      {onInspectPermissions ? (
+                        <button
+                          type="button"
+                          onClick={() => onInspectPermissions(project.id)}
+                          className="text-sm font-medium text-white hover:text-frame-accent transition-colors text-left"
+                        >
+                          {project.name}
+                        </button>
+                      ) : (
+                        <p className="text-sm font-medium text-white">{project.name}</p>
+                      )}
                       {descriptionSnippet && (
                         <p className="text-xs text-frame-textMuted mt-0.5">{descriptionSnippet}</p>
                       )}

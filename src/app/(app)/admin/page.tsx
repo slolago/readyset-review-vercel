@@ -10,6 +10,7 @@ import { UserDrawer } from '@/components/admin/UserDrawer';
 import type { User } from '@/types';
 import { Shield, UserPlus, Users, FolderOpen, LayoutGrid } from 'lucide-react';
 import { SafeZonesManager } from '@/components/admin/SafeZonesManager';
+import { ProjectPermissionsPanel } from '@/components/admin/ProjectPermissionsPanel';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 
@@ -23,6 +24,7 @@ export default function AdminPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [inspectingUserId, setInspectingUserId] = useState<string | null>(null);
+  const [permsProjectId, setPermsProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && user.role !== 'admin') router.replace('/dashboard');
@@ -220,7 +222,12 @@ export default function AdminPage() {
               </p>
             )}
           </div>
-          <ProjectsTable projects={projects} loading={projectsLoading} onChanged={fetchProjects} />
+          <ProjectsTable
+            projects={projects}
+            loading={projectsLoading}
+            onChanged={fetchProjects}
+            onInspectPermissions={setPermsProjectId}
+          />
         </div>
       )}
 
@@ -251,6 +258,14 @@ export default function AdminPage() {
           userId={inspectingUserId}
           onClose={() => setInspectingUserId(null)}
           onChanged={fetchUsers}
+          getIdToken={getIdToken}
+        />
+      )}
+
+      {permsProjectId && (
+        <ProjectPermissionsPanel
+          projectId={permsProjectId}
+          onClose={() => setPermsProjectId(null)}
           getIdToken={getIdToken}
         />
       )}
