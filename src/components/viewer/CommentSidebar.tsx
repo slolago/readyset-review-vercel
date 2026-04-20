@@ -366,7 +366,7 @@ export function CommentSidebar({
                         ? 'bg-frame-accent/15 text-frame-accent'
                         : 'text-frame-textMuted hover:text-white'
                     }`}
-                    title="Mark range start at current time"
+                    title="Mark range start at current time (I)"
                   >
                     <Scissors className="w-3 h-3" />
                     <span className="font-mono text-[10px]">IN</span>
@@ -394,7 +394,7 @@ export function CommentSidebar({
                         ? 'text-yellow-400 animate-pulse border-frame-accent/30'
                         : 'text-frame-textMuted/50 cursor-not-allowed border-frame-border'
                     }`}
-                    title={inPoint === undefined ? 'Mark IN first' : 'Mark range end at current time'}
+                    title={inPoint === undefined ? 'Mark IN first' : 'Mark range end at current time (O)'}
                   >
                     <span className="font-mono text-[10px]">OUT</span>
                     {outPoint !== undefined && (

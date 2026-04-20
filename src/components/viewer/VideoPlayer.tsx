@@ -33,6 +33,9 @@ interface VideoPlayerProps {
   /** Range loop bounds lifted from the viewer parent (shared with CommentSidebar in/out). */
   loopIn?: number;
   loopOut?: number;
+  /** Setters so keyboard shortcuts (I / O) can mark the range from the player. */
+  onLoopInChange?: (v: number | undefined) => void;
+  onLoopOutChange?: (v: number | undefined) => void;
 }
 
 export interface VideoPlayerHandle {
@@ -51,7 +54,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   isAnnotationMode, displayShapes,
   onRequestAnnotation, onAnnotationCapture, onAnnotationCancel,
   onCommentClick, onAnnotationStarted, downloadUrl, onRequestExport,
-  loopIn, loopOut,
+  loopIn, loopOut, onLoopInChange, onLoopOutChange,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -267,13 +270,45 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           // Focus comment textarea — dispatch a custom event the sidebar listens to
           window.dispatchEvent(new CustomEvent('focus-comment-input'));
           break;
+        case 'i':
+        case 'I':
+          // Mark in-point at current time (used for range comments + loop)
+          if (!onLoopInChange) break;
+          e.preventDefault();
+          onLoopInChange(v.currentTime);
+          // If the existing out-point is now <= new in-point, clear it so
+          // the user isn't left with an invalid range.
+          if (
+            onLoopOutChange &&
+            typeof loopOut === 'number' &&
+            loopOut <= v.currentTime
+          ) {
+            onLoopOutChange(undefined);
+          }
+          break;
+        case 'o':
+        case 'O':
+          // Mark out-point at current time. Requires in-point first.
+          if (!onLoopOutChange) break;
+          e.preventDefault();
+          if (typeof loopIn !== 'number') {
+            // No in-point yet — ignore silently; the composer banner
+            // already tells the user "click IN first".
+            break;
+          }
+          if (v.currentTime <= loopIn) {
+            // Invalid — don't set out before in
+            break;
+          }
+          onLoopOutChange(v.currentTime);
+          break;
         default:
           break;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isAnnotationMode, duration, onUserInteraction]);
+  }, [isAnnotationMode, duration, onUserInteraction, muted, onLoopInChange, onLoopOutChange, loopIn, loopOut]);
 
   // Ctrl+Z in annotation mode
   useEffect(() => {

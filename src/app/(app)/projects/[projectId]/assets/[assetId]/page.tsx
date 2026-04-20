@@ -308,6 +308,8 @@ export default function AssetViewerPage() {
               onRequestExport={() => setShowExportModal(true)}
               loopIn={rangeIn}
               loopOut={rangeOut}
+              onLoopInChange={setRangeIn}
+              onLoopOutChange={setRangeOut}
             />
           ) : displayAsset ? (
             <ImageViewer

@@ -351,6 +351,8 @@ export default function ReviewPage() {
                     }
                     loopIn={rangeIn}
                     loopOut={rangeOut}
+                    onLoopInChange={setRangeIn}
+                    onLoopOutChange={setRangeOut}
                   />
                 ) : (
                   <ImageViewer
