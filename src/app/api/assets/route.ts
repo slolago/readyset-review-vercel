@@ -28,7 +28,21 @@ export async function GET(request: NextRequest) {
     // Fetch all assets for project, filter folderId in memory to avoid composite index
     const snap = await db.collection('assets').where('projectId', '==', projectId).get();
     const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
-    const filtered = all.filter((a: any) => (a.folderId ?? null) === folderId);
+
+    // Load soft-deleted folder IDs for this project so we can hide assets whose parent is trashed.
+    const foldersSnap = await db.collection('folders')
+      .where('projectId', '==', projectId)
+      .get();
+    const deletedFolderIds = new Set(
+      foldersSnap.docs.filter((d) => (d.data() as any).deletedAt).map((d) => d.id)
+    );
+
+    const liveAssets = all.filter((a: any) => {
+      if (a.deletedAt) return false;
+      if (a.folderId && deletedFolderIds.has(a.folderId)) return false;
+      return true;
+    });
+    const filtered = liveAssets.filter((a: any) => (a.folderId ?? null) === folderId);
 
     // Group by versionGroupId, show only the latest version per group
     const groups = new Map<string, any[]>();

@@ -33,9 +33,11 @@ export async function GET(request: NextRequest) {
     const db = getAdminDb();
     const snap = await db.collection('folders').where('projectId', '==', projectId).get();
     const allFolders = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+    // Hide soft-deleted folders from normal listings — they surface only in the Trash view.
+    const liveFolders = allFolders.filter((f: any) => !f.deletedAt);
     const folders = all
-      ? allFolders.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis())
-      : allFolders
+      ? liveFolders.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis())
+      : liveFolders
           .filter((f: any) => (f.parentId ?? null) === parentId)
           .sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis());
 
