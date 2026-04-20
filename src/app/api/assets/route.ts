@@ -47,13 +47,20 @@ export async function GET(request: NextRequest) {
     // Sort by earliest version's createdAt (stack creation time) descending
     grouped.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
 
-    // Fetch comment counts for all assets in one query, grouped by assetId
+    // Fetch comment counts for all assets in one query, grouped by assetId.
+    // Rule: count only top-level (parentId == null) comments with non-empty
+    // text. Replies and empty-text docs are excluded so the grid badge matches
+    // what the user sees in the sidebar tab.
     const commentCountMap = new Map<string, number>();
     try {
       const commentsSnap = await db.collection('comments').where('projectId', '==', projectId).get();
       for (const doc of commentsSnap.docs) {
-        const aid = doc.data().assetId as string | undefined;
-        if (aid) commentCountMap.set(aid, (commentCountMap.get(aid) ?? 0) + 1);
+        const d = doc.data() as any;
+        const aid = d.assetId as string | undefined;
+        if (!aid) continue;
+        if (d.parentId) continue;                           // skip replies
+        if (!d.text || !String(d.text).trim()) continue;    // skip empty/whitespace
+        commentCountMap.set(aid, (commentCountMap.get(aid) ?? 0) + 1);
       }
     } catch {
       // Non-fatal: comment counts stay 0 if query fails
