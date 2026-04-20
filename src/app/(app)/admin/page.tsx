@@ -109,6 +109,38 @@ export default function AdminPage() {
     }
   };
 
+  const handleSuspendToggle = async (userId: string, disabled: boolean) => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ disabled }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { toast.error(data?.error || 'Failed to update'); return; }
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, disabled } as User : u)));
+      toast.success(disabled ? 'User suspended' : 'User reactivated');
+    } catch {
+      toast.error('Failed to update user');
+    }
+  };
+
+  const handleRevoke = async (userId: string) => {
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/admin/users/${userId}/revoke-sessions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { toast.error(data?.error || 'Failed to revoke sessions'); return; }
+      toast.success(data?.hadAuthRecord === false ? 'No active sessions to revoke' : 'Sessions revoked');
+    } catch {
+      toast.error('Failed to revoke sessions');
+    }
+  };
+
   const handleCreated = (newUser: User) => {
     setUsers((prev) => [newUser, ...prev]);
     setShowCreate(false);
@@ -208,6 +240,8 @@ export default function AdminPage() {
             onRoleChange={handleRoleChange}
             onDelete={handleDelete}
             onInspect={setInspectingUserId}
+            onSuspendToggle={handleSuspendToggle}
+            onRevoke={handleRevoke}
           />
         </div>
       )}

@@ -7,6 +7,7 @@ import { formatRelativeTime } from '@/lib/utils';
 import type { User } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Shield, Trash2, ChevronDown } from 'lucide-react';
+import { UserSessionActions } from './UserSessionActions';
 
 interface UserTableProps {
   users: User[];
@@ -14,6 +15,8 @@ interface UserTableProps {
   onRoleChange: (userId: string, role: 'admin' | 'manager' | 'editor' | 'viewer') => Promise<void>;
   onDelete: (userId: string) => Promise<void>;
   onInspect?: (userId: string) => void;
+  onSuspendToggle?: (userId: string, disabled: boolean) => Promise<void>;
+  onRevoke?: (userId: string) => Promise<void>;
 }
 
 const ROLE_STYLES: Record<string, string> = {
@@ -38,12 +41,16 @@ function UserRow({
   onRoleChange,
   onDelete,
   onInspect,
+  onSuspendToggle,
+  onRevoke,
 }: {
   u: User;
   isSelf: boolean;
   onRoleChange: (userId: string, role: 'admin' | 'manager' | 'editor' | 'viewer') => Promise<void>;
   onDelete: (userId: string) => Promise<void>;
   onInspect?: (userId: string) => void;
+  onSuspendToggle?: (userId: string, disabled: boolean) => Promise<void>;
+  onRevoke?: (userId: string) => Promise<void>;
 }) {
   const [roleLoading, setRoleLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -138,39 +145,49 @@ function UserRow({
       {/* Actions */}
       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
         {!isSelf && (
-          confirmDelete ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-frame-textSecondary">Sure?</span>
+          <div className="flex items-center gap-4 justify-end">
+            {onSuspendToggle && onRevoke && (
+              <UserSessionActions
+                user={u}
+                isSelf={isSelf}
+                onSuspendToggle={onSuspendToggle}
+                onRevoke={onRevoke}
+              />
+            )}
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-frame-textSecondary">Sure?</span>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                  className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors disabled:opacity-50"
+                >
+                  {deleteLoading ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-xs text-frame-textMuted hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
               <button
                 onClick={handleDelete}
-                disabled={deleteLoading}
-                className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors disabled:opacity-50"
+                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs text-frame-textMuted hover:text-red-400 transition-colors"
               >
-                {deleteLoading ? 'Deleting…' : 'Yes, delete'}
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
               </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="text-xs text-frame-textMuted hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleDelete}
-              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs text-frame-textMuted hover:text-red-400 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Delete
-            </button>
-          )
+            )}
+          </div>
         )}
       </td>
     </tr>
   );
 }
 
-export function UserTable({ users, loading, onRoleChange, onDelete, onInspect }: UserTableProps) {
+export function UserTable({ users, loading, onRoleChange, onDelete, onInspect, onSuspendToggle, onRevoke }: UserTableProps) {
   const { user: currentUser } = useAuth();
 
   if (loading) {
@@ -209,6 +226,8 @@ export function UserTable({ users, loading, onRoleChange, onDelete, onInspect }:
               onRoleChange={onRoleChange}
               onDelete={onDelete}
               onInspect={onInspect}
+              onSuspendToggle={onSuspendToggle}
+              onRevoke={onRevoke}
             />
           ))}
         </tbody>
