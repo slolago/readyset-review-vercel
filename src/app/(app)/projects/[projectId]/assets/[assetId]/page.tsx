@@ -13,6 +13,7 @@ import { ChevronLeft, Share2, Download, CheckCircle2, AlertCircle, Clock, X, Tag
 import { forceDownload } from '@/lib/utils';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { CreateReviewLinkModal } from '@/components/review/CreateReviewLinkModal';
+import { ExportModal } from '@/components/viewer/ExportModal';
 import { VersionSwitcher } from '@/components/viewer/VersionSwitcher';
 import { VersionComparison } from '@/components/viewer/VersionComparison';
 import type { Comment, Asset } from '@/types';
@@ -35,6 +36,7 @@ export default function AssetViewerPage() {
   const { comments, addComment, resolveComment, deleteComment, editComment } = useComments(displayAsset?.id);
   const [currentTime, setCurrentTime] = useState(0);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const videoRef = useRef<VideoPlayerHandle>(null);
   const imageRef = useRef<ImageViewerHandle>(null);
 
@@ -297,6 +299,7 @@ export default function AssetViewerPage() {
               onAnnotationCancel={handleAnnotationCancel}
               onCommentClick={handleCommentClickFromTimeline}
               onAnnotationStarted={() => window.dispatchEvent(new CustomEvent('focus-comment-input'))}
+              onRequestExport={() => setShowExportModal(true)}
             />
           ) : displayAsset ? (
             <ImageViewer
@@ -337,6 +340,13 @@ export default function AssetViewerPage() {
 
       {showReviewModal && (
         <CreateReviewLinkModal projectId={projectId} onClose={() => setShowReviewModal(false)} />
+      )}
+      {displayAsset && displayAsset.type === 'video' && (
+        <ExportModal
+          asset={displayAsset}
+          open={showExportModal}
+          onClose={() => setShowExportModal(false)}
+        />
       )}
     </div>
   );

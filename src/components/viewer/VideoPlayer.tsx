@@ -10,7 +10,7 @@ import { VUMeter, type VUMeterHandle } from './VUMeter';
 import { PlayerBgPicker } from './PlayerBgPicker';
 import { usePlayerBg } from '@/hooks/usePlayerBg';
 import { formatDuration } from '@/lib/utils';
-import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize, Download, Activity } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize, Download, Activity, Scissors } from 'lucide-react';
 import { forceDownload } from '@/lib/utils';
 
 interface VideoPlayerProps {
@@ -28,6 +28,8 @@ interface VideoPlayerProps {
   onAnnotationStarted?: () => void;
   /** When provided, an always-visible Download button appears in the player controls. */
   downloadUrl?: string;
+  /** When provided, an Export button appears in the player controls (internal viewers only). */
+  onRequestExport?: () => void;
 }
 
 export interface VideoPlayerHandle {
@@ -45,7 +47,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   asset, comments, onTimeUpdate, onUserInteraction,
   isAnnotationMode, displayShapes,
   onRequestAnnotation, onAnnotationCapture, onAnnotationCancel,
-  onCommentClick, onAnnotationStarted, downloadUrl,
+  onCommentClick, onAnnotationStarted, downloadUrl, onRequestExport,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -696,6 +698,18 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               <option key={r} value={r} className="bg-[#111] text-white">{r}x</option>
             ))}
           </select>
+
+          {/* Export — visible when onRequestExport is provided (internal viewers) */}
+          {onRequestExport && (
+            <button
+              onClick={onRequestExport}
+              title="Export clip (MP4 or GIF)"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/70 hover:text-white border border-white/10 hover:border-white/30 rounded-lg transition-colors"
+            >
+              <Scissors className="w-3.5 h-3.5" />
+              Export
+            </button>
+          )}
 
           {/* Download — visible when downloadUrl is provided */}
           {downloadUrl && (
