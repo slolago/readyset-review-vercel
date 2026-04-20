@@ -5,6 +5,9 @@ import { useAsset } from '@/hooks/useAssets';
 import { useComments } from '@/hooks/useComments';
 import { VideoPlayer, VideoPlayerHandle } from '@/components/viewer/VideoPlayer';
 import { ImageViewer, ImageViewerHandle } from '@/components/viewer/ImageViewer';
+import { DocumentViewer } from '@/components/viewer/DocumentViewer';
+import { HtmlViewer } from '@/components/viewer/HtmlViewer';
+import { FileTypeCard } from '@/components/viewer/FileTypeCard';
 import { CommentSidebar } from '@/components/viewer/CommentSidebar';
 import { Spinner } from '@/components/ui/Spinner';
 import { useProject } from '@/hooks/useProject';
@@ -311,7 +314,7 @@ export default function AssetViewerPage() {
               onLoopInChange={setRangeIn}
               onLoopOutChange={setRangeOut}
             />
-          ) : displayAsset ? (
+          ) : displayAsset && displayAsset.type === 'image' ? (
             <ImageViewer
               key={displayAsset.id}
               ref={imageRef}
@@ -322,6 +325,12 @@ export default function AssetViewerPage() {
               onAnnotationCancel={handleAnnotationCancel}
               displayShapes={displayShapes}
             />
+          ) : displayAsset && displayAsset.subtype === 'pdf' ? (
+            <DocumentViewer key={displayAsset.id} asset={displayAsset} />
+          ) : displayAsset && displayAsset.subtype === 'html' ? (
+            <HtmlViewer key={displayAsset.id} asset={displayAsset} />
+          ) : displayAsset ? (
+            <FileTypeCard key={displayAsset.id} asset={displayAsset} />
           ) : null}
         </div>
 
