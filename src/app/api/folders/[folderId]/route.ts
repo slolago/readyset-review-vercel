@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 import { canAccessProject, canRenameFolder, canDeleteFolder } from '@/lib/permissions';
 import type { Project } from '@/types';
 
@@ -124,40 +125,17 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Cascade: collect all descendant folder IDs via BFS so we can batch delete.
-    // Assets inside these folders are re-parented to null (preserved as unfiled)
-    // — deleting thousands of GCS blobs on cascade is risky and irreversible.
-    const toDelete: string[] = [params.folderId];
-    const queue: string[] = [params.folderId];
-    while (queue.length > 0) {
-      const parentId = queue.shift()!;
-      const children = await db.collection('folders').where('parentId', '==', parentId).get();
-      for (const child of children.docs) {
-        toDelete.push(child.id);
-        queue.push(child.id);
-      }
-    }
-
-    const BATCH_LIMIT = 400;
-    // Re-parent all assets in these folders to null
-    for (const fid of toDelete) {
-      const assetsSnap = await db.collection('assets').where('folderId', '==', fid).get();
-      for (let i = 0; i < assetsSnap.docs.length; i += BATCH_LIMIT) {
-        const batch = db.batch();
-        assetsSnap.docs.slice(i, i + BATCH_LIMIT).forEach((d) => batch.update(d.ref, { folderId: null }));
-        await batch.commit();
-      }
-    }
-    // Delete folders (batched)
-    for (let i = 0; i < toDelete.length; i += BATCH_LIMIT) {
-      const batch = db.batch();
-      toDelete.slice(i, i + BATCH_LIMIT).forEach((id) => batch.delete(db.collection('folders').doc(id)));
-      await batch.commit();
-    }
-
-    return NextResponse.json({ success: true, foldersDeleted: toDelete.length });
+    // Soft-delete the folder only — children keep their parentId and are
+    // hidden from normal views by the list-endpoint filter (which excludes
+    // items whose parent folder is soft-deleted). On restore, children
+    // automatically reappear.
+    await db.collection('folders').doc(params.folderId).update({
+      deletedAt: Timestamp.now(),
+      deletedBy: user.id,
+    });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Folder delete error:', err);
+    console.error('Folder soft-delete error:', err);
     return NextResponse.json({ error: 'Failed to delete folder' }, { status: 500 });
   }
 }
