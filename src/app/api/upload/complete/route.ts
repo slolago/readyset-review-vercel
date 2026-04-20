@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { getPublicUrl } from '@/lib/gcs';
+import { canUpload } from '@/lib/permissions';
+import type { Project } from '@/types';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -16,6 +18,14 @@ export async function POST(request: NextRequest) {
     if (!doc.exists) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
 
     const asset = doc.data() as any;
+    // Two gates: (1) platform/project role must allow upload; (2) the user who
+    // reserved the signed URL (uploadedBy) must be the one calling complete.
+    const projDoc = await db.collection('projects').doc(asset.projectId).get();
+    if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projDoc.id, ...projDoc.data() } as Project;
+    if (!canUpload(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     if (asset.uploadedBy !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

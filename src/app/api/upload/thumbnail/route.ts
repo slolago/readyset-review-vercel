@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { uploadBuffer, buildThumbnailPath, getPublicUrl } from '@/lib/gcs';
+import { canUpload } from '@/lib/permissions';
+import type { Project } from '@/types';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -25,9 +27,12 @@ export async function POST(request: NextRequest) {
     if (!doc.exists) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
 
     const asset = doc.data() as any;
-    // Any project collaborator can upload a thumbnail/sprite, not just the
-    // uploader — previously blocked legit re-generation by teammates.
-    if (!(await canAccessProject(user.id, asset.projectId))) {
+    // Any collaborator with upload rights can regenerate thumbnails/sprites.
+    // Reviewers are blocked (read-only); platform-viewers are blocked.
+    const projDoc = await db.collection('projects').doc(asset.projectId).get();
+    if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projDoc.id, ...projDoc.data() } as Project;
+    if (!canUpload(user, project)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

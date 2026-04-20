@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
+import { canUpload } from '@/lib/permissions';
+import type { Project } from '@/types';
 import { generateUploadSignedUrl, buildGcsPath, getPublicUrl } from '@/lib/gcs';
 import { getAssetType } from '@/lib/utils';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -22,15 +24,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
     }
 
-    const hasAccess = await canAccessProject(user.id, projectId);
-    if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const db = getAdminDb();
+    const projDoc = await db.collection('projects').doc(projectId).get();
+    if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projDoc.id, ...projDoc.data() } as Project;
+    if (!canUpload(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const assetId = randomUUID();
     const gcsPath = buildGcsPath(projectId, assetId, filename);
     const signedUrl = await generateUploadSignedUrl(gcsPath, contentType);
     const publicUrl = getPublicUrl(gcsPath);
-
-    const db = getAdminDb();
 
     // Versioning logic
     let versionNumber = 1;

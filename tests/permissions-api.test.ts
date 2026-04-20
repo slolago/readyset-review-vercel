@@ -339,5 +339,37 @@ describe('API enforcement — assets', () => {
     expect((await call(F.reviewer)).status).toBe(403);
   });
 });
+
+// ---------- Tests: upload pipeline ----------
+
+describe('API enforcement — upload', () => {
+  it('POST /api/upload/signed-url — reviewer is 403 (gap closure)', async () => {
+    const { POST } = await import('@/app/api/upload/signed-url/route');
+    const body = {
+      filename: 'clip.mp4',
+      contentType: 'video/mp4',
+      size: 1000,
+      projectId: F.projectId,
+    };
+    const call = (uid: string) => POST(makeRequest({ body: body as any, headers: authHeader(uid) }));
+    expect((await call(F.owner)).status).toBe(200);
+    expect((await call(F.editor)).status).toBe(200);
+    expect((await call(F.reviewer)).status).toBe(403);
+    expect((await call(F.admin)).status).toBe(200);
+    expect((await call(F.stranger)).status).toBe(403);
+  });
+
+  it('POST /api/upload/signed-url — platform-viewer owner is 403', async () => {
+    const { POST } = await import('@/app/api/upload/signed-url/route');
+    const body = {
+      filename: 'clip.mp4',
+      contentType: 'video/mp4',
+      size: 1000,
+      projectId: 'proj-viewer',
+    };
+    const res = await POST(makeRequest({ body: body as any, headers: authHeader(F.platformViewerOwner) }));
+    expect(res.status).toBe(403);
+  });
+});
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
