@@ -421,6 +421,11 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const sharedAspect =
     aspectA && aspectB ? Math.max(aspectA, aspectB) : aspectA ?? aspectB ?? 16 / 9;
 
+  // Frame sizing is viewMode-aware:
+  //   - Slider: fit sharedAspect inside the container (letterbox/pillarbox)
+  //     so both videos occupy the SAME visible rect → clip-path split aligns.
+  //   - Side-by-side: frame IS the full container. Each video uses its half
+  //     at full container height, object-contain letterboxing individually.
   const [frameSize, setFrameSize] = useState<{ w: number; h: number } | null>(null);
   useEffect(() => {
     const container = containerRef.current;
@@ -429,6 +434,10 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
       const cw = container.clientWidth;
       const ch = container.clientHeight;
       if (!cw || !ch) return;
+      if (viewMode === 'side-by-side') {
+        setFrameSize({ w: cw, h: ch });
+        return;
+      }
       const containerAspect = cw / ch;
       let fw: number, fh: number;
       if (sharedAspect >= containerAspect) {
@@ -442,7 +451,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     const ro = new ResizeObserver(compute);
     ro.observe(container);
     return () => ro.disconnect();
-  }, [sharedAspect]);
+  }, [sharedAspect, viewMode]);
 
   // Zoom/pan transform applied to BOTH videos identically so the split stays
   // aligned. Order matters: translate first, then scale around the result.
