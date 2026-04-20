@@ -160,6 +160,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!canProbeAsset(user, project)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // Images (and any future non-video types) do not go through ffprobe.
+    // Mark probed:true so the UI's "Probe" affordance in FileInfoPanel hides.
+    if (asset.type !== 'video') {
+      await db.collection('assets').doc(params.assetId).update({ probed: true });
+      return NextResponse.json({ success: true, skipped: 'non-video asset', updates: { probed: true } });
+    }
+
     if (!asset.gcsPath) return NextResponse.json({ error: 'Asset has no file' }, { status: 400 });
 
     const ffprobePath = await resolveFfprobe();
