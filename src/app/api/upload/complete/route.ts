@@ -33,6 +33,20 @@ export async function POST(request: NextRequest) {
     await db.collection('assets').doc(assetId).update(updates);
 
     const updated = await db.collection('assets').doc(assetId).get();
+
+    // Fire-and-forget: run ffprobe to replace client-extracted metadata
+    // with server-verified values. We don't block the upload-complete response
+    // on it — the client already has acceptable metadata to start viewing.
+    // If probe fails, the Probe button in the info panel can be used manually.
+    const origin = request.nextUrl.origin;
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      fetch(`${origin}/api/assets/${assetId}/probe`, {
+        method: 'POST',
+        headers: { Authorization: authHeader },
+      }).catch((e) => console.warn('[upload/complete] background probe failed', e));
+    }
+
     return NextResponse.json({ asset: { id: assetId, ...updated.data() } });
   } catch (error) {
     console.error('Upload complete error:', error);

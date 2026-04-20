@@ -65,6 +65,27 @@ export interface Asset {
   _commentCount?: number;
   frameRate?: number;
   reviewStatus?: ReviewStatus;
+
+  // Accurate metadata populated by server-side ffprobe after upload. Absent
+  // on assets uploaded before the probe pipeline existed — use the /probe
+  // endpoint to backfill.
+  probed?: boolean;                // true once ffprobe ran successfully
+  containerFormat?: string;        // e.g. 'mov,mp4,m4a,3gp,3g2,mj2'
+  videoCodec?: string;             // e.g. 'h264', 'hevc', 'av1', 'vp9'
+  audioCodec?: string;             // e.g. 'aac', 'opus', 'mp3'
+  bitRate?: number;                // overall bits per second
+  videoBitRate?: number;           // video stream bits per second
+  audioBitRate?: number;           // audio stream bits per second
+  audioChannels?: number;          // 1=mono, 2=stereo, 6=5.1
+  audioChannelLayout?: string;     // e.g. 'stereo', '5.1(side)'
+  audioSampleRate?: number;        // Hz, e.g. 48000
+  pixelFormat?: string;            // e.g. 'yuv420p', 'yuv422p10le'
+  colorSpace?: string;             // e.g. 'bt709', 'bt2020nc'
+  colorPrimaries?: string;         // e.g. 'bt709'
+  colorTransfer?: string;          // e.g. 'bt709', 'smpte2084'
+  profile?: string;                // e.g. 'High', 'Main 10'
+  level?: number;                  // H.264 level (40 = 4.0)
+  rotation?: number;               // display rotation in degrees (0/90/180/270)
 }
 
 export interface AnnotationData {

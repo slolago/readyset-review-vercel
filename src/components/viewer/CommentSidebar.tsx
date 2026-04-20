@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { CommentItem } from './CommentItem';
 import type { Asset, Comment } from '@/types';
-import { MessageSquare, Send, Clock, Pencil, X, Filter, CheckCircle2, Info } from 'lucide-react';
+import { MessageSquare, Send, Clock, Pencil, X, CheckCircle2, Info } from 'lucide-react';
 import { FileInfoPanel } from './FileInfoPanel';
 import { formatTimestamp } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -60,7 +60,6 @@ export function CommentSidebar({
   const [text, setText] = useState('');
   const [includeTimestamp, setIncludeTimestamp] = useState(asset.type === 'video');
   const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [showResolved, setShowResolved] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'info'>('comments');
   const [submitting, setSubmitting] = useState(false);
   const [inPoint, setInPoint] = useState<number | undefined>(undefined);
@@ -82,18 +81,19 @@ export function CommentSidebar({
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [selectedCommentId]);
 
-  // Sort top-level: timed ascending, untimed after — memoized so it only
-  // recalculates when comments array or showResolved changes, not on every currentTime tick.
+  // Sort top-level: timed ascending, untimed after. Resolved comments stay
+  // in the list (with a "Completed" badge rendered by CommentItem) — they're
+  // not hidden; the resolve action is a status marker, not a delete.
   const topLevel = useMemo(
     () =>
       comments
-        .filter((c) => !c.parentId && (showResolved || !c.resolved))
+        .filter((c) => !c.parentId)
         .sort((a, b) => {
           const aT = a.timestamp !== undefined, bT = b.timestamp !== undefined;
           if (aT && bT) return (a.timestamp ?? 0) - (b.timestamp ?? 0);
           if (aT) return -1; if (bT) return 1; return 0;
         }),
-    [comments, showResolved]
+    [comments]
   );
 
   const getReplies = (id: string) => comments.filter((c) => c.parentId === id);
@@ -186,15 +186,6 @@ export function CommentSidebar({
           <Info className="w-3.5 h-3.5" />
           Info
         </button>
-        {activeTab === 'comments' && (
-          <button
-            onClick={() => setShowResolved((v) => !v)}
-            className={`p-3 transition-colors ${showResolved ? 'text-frame-accent' : 'text-frame-textMuted hover:text-white'}`}
-            title="Toggle resolved"
-          >
-            <Filter className="w-3.5 h-3.5" />
-          </button>
-        )}
       </div>
 
       {/* Info tab panel */}

@@ -88,7 +88,7 @@ export function CommentItem({
   return (
     <div
       className={`group rounded-lg transition-colors px-2 py-2 ${
-        comment.resolved ? 'opacity-50' : ''
+        comment.resolved ? 'opacity-65' : ''
       } ${hasTimestamp ? 'cursor-pointer hover:bg-white/5' : ''} ${
         isSelected ? 'bg-frame-accent/10 ring-1 ring-frame-accent/40' : ''
       }`}
@@ -98,18 +98,29 @@ export function CommentItem({
         {/* Timecode pill on the left for video comments */}
         {hasTimestamp && (
           <div className="flex-shrink-0 pt-0.5">
-            <div className="px-1.5 py-0.5 bg-frame-accent/15 border border-frame-accent/30 rounded text-[10px] font-mono text-frame-accent font-medium whitespace-nowrap">
+            <div className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium whitespace-nowrap border ${
+              comment.resolved
+                ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                : 'bg-frame-accent/15 border-frame-accent/30 text-frame-accent'
+            }`}>
               {formatDuration(comment.timestamp!)}
             </div>
           </div>
         )}
 
         <div className={`flex-1 min-w-0 ${!hasTimestamp ? '' : ''}`}>
-          {/* Author + time */}
+          {/* Author + status + time */}
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Avatar name={comment.authorName} size="sm" className="flex-shrink-0" />
-            <span className="text-xs font-medium text-white">{comment.authorName}</span>
-            {comment.resolved && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />}
+            <span className={`text-xs font-medium ${comment.resolved ? 'text-white/70 line-through decoration-1 decoration-white/30' : 'text-white'}`}>
+              {comment.authorName}
+            </span>
+            {comment.resolved && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/15 border border-green-500/30 text-[9px] uppercase tracking-wider font-semibold text-green-400">
+                <CheckCircle2 className="w-2.5 h-2.5" />
+                Completed
+              </span>
+            )}
             <span className="text-[10px] text-frame-textMuted ml-auto">{formatRelativeTime(createdAt)}</span>
           </div>
 
