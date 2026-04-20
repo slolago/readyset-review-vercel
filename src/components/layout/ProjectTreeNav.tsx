@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ChevronRight, Link as LinkIcon } from 'lucide-react';
 import { useProjectTree } from '@/hooks/useProjectTree';
 import { cn } from '@/lib/utils';
+import { selectionStyle, type SelectionState } from '@/lib/selectionStyle';
 
 export function ProjectTreeNav() {
   const { treeNodes, toggleProject } = useProjectTree();
@@ -18,8 +19,20 @@ export function ProjectTreeNav() {
 
       {treeNodes.map(({ project, folders, foldersLoaded, expanded }) => {
         const projectPath = `/projects/${project.id}`;
+        const isProjectSelected = pathname === projectPath;
         const isProjectActive =
           pathname === projectPath || pathname.startsWith(`${projectPath}/`);
+        const isProjectParentOfSelected = isProjectActive && !isProjectSelected;
+        const projectState: SelectionState = isProjectSelected
+          ? 'selected'
+          : isProjectParentOfSelected
+          ? 'parent-of-selected'
+          : 'idle';
+        const projectTextColor = isProjectSelected
+          ? 'text-frame-accent'
+          : isProjectParentOfSelected
+          ? 'text-white'
+          : 'text-frame-text';
 
         return (
           <div key={project.id}>
@@ -41,10 +54,9 @@ export function ProjectTreeNav() {
               <Link
                 href={projectPath}
                 className={cn(
-                  'flex-1 py-1.5 px-2 rounded text-sm truncate transition-colors hover:bg-frame-accent/10',
-                  isProjectActive
-                    ? 'text-frame-accent bg-frame-accent/10'
-                    : 'text-frame-text'
+                  'flex-1 py-1.5 px-2 rounded text-sm truncate hover:bg-frame-accent/10',
+                  selectionStyle('project', projectState),
+                  projectTextColor
                 )}
               >
                 {project.name}
@@ -68,16 +80,16 @@ export function ProjectTreeNav() {
                   folders.map((folder) => {
                     const folderPath = `/projects/${project.id}/folders/${folder.id}`;
                     const isFolderActive = pathname === folderPath;
+                    const folderState: SelectionState = isFolderActive ? 'selected' : 'idle';
 
                     return (
                       <Link
                         key={folder.id}
                         href={folderPath}
                         className={cn(
-                          'block pl-6 py-1 px-2 text-sm rounded truncate transition-colors hover:bg-frame-accent/10',
-                          isFolderActive
-                            ? 'text-frame-accent bg-frame-accent/10'
-                            : 'text-frame-text'
+                          'block pl-6 py-1 px-2 text-sm rounded truncate hover:bg-frame-accent/10',
+                          selectionStyle('folder', folderState),
+                          isFolderActive ? 'text-frame-accent' : 'text-frame-text'
                         )}
                       >
                         {folder.name}
