@@ -104,6 +104,12 @@ export function isImageMime(mime: string): boolean {
   return mime.startsWith('image/');
 }
 
+/**
+ * @deprecated Prefer `classify()` from `@/lib/file-types` for new call sites —
+ * it handles the full Phase 51 file-type surface (documents, archives, fonts,
+ * design files). This helper is kept for legacy callers that only need to
+ * distinguish video vs image.
+ */
 export function getAssetType(mimeType: string): 'video' | 'image' | null {
   if (isVideoMime(mimeType)) return 'video';
   if (isImageMime(mimeType)) return 'image';

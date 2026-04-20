@@ -39,7 +39,7 @@ export interface Folder {
 }
 
 export type AssetStatus = 'uploading' | 'ready';
-export type AssetType = 'video' | 'image';
+export type AssetType = 'video' | 'image' | 'document' | 'archive' | 'font' | 'design';
 export type ReviewStatus = 'approved' | 'needs_revision' | 'in_review';
 
 export interface Asset {
@@ -48,6 +48,8 @@ export interface Asset {
   folderId: string | null;
   name: string;
   type: AssetType;
+  /** Extension hint (e.g. 'pdf', 'html', 'zip', 'ttf', 'psd'). Optional — absent on pre-Phase-51 assets. */
+  subtype?: string;
   mimeType: string;
   url: string;
   gcsPath: string;
