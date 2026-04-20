@@ -486,14 +486,47 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                 const startPct = ((c.inPoint ?? 0) / duration) * 100;
                 const endPct = ((c.outPoint ?? 0) / duration) * 100;
                 const widthPct = endPct - startPct;
+                const isHovered = hoveredComment?.id === c.id;
                 return (
-                  <button
+                  <div
                     key={`range-${c.id}`}
+                    className="absolute top-1 group/range"
                     style={{ left: `${startPct}%`, width: `${widthPct}%` }}
-                    className="absolute top-1 h-2 rounded-full bg-frame-accent/50 border border-frame-accent/80 hover:bg-frame-accent/70 transition-colors cursor-pointer"
-                    onClick={() => onCommentClick?.(c)}
-                    title={`${c.authorName}: ${c.text.slice(0, 60)}`}
-                  />
+                    onMouseEnter={() => { setHoveredComment(c); setTooltipPct(startPct); }}
+                    onMouseLeave={() => setHoveredComment(null)}
+                  >
+                    <button
+                      className="w-full h-2 rounded-full bg-frame-accent/50 border border-frame-accent/80 hover:bg-frame-accent/70 transition-colors cursor-pointer"
+                      onClick={() => onCommentClick?.(c)}
+                    />
+                    {isHovered && (
+                      <div
+                        className="absolute bottom-4 z-30 pointer-events-none"
+                        style={{
+                          minWidth: 180, maxWidth: 240,
+                          ...(startPct < 20
+                            ? { left: 0 }
+                            : startPct > 80
+                            ? { right: 0 }
+                            : { left: '50%', transform: 'translateX(-50%)' }),
+                        }}
+                      >
+                        <div className="bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl p-2.5 text-left">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[10px] font-mono text-frame-accent font-medium">
+                              IN {formatDuration(c.inPoint ?? 0)} - OUT {formatDuration(c.outPoint ?? 0)}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium text-white leading-none mb-0.5">{c.authorName}</p>
+                          <p className="text-xs text-white/60 leading-snug line-clamp-3">{c.text.slice(0, 120)}</p>
+                        </div>
+                        <div
+                          className="w-2 h-2 bg-[#1e1e1e] border-r border-b border-white/10 rotate-45 -mt-1"
+                          style={startPct < 20 ? { marginLeft: 6 } : startPct > 80 ? { marginRight: 6, marginLeft: 'auto' } : { marginLeft: 'auto', marginRight: 'auto' }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 );
               })}
               {timedComments.map((c) => {
