@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb, getAdminAuth } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { generateReadSignedUrl } from '@/lib/gcs';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
+import { canEditReviewLink, canAccessProject } from '@/lib/permissions';
+import type { Project, ReviewLink } from '@/types';
 
 interface RouteParams { params: { token: string } }
 
@@ -25,16 +28,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!snap.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const link = snap.data() as any;
 
-    // Anyone with project access can read raw contents; only the creator can PATCH.
+    // Anyone with project access (or platform admin) can read raw contents.
     const projectDoc = await db.collection('projects').doc(link.projectId).get();
-    const project = projectDoc.exists ? (projectDoc.data() as any) : null;
-    const isCollaborator = !!project && (
-      project.ownerId === uid ||
-      (Array.isArray(project.collaborators) && project.collaborators.some((c: any) => c.userId === uid))
-    );
-    if (link.createdBy !== uid && !isCollaborator) {
+    if (!projectDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
+    // Load user doc to evaluate platform-admin override via canAccessProject.
+    const userDoc = await db.collection('users').doc(uid).get();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userObj = userDoc.exists ? ({ id: userDoc.id, ...userDoc.data() } as any) : null;
+    if (!userObj || !canAccessProject(userObj, project)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    const canEdit = canEditReviewLink(userObj, project, { id: params.token, ...link } as ReviewLink);
 
     const assetIds: string[] = Array.isArray(link.assetIds) ? link.assetIds : [];
     const folderIds: string[] = Array.isArray(link.folderIds) ? link.folderIds : [];
@@ -78,7 +83,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       assets,
       folders,
       projectId: link.projectId,
-      canEdit: link.createdBy === uid,
+      canEdit,
     });
   } catch (err) {
     console.error('review-link contents GET error:', err);
@@ -97,11 +102,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const decoded = await getAdminAuth().verifyIdToken(authHeader.slice(7));
-    const uid = decoded.uid;
+    const user = await getAuthenticatedUser(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const uid = user.id;
 
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
@@ -122,10 +125,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const initialSnap = await ref.get();
     if (!initialSnap.exists) return NextResponse.json({ error: 'Review link not found' }, { status: 404 });
     const initialLink = initialSnap.data() as any;
-    if (initialLink.createdBy !== uid) {
-      return NextResponse.json({ error: 'Only the link creator can edit its contents' }, { status: 403 });
-    }
     const projectId = initialLink.projectId as string;
+
+    // Permission: link creator, project owner, or platform admin may edit contents.
+    const projDoc = await db.collection('projects').doc(projectId).get();
+    if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projDoc.id, ...projDoc.data() } as Project;
+    const linkForCheck = { id: params.token, ...initialLink } as ReviewLink;
+    if (!canEditReviewLink(user, project, linkForCheck)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Validate additions belong to this project (batched reads outside the txn for scalability)
     if (addAssetIds.length) {
@@ -149,7 +158,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       const doc = await tx.get(ref);
       if (!doc.exists) throw new Error('NOT_FOUND');
       const link = doc.data() as any;
-      if (link.createdBy !== uid) throw new Error('FORBIDDEN');
+      // Permission re-checked outside the txn; re-verify here under the assumption
+      // the caller's authority hasn't changed mid-request. We recompute with the
+      // already-loaded project for consistency.
+      if (!canEditReviewLink(user, project, { id: params.token, ...link } as ReviewLink)) {
+        throw new Error('FORBIDDEN');
+      }
 
       // Current arrays (migrate legacy folderId → folderIds[] on first edit)
       let currentAssetIds: string[] = Array.isArray(link.assetIds) ? [...link.assetIds] : [];

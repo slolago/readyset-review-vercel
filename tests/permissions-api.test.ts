@@ -371,5 +371,51 @@ describe('API enforcement — upload', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ---------- Tests: review-link endpoints ----------
+
+describe('API enforcement — review-links', () => {
+  it('POST /api/review-links — create matrix (project-owner + platform-editor is 200, gap closure)', async () => {
+    const { POST } = await import('@/app/api/review-links/route');
+    const body = { name: 'L1', projectId: F.projectId };
+    const call = (uid: string) => POST(makeRequest({ body: body as any, headers: authHeader(uid) }));
+    expect((await call(F.owner)).status).toBe(201);
+    expect((await call(F.editor)).status).toBe(201);
+    expect((await call(F.reviewer)).status).toBe(403);
+    expect((await call(F.admin)).status).toBe(201);
+    expect((await call(F.stranger)).status).toBe(403);
+  });
+
+  it('PATCH /api/review-links/[token] — project owner (not creator) can revoke (gap closure)', async () => {
+    const { PATCH } = await import('@/app/api/review-links/[token]/route');
+    // Link created by a former collaborator (NOT the owner)
+    const tok = seedReviewLink(db, { projectId: F.projectId, createdBy: 'former-user' });
+    const req = (uid: string) =>
+      makeRequest({ body: { name: 'renamed' } as any, headers: authHeader(uid) });
+    expect((await PATCH(req(F.owner), { params: { token: tok } })).status).toBe(200);
+    expect((await PATCH(req(F.editor), { params: { token: tok } })).status).toBe(403);
+    expect((await PATCH(req(F.admin), { params: { token: tok } })).status).toBe(200);
+  });
+
+  it('DELETE /api/review-links/[token] — creator, owner, admin can delete; other collab denied', async () => {
+    const { DELETE } = await import('@/app/api/review-links/[token]/route');
+    const mkTok = (createdBy: string) =>
+      seedReviewLink(db, { projectId: F.projectId, createdBy });
+
+    const req = (uid: string) => makeRequest({ headers: authHeader(uid) });
+
+    const t1 = mkTok(F.editor);
+    expect((await DELETE(req(F.editor), { params: { token: t1 } })).status).toBe(200); // creator
+
+    const t2 = mkTok('former-user');
+    expect((await DELETE(req(F.owner), { params: { token: t2 } })).status).toBe(200); // project owner
+
+    const t3 = mkTok(F.owner);
+    expect((await DELETE(req(F.editor), { params: { token: t3 } })).status).toBe(403); // non-creator editor
+
+    const t4 = mkTok('former-user');
+    expect((await DELETE(req(F.admin), { params: { token: t4 } })).status).toBe(200); // admin
+  });
+});
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

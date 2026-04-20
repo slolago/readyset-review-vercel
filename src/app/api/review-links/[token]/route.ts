@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { Timestamp } from 'firebase-admin/firestore';
 import { generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
+import {
+  assertReviewLinkActive,
+  canEditReviewLink,
+  canDeleteReviewLink,
+  ReviewLinkDenied,
+} from '@/lib/permissions';
+import type { Project, ReviewLink } from '@/types';
 
 interface RouteParams {
   params: { token: string };
@@ -21,19 +28,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const link = { id: doc.id, ...doc.data() } as any;
 
-    // Check expiry
-    if (link.expiresAt) {
-      const expiresAt = link.expiresAt as Timestamp;
-      if (expiresAt.toMillis() < Date.now()) {
-        return NextResponse.json({ error: 'This review link has expired' }, { status: 410 });
+    // Expiry + password via shared assertion (maps to 410/401)
+    try {
+      assertReviewLinkActive(link as ReviewLink, {
+        providedPassword: providedPassword ?? undefined,
+      });
+    } catch (e) {
+      if (e instanceof ReviewLinkDenied) {
+        if (e.reason === 'expired') {
+          return NextResponse.json({ error: 'This review link has expired' }, { status: 410 });
+        }
+        if (e.reason === 'password') {
+          return NextResponse.json({ error: 'Password required' }, { status: 401 });
+        }
       }
-    }
-
-    // Check password
-    if (link.password) {
-      if (!providedPassword || providedPassword !== link.password) {
-        return NextResponse.json({ error: 'Password required' }, { status: 401 });
-      }
+      throw e;
     }
 
     // Get project info
@@ -222,11 +231,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { getAdminAuth } = await import('@/lib/firebase-admin');
-    const decoded = await getAdminAuth().verifyIdToken(authHeader.slice(7));
+    const user = await getAuthenticatedUser(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { name } = await request.json();
     if (!name || typeof name !== 'string' || !name.trim()) {
@@ -235,11 +241,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const db = getAdminDb();
     const doc = await db.collection('reviewLinks').doc(params.token).get();
-
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const link = doc.data() as any;
-    if (link.createdBy !== decoded.uid) {
+    const link = { id: doc.id, ...doc.data() } as ReviewLink;
+    const projDoc = await db.collection('projects').doc(link.projectId).get();
+    if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projDoc.id, ...projDoc.data() } as Project;
+    if (!canEditReviewLink(user, project, link)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -252,19 +260,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { getAdminAuth } = await import('@/lib/firebase-admin');
-    const decoded = await getAdminAuth().verifyIdToken(authHeader.slice(7));
+    const user = await getAuthenticatedUser(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const db = getAdminDb();
     const doc = await db.collection('reviewLinks').doc(params.token).get();
-
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const link = doc.data() as any;
-    if (link.createdBy !== decoded.uid) {
+    const link = { id: doc.id, ...doc.data() } as ReviewLink;
+    const projDoc = await db.collection('projects').doc(link.projectId).get();
+    if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projDoc.id, ...projDoc.data() } as Project;
+    if (!canDeleteReviewLink(user, project, link)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

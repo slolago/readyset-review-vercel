@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser, canAccessProject, roleAtLeast } from '@/lib/auth-helpers';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
+import { canAccessProject, canCreateReviewLink } from '@/lib/permissions';
+import type { Project } from '@/types';
 import { Timestamp } from 'firebase-admin/firestore';
 import { customAlphabet } from 'nanoid';
 
@@ -18,11 +20,15 @@ export async function GET(request: NextRequest) {
 
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
 
-  const hasAccess = await canAccessProject(user.id, projectId);
-  if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const db = getAdminDb();
+  const projDoc = await db.collection('projects').doc(projectId).get();
+  if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const project = { id: projDoc.id, ...projDoc.data() } as Project;
+  if (!canAccessProject(user, project)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   try {
-    const db = getAdminDb();
     const snap = await db.collection('reviewLinks')
       .where('projectId', '==', projectId)
       .orderBy('createdAt', 'desc')
@@ -52,12 +58,15 @@ export async function POST(request: NextRequest) {
     if (assetIds && assetIds.length > 200) return NextResponse.json({ error: 'Maximum 200 assets per link' }, { status: 400 });
     if (folderIds && folderIds.length > 50) return NextResponse.json({ error: 'Maximum 50 folders per link' }, { status: 400 });
 
-    const hasAccess = await canAccessProject(user.id, projectId);
-    if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    if (!roleAtLeast(user, 'manager')) return NextResponse.json({ error: 'Forbidden: manager role required to create review links' }, { status: 403 });
+    const db = getAdminDb();
+    const projDoc = await db.collection('projects').doc(projectId).get();
+    if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projDoc.id, ...projDoc.data() } as Project;
+    if (!canCreateReviewLink(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const token = generateShortToken();
-    const db = getAdminDb();
 
     // New links use folderIds[]/assetIds[] arrays (editable). folderId (legacy) is only set
     // when the caller passes a single folderId and no arrays — preserves backward compat.
