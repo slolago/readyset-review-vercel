@@ -307,8 +307,11 @@ See [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) for full phase deta
   2. The Info panel for an image asset does not show Container, Pixel format, Color space, or Overall bitrate fields; it does show image-relevant fields (resolution, size, optional EXIF/color-profile)
   3. The Info panel for a video asset continues to show the current v1.6 field set (container, codecs, bitrate, color, frame rate, audio)
   4. The Upload → Date row renders a human-readable date (e.g. "Apr 20, 2026, 3:42 PM") for assets uploaded before and after this phase; never "Invalid Date"
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans:
+- [ ] 49-01: probe bail-out for images, server-side image dims, client File-based dims, image-only Info section, robust formatDate + tests
 
 ### Phase 50: review-links-repair
 **Goal**: Review-link discovery works from every entry point — the "Add to review link" modal shows existing links for the asset's project, and the project-scoped Review Links views list the project's links.
@@ -330,7 +333,11 @@ See [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) for full phase deta
   3. An HTML asset opens in a sandboxed iframe inside the asset page
   4. Archive, font, and design-file assets show a file-type icon + name + size + uploader + date card in the viewer instead of a broken preview
   5. Grid/list cards for non-viewable types show the same file-type icon, clearly distinguishing them from broken thumbnails
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans:
+- [ ] 51-01-PLAN.md — Central file-type map + expanded allow-lists + DocumentViewer/HtmlViewer/FileTypeCard + grid/list icons
 
 ### Phase 52: trash-and-recovery
 **Goal**: Deleting an asset or folder never destroys data immediately — users have a Trash view to restore or permanently delete items.
@@ -389,8 +396,8 @@ See [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) for full phase deta
 | 46. comments-integrity-and-range | v1.7 | 1/1 | Human-verify | 2026-04-20 |
 | 47. video-export-pipeline | v1.7 | 1/1 | Human-verify | 2026-04-20 |
 | 48. playback-loop-and-selection-hierarchy | v1.7 | 1/1 | Human-verify | 2026-04-20 |
-| 49. metadata-accuracy | v1.8 | 0/? | Not started | - |
-| 50. review-links-repair | v1.8 | 0/? | Not started | - |
-| 51. file-type-expansion | v1.8 | 0/? | Not started | - |
+| 49. metadata-accuracy | v1.8 | 1/1 | Human-verify | 2026-04-20 |
+| 50. review-links-repair | v1.8 | 1/1 | Complete | 2026-04-20 |
+| 51. file-type-expansion | v1.8 | 0/1 | Not started | - |
 | 52. trash-and-recovery | v1.8 | 0/? | Not started | - |
 | 53. visual-polish | v1.8 | 0/? | Not started | - |
