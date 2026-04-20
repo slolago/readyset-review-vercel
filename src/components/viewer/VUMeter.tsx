@@ -123,15 +123,27 @@ function captureAudioStream(video: HTMLVideoElement): MediaStream | null {
   }
 }
 
-/** Build an analysis graph. Returns null if the video has no audio track yet;
- *  the caller is expected to retry on later media events. */
+/**
+ * Build an analysis graph for an UNMUTED, READY video.
+ *
+ * Precondition — enforced by the caller:
+ *   video.muted === false
+ *   video.readyState >= 2 (HAVE_CURRENT_DATA)
+ *
+ * Why these preconditions:
+ *   - Chrome's `captureStream()` on a MUTED video returns a MediaStream with no
+ *     active audio track (even if the underlying media has audio). A source node
+ *     built from that stream is silent forever — it does not pick up the track
+ *     when the video is later unmuted.
+ *   - If readyState < 2 the audio track hasn't been exposed yet even for an
+ *     unmuted video.
+ *
+ * So: only call this when the video has audio available right now. If the
+ * conditions aren't met, let the lifecycle retry on the next relevant event.
+ */
 function buildAnalysisGraph(ctx: AudioContext, video: HTMLVideoElement): AnalysisGraph | null {
   const stream = captureAudioStream(video);
   if (!stream) return null;
-  // CRITICAL: MediaStreamAudioSourceNode binds to the audio track that exists
-  // at creation time. If we build the source when the stream has zero audio
-  // tracks, it will emit silence forever even after the track appears. So we
-  // only build once tracks are present and ask the caller to retry otherwise.
   if (stream.getAudioTracks().length === 0) return null;
   try {
     const source = ctx.createMediaStreamSource(stream);
@@ -182,9 +194,29 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
     const setMuted  = useCallback((_m: boolean) => { /* no-op */ }, []);
     useImperativeHandle(ref, () => ({ resume, setVolume, setMuted }), [resume, setVolume, setMuted]);
 
-    // Build + maintain analysis graphs per video. One cohesive lifecycle,
-    // event-driven rather than state-driven to avoid the race we had when
-    // activeIndex's effect would tear down a just-built graph on mount.
+    // Graph lifecycle per video.
+    //
+    // Core invariant: NEVER attempt to build while the video is muted or not
+    // ready. Chrome's captureStream() produces a stream with no (or stale)
+    // audio track if either condition is off, and MediaStreamAudioSourceNode
+    // binds permanently to whatever it finds at creation time — so a bad build
+    // means a silent graph forever until we re-create it.
+    //
+    // Rules enforced by `attemptBuild`:
+    //   - skip if a graph already exists (don't blink a working meter)
+    //   - skip if video.muted (Chrome won't include the audio track)
+    //   - skip if video.readyState < 2 (audio pipeline not up yet)
+    //
+    // Triggers that call attemptBuild:
+    //   - Directly in this effect (synchronously, for already-ready unmuted videos)
+    //   - 'canplay' / 'canplaythrough' / 'playing' / 'play'  (readiness events)
+    //   - 'volumechange'  (fires when video.muted flips — this is THE trigger
+    //                     for the inactive-side-becomes-active path in compare)
+    //   - 'loadeddata'    (readyState hits 2)
+    //
+    // Teardown triggers:
+    //   - 'loadstart' (src changed — old audio track is dead, rebuild on next readiness)
+    //   - effect cleanup (component unmount)
     useEffect(() => {
       const ctx = getOrCreateAudioContext();
       if (!ctx) return;
@@ -204,43 +236,30 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
           }
         };
 
-        const build = () => {
-          if (graphsRef.current[i]) return; // already have one — don't disturb a working meter
+        const attemptBuild = () => {
+          if (graphsRef.current[i]) return;
+          if (video.muted) return;                // Chrome omits audio track when muted
+          if (video.readyState < 2) return;       // HAVE_CURRENT_DATA required
           const g = buildAnalysisGraph(ctx, video);
           if (g) graphsRef.current[i] = g;
         };
 
-        // First attempt — may fail if the audio track isn't exposed yet
-        build();
+        // Every event where the preconditions might have just flipped true
+        const readinessEvents: Array<keyof HTMLMediaElementEventMap> = [
+          'loadeddata', 'canplay', 'canplaythrough', 'play', 'playing', 'volumechange',
+        ];
+        readinessEvents.forEach((ev) => video.addEventListener(ev, attemptBuild));
 
-        // Retry on readiness events. 'loadedmetadata' once tracks are known,
-        // 'canplay' once buffered, 'playing' covers browsers that only expose
-        // tracks at playback start.
-        const retryEvents: Array<keyof HTMLMediaElementEventMap> = ['loadedmetadata', 'canplay', 'playing'];
-        retryEvents.forEach((ev) => video.addEventListener(ev, build));
-
-        // Critical: Chrome omits the audio track from captureStream() when
-        // video.muted=true at capture time. In compare, the inactive side is
-        // muted at mount → its first capture has 0 tracks → graph stays null.
-        // When the user switches to that side (React flips video.muted=false),
-        // 'volumechange' fires. We build then — NOT before — so the new
-        // capture runs while the video is audible and actually includes audio.
-        // We only build if no graph yet (never tear down a working one, it
-        // would blink the meter).
-        const onVolumeChange = () => {
-          if (!video.muted && !graphsRef.current[i]) build();
-        };
-        video.addEventListener('volumechange', onVolumeChange);
-
-        // Src change: old track ends, a new one replaces it. The source node
-        // is bound to the old track and won't follow — tear down, rebuild on
-        // the next retry event.
+        // Src change: tear down; will rebuild on next readiness event
         const onLoadStart = () => { tearDown(); };
         video.addEventListener('loadstart', onLoadStart);
 
+        // If the video is already ready + unmuted at mount (e.g. HMR, navigation
+        // back with cached element), try now.
+        attemptBuild();
+
         cleanups.push(() => {
-          retryEvents.forEach((ev) => video.removeEventListener(ev, build));
-          video.removeEventListener('volumechange', onVolumeChange);
+          readinessEvents.forEach((ev) => video.removeEventListener(ev, attemptBuild));
           video.removeEventListener('loadstart', onLoadStart);
           tearDown();
         });
