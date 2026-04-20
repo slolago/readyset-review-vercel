@@ -7,7 +7,7 @@
 - ✅ **v1.4 — Review & Version Workflow** - Phases 29–33 (shipped 2026-04-14)
 - ✅ **v1.5 — Polish & Production Accuracy** - Phases 35–42 (shipped 2026-04-14)
 - 📦 **v1.6 — Polish & UX Refinement** - archived, never executed — superseded by v1.7. See [milestones/v1.6-archive/README.md](milestones/v1.6-archive/README.md)
-- 🚧 **v1.7 — Review UX & Access Rewrite** - Phases 43–48 (in progress)
+- ✅ **v1.7 — Review UX & Access Rewrite** - Phases 43–48 (shipped 2026-04-20)
 
 ## Phases
 
@@ -354,7 +354,10 @@ Plans:
   1. User can toggle a loop button in the player controls; when no in/out markers are set, the whole video loops; when in/out markers are set (via range comments or export trim bar), the loop honors those bounds
   2. Loop state resets when the user switches asset or version (it is per-session, not persisted)
   3. When a project, folder, asset, and version are nested and one is selected, the selected-parent vs selected-child vs hovered-child states are visually distinguishable at a glance — no ambiguity about which level the user's action will target
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 48-01-PLAN.md — Loop toggle in VideoPlayer + selectionStyle helper applied to cards and sidebar tree
 **UI hint**: yes
 
 ## Progress
@@ -386,6 +389,7 @@ Plans:
 | 45. admin-ui-and-project-rename | v1.7 | 1/1 | Human-verify | 2026-04-20 |
 | 46. comments-integrity-and-range | v1.7 | 1/1 | Human-verify | 2026-04-20 |
 | 47. video-export-pipeline | v1.7 | 1/1 | Human-verify | 2026-04-20 |
+| 48. playback-loop-and-selection-hierarchy | v1.7 | 1/1 | Human-verify | 2026-04-20 |
 | 44. access-model-enforcement | v1.7 | 0/? | Not started | - |
 | 45. admin-ui-and-project-rename | v1.7 | 0/? | Not started | - |
 | 46. comments-integrity-and-range | v1.7 | 0/? | Not started | - |
