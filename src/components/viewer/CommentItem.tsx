@@ -72,11 +72,12 @@ export function CommentItem({
   const canDelete = !readOnly && (user?.id === comment.authorId || user?.role === 'admin' || user?.role === 'manager' || user?.role === 'editor');
   const hasAnnotation = !!(comment.annotation?.shapes && comment.annotation.shapes !== '[]');
   const hasTimestamp = comment.timestamp !== undefined;
+  const hasRange = comment.inPoint !== undefined && comment.outPoint !== undefined;
 
   const handleClick = () => {
-    // Clicking the comment body seeks to its timestamp
+    // Clicking the comment body seeks to its timestamp (or in-point for range comments)
     if (hasTimestamp) {
-      onSeek?.(comment.timestamp!);
+      onSeek?.(hasRange ? comment.inPoint! : comment.timestamp!);
       onCommentClick?.(comment);
       // Also show annotation if present
       if (hasAnnotation && onAnnotationClick) {
@@ -103,7 +104,9 @@ export function CommentItem({
                 ? 'bg-green-500/15 border-green-500/30 text-green-400'
                 : 'bg-frame-accent/15 border-frame-accent/30 text-frame-accent'
             }`}>
-              {formatDuration(comment.timestamp!)}
+              {hasRange
+                ? `${formatDuration(comment.inPoint!)} - ${formatDuration(comment.outPoint!)}`
+                : formatDuration(comment.timestamp!)}
             </div>
           </div>
         )}
