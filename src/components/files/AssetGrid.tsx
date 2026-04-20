@@ -71,6 +71,7 @@ export const AssetGrid = React.memo(function AssetGrid({
             onDragOver={onAssetDragOver ? (e) => onAssetDragOver(asset.id, e) : undefined}
             onDragLeave={onAssetDragLeave ? (e) => onAssetDragLeave(asset.id, e) : undefined}
             onDrop={onAssetDrop ? (e) => onAssetDrop(asset.id, e) : undefined}
+            folderSiblings={assets}
           />
         ))}
       </div>

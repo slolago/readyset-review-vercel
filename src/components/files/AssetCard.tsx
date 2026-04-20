@@ -12,6 +12,7 @@ import type { MenuItem } from '@/components/ui/ContextMenu';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { SmartCopyModal } from './SmartCopyModal';
 import { VersionStackModal } from './VersionStackModal';
+import { StackOntoModal } from './StackOntoModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpload } from '@/hooks/useAssets';
 import toast from 'react-hot-toast';
@@ -34,12 +35,14 @@ interface AssetCardProps {
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
   isDropTarget?: boolean;
+  /** Sibling assets in the same folder — used for the "Stack onto…" picker. */
+  folderSiblings?: Asset[];
 }
 
 export const AssetCard = memo(function AssetCard({
   asset, onClick, onDeleted, onVersionUploaded, onCopied, onDuplicated,
   onRequestMove, onCreateReviewLink, onAddToReviewLink, isSelected, onToggleSelect, onDragStart, hideActions,
-  onDragOver, onDragLeave, onDrop, isDropTarget
+  onDragOver, onDragLeave, onDrop, isDropTarget, folderSiblings
 }: AssetCardProps) {
   const { getIdToken } = useAuth();
   const { uploadFile } = useUpload();
@@ -52,6 +55,7 @@ export const AssetCard = memo(function AssetCard({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [showCopyToModal, setShowCopyToModal] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(false);
+  const [showStackOntoModal, setShowStackOntoModal] = useState(false);
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
@@ -194,6 +198,27 @@ export const AssetCard = memo(function AssetCard({
       }
     } catch (err) {
       toast.error(`Duplicate failed: ${(err as Error).message || 'network error'}`);
+    }
+  };
+
+  const handleStackOnto = async (targetId: string) => {
+    setShowStackOntoModal(false);
+    try {
+      const token = await getIdToken();
+      const res = await fetch('/api/assets/merge-version', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sourceId: asset.id, targetId }),
+      });
+      if (res.ok) {
+        toast.success('Stacked');
+        onDeleted?.(); // reuse refresh callback
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Stack failed: ${data.error}` : 'Stack failed');
+      }
+    } catch (err) {
+      toast.error(`Stack failed: ${(err as Error).message || 'network error'}`);
     }
   };
 
@@ -589,6 +614,14 @@ export const AssetCard = memo(function AssetCard({
           getIdToken={getIdToken}
         />
       )}
+      {showStackOntoModal && (
+        <StackOntoModal
+          source={asset}
+          candidates={folderSiblings ?? []}
+          onPick={handleStackOnto}
+          onClose={() => setShowStackOntoModal(false)}
+        />
+      )}
       {contextMenu && !hideActions && (
         <ContextMenu
           position={contextMenu}
@@ -600,6 +633,7 @@ export const AssetCard = memo(function AssetCard({
             { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
             { label: 'Move to', icon: <MoveIcon className="w-4 h-4" />, onClick: () => onRequestMove?.() },
             { label: 'Upload new version', icon: <Upload className="w-4 h-4" />, onClick: handleUploadVersion },
+            { label: 'Stack onto\u2026', icon: <Layers className="w-4 h-4" />, onClick: () => setShowStackOntoModal(true) },
             { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
             { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
             { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
