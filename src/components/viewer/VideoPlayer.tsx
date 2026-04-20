@@ -165,12 +165,29 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           setCurrentTime(t);
           onTimeUpdate?.(t);
         }
+        // Range-loop clamp with one-cycle grace: only snap back if playback
+        // naturally crossed loopOut from inside the range. If the user seeks
+        // outside the range (was outside → still outside), let it play until
+        // the next onEnded, which handles the loop.
+        if (loop && typeof loopIn === 'number' && typeof loopOut === 'number' && loopOut > loopIn) {
+          const wasInside = insideRangeRef.current;
+          const isInside = t >= loopIn && t <= loopOut;
+          insideRangeRef.current = isInside;
+          if (wasInside && !isInside && t >= loopOut && !v.paused) {
+            v.currentTime = loopIn;
+            insideRangeRef.current = true;
+          }
+        } else {
+          // No active range — keep ref "inside" so toggling loop on mid-playback
+          // doesn't immediately snap to loopIn on the first tick.
+          insideRangeRef.current = true;
+        }
       }
       animRef.current = requestAnimationFrame(tick);
     };
     animRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animRef.current);
-  }, [scrubbing, onTimeUpdate]);
+  }, [scrubbing, onTimeUpdate, loop, loopIn, loopOut]);
 
   // ── Keyboard shortcuts (Frame.io style) ──────────────────────────────
   useEffect(() => {
