@@ -30,7 +30,11 @@ import {
 import type { Project, ExportFormat, ExportJob } from '@/types';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+// Bumped from 60s — encoding a 30-60s clip on a cold container can comfortably
+// exceed 60s once you add source-download + ffmpeg startup. 300s is Vercel's
+// Pro-plan ceiling; on Hobby it silently clamps back to 60, which is fine —
+// the user just won't get the headroom.
+export const maxDuration = 300;
 
 const MAX_DURATION_SECONDS = 120;
 
@@ -40,12 +44,17 @@ function sanitizeFilename(raw: string): string {
 }
 
 function runFfmpeg(binPath: string, args: string[]): Promise<{ code: number; stderr: string }> {
+  const t0 = Date.now();
+  console.log('[export] ffmpeg', args.map((a) => (a.startsWith('http') ? '<signed-url>' : a)).join(' '));
   return new Promise((resolve, reject) => {
     const proc = spawn(binPath, args);
     let stderr = '';
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
     proc.on('error', reject);
-    proc.on('close', (code) => resolve({ code: code ?? -1, stderr }));
+    proc.on('close', (code) => {
+      console.log(`[export] ffmpeg exited ${code ?? -1} in ${Date.now() - t0}ms`);
+      resolve({ code: code ?? -1, stderr });
+    });
   });
 }
 
@@ -160,24 +169,33 @@ export async function POST(request: NextRequest) {
         !asset.containerFormat || asset.containerFormat.toLowerCase().includes('mp4');
       const tryCopy = videoOk && audioOk && containerOk;
 
+      // Copy path — near-instant when source is already h264/aac in mp4.
+      // `-ss` BEFORE `-i` requests a byte-range seek on GCS (fast) instead
+      // of decoding from frame 0. `-avoid_negative_ts make_zero` fixes the
+      // PTS offset that -ss creates, otherwise players stutter at t=0.
       const copyArgs = [
         '-y',
         '-ss', String(inPoint),
         '-i', sourceUrl,
         '-t', String(clipDur),
         '-c', 'copy',
+        '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
         outPath,
       ];
+      // Re-encode path — ultrafast preset trades file size for speed,
+      // which is the right choice on a 60s-capped serverless function.
+      // `-threads 0` lets ffmpeg use every available core.
       const reencodeArgs = [
         '-y',
         '-ss', String(inPoint),
         '-i', sourceUrl,
         '-t', String(clipDur),
         '-c:v', 'libx264',
-        '-preset', 'fast',
+        '-preset', 'ultrafast',
         '-crf', '23',
         '-c:a', 'aac',
+        '-threads', '0',
         '-movflags', '+faststart',
         outPath,
       ];
@@ -207,6 +225,12 @@ export async function POST(request: NextRequest) {
       contentType = 'image/gif';
       gcsOutPath = `exports/${user.id}/${jobId}.gif`;
 
+      // GIFs are expensive — two full decode passes. Defaults tuned for
+      // speed on serverless: 480p (not 720p), 12 fps (not 15), lighter
+      // dithering. Still looks fine for review/share clips.
+      const GIF_FPS = 12;
+      const GIF_SCALE = 'scale=480:-2:flags=lanczos';
+
       // Pass 1 — palettegen. `-t` BEFORE `-i` binds to that input, so it
       // bounds the source decode window correctly.
       const paletteArgs = [
@@ -214,17 +238,14 @@ export async function POST(request: NextRequest) {
         '-ss', String(inPoint),
         '-t', String(clipDur),
         '-i', sourceUrl,
-        '-vf', 'fps=15,scale=720:-2:flags=lanczos,palettegen=stats_mode=diff',
+        '-vf', `fps=${GIF_FPS},${GIF_SCALE},palettegen=stats_mode=diff`,
+        '-threads', '0',
         palettePath,
       ];
-      // Pass 2 — paletteuse. Two inputs: the source video (clipped again)
-      // and the palette PNG. The palette PNG is a still image — we must
-      // either loop it as an input or apply `-t` only to the source, NOT
-      // to the palette input, otherwise ffmpeg caps the output to the
-      // palette's implicit 0-second duration and you get a single frame.
-      // We put `-ss`/`-t` before the source `-i` (binds to it) and use
-      // `-loop 1 -i palette` so the palette stream runs as long as the
-      // filter graph needs.
+      // Pass 2 — paletteuse. Source + palette PNG. Palette is a still
+      // image so we `-loop 1` it as an input, otherwise ffmpeg caps the
+      // output to the palette's implicit 0-second duration and produces
+      // a single frame. `-ss`/`-t` before the source `-i` binds to it.
       const useArgs = [
         '-y',
         '-ss', String(inPoint),
@@ -232,8 +253,9 @@ export async function POST(request: NextRequest) {
         '-i', sourceUrl,
         '-loop', '1',
         '-i', palettePath,
-        '-filter_complex', '[0:v]fps=15,scale=720:-2:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5',
+        '-filter_complex', `[0:v]fps=${GIF_FPS},${GIF_SCALE}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5`,
         '-loop', '0',
+        '-threads', '0',
         outPath,
       ];
 

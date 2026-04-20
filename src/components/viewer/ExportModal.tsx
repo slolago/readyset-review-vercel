@@ -351,7 +351,7 @@ export function ExportModal({
         {/* Footer — submit / status / download */}
         <div className="px-5 py-4 mt-4 border-t border-frame-border flex items-center justify-between gap-3">
           <div className="text-[11px] text-frame-textMuted min-h-[1em]">
-            {ui === 'encoding' && 'Encoding on the server — this may take 10–45s.'}
+            {ui === 'encoding' && 'Encoding on the server — this may take up to a few minutes for longer clips.'}
             {ui === 'failed' && errorMsg && (
               <span className="text-frame-red">{errorMsg}</span>
             )}
