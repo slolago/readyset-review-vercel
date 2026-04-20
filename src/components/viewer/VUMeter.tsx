@@ -86,6 +86,69 @@ interface AudioGraph {
   bufR: Float32Array;
 }
 
+/**
+ * Module-level singleton state. Two reasons:
+ *
+ *   1. `createMediaElementSource(video)` can only be called ONCE per <video>
+ *      element for its entire lifetime. In React StrictMode / HMR, effects
+ *      double-invoke; a naive implementation would throw InvalidStateError on
+ *      the second attempt and silently produce no audio. Caching the graph
+ *      per video element avoids the retry.
+ *   2. Browsers cap the number of AudioContexts (Chrome ~6). A singleton
+ *      prevents resource leaks when VUMeter remounts.
+ *
+ * Cleanup intentionally does NOT close the context or destroy graphs — they
+ * live for the lifetime of the <video> elements they're bound to.
+ */
+let sharedCtx: AudioContext | null = null;
+const graphCache = new WeakMap<HTMLVideoElement, AudioGraph>();
+
+function getOrCreateAudioContext(): AudioContext | null {
+  if (sharedCtx && sharedCtx.state !== 'closed') return sharedCtx;
+  if (typeof window === 'undefined') return null;
+  const Ctor = window.AudioContext
+    || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctor) return null;
+  try {
+    sharedCtx = new Ctor();
+    return sharedCtx;
+  } catch { return null; }
+}
+
+function getOrCreateGraph(ctx: AudioContext, video: HTMLVideoElement): AudioGraph | null {
+  const cached = graphCache.get(video);
+  if (cached) return cached;
+  try {
+    const source   = ctx.createMediaElementSource(video);
+    const gain     = ctx.createGain();
+    const splitter = ctx.createChannelSplitter(2);
+    const aL = ctx.createAnalyser();
+    const aR = ctx.createAnalyser();
+    aL.fftSize = 2048; aL.smoothingTimeConstant = 0;
+    aR.fftSize = 2048; aR.smoothingTimeConstant = 0;
+
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.connect(splitter);
+    splitter.connect(aL, 0);
+    splitter.connect(aR, 1);
+
+    gain.gain.value = 1;
+    video.volume = 1;
+
+    const graph: AudioGraph = {
+      source, gain, analyserL: aL, analyserR: aR,
+      bufL: new Float32Array(aL.fftSize),
+      bufR: new Float32Array(aR.fftSize),
+    };
+    graphCache.set(video, graph);
+    return graph;
+  } catch (e) {
+    console.warn('[VUMeter] createMediaElementSource failed', e);
+    return null;
+  }
+}
+
 export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
   function VUMeter({ videoRefs, activeIndex = 0, isPlaying }, ref) {
     const canvasRef   = useRef<HTMLCanvasElement>(null);
@@ -138,66 +201,31 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
 
     useImperativeHandle(ref, () => ({ resume, setVolume, setMuted }), [resume, setVolume, setMuted]);
 
-    // ── Build audio graph (one per video, once) ──────────────────────────────
+    // ── Build audio graph (one per video, shared via module-level cache) ─────
+    // See the singleton doc above the cache definitions for why we cache
+    // at module scope instead of per-instance.
     useEffect(() => {
-      if (typeof window === 'undefined') return;
-      const Ctor = window.AudioContext
-        || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Ctor) return;
-
-      let ctx: AudioContext;
-      try {
-        ctx = new Ctor();
-        ctxRef.current = ctx;
-      } catch {
-        return;
-      }
+      const ctx = getOrCreateAudioContext();
+      if (!ctx) return;
+      ctxRef.current = ctx;
 
       const graphs: (AudioGraph | null)[] = videoRefs.map((vr) => {
         const video = vr.current;
         if (!video) return null;
-        try {
-          const source   = ctx.createMediaElementSource(video);
-          const gain     = ctx.createGain();
-          const splitter = ctx.createChannelSplitter(2);
-          const aL = ctx.createAnalyser();
-          const aR = ctx.createAnalyser();
-          aL.fftSize = 2048; aL.smoothingTimeConstant = 0;
-          aR.fftSize = 2048; aR.smoothingTimeConstant = 0;
-
-          // Playback path (gain-controlled)
-          source.connect(gain);
-          gain.connect(ctx.destination);
-
-          // Measurement path (pre-gain — reads source level independent of user volume)
-          source.connect(splitter);
-          splitter.connect(aL, 0);
-          splitter.connect(aR, 1);
-
-          gain.gain.value = 1;
-          video.volume = 1;
-          // Do NOT force video.muted here. For single-source usage the meter sets
-          // muted=false so the source isn't silenced. For multi-source (compare),
-          // the parent sets muted via declarative props per video.
-          if (videoRefs.length === 1) video.muted = false;
-
-          return {
-            source, gain, analyserL: aL, analyserR: aR,
-            bufL: new Float32Array(aL.fftSize),
-            bufR: new Float32Array(aR.fftSize),
-          };
-        } catch {
-          return null;
-        }
+        const graph = getOrCreateGraph(ctx, video);
+        // For single-source callers, clear video.muted so the source isn't born silent.
+        // Multi-source (compare) callers manage video.muted declaratively per side.
+        if (graph && videoRefs.length === 1) video.muted = false;
+        return graph;
       });
 
       graphsRef.current = graphs;
-      applyGains(); // set initial gains based on activeIndex
+      applyGains();
 
       return () => {
+        // Cancel the RAF loop; do NOT close the context or discard graphs
+        // (they're cached module-wide and bound to the video elements).
         cancelAnimationFrame(rafRef.current);
-        ctx.close().catch(() => {});
-        ctxRef.current = null;
         graphsRef.current = [];
       };
     // Rebuild only if the set of video refs changes (stable across renders in practice)

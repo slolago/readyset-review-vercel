@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, memo } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronDown, Columns2, SplitSquareHorizontal, AudioLines, AlertCircle } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronDown, Columns2, SplitSquareHorizontal, AudioLines, AlertCircle, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { formatDuration } from '@/lib/utils';
 import { VUMeter, type VUMeterHandle } from './VUMeter';
 import type { Asset } from '@/types';
@@ -142,8 +142,97 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const [dimsA, setDimsA] = useState<{ w: number; h: number } | null>(null);
   const [dimsB, setDimsB] = useState<{ w: number; h: number } | null>(null);
 
+  // Ready = both dims known (or skipped for images — onLoad fires quickly).
+  // Until ready we render the media at opacity-0 behind a spinner, so the user
+  // doesn't see the frame rubber-band from 16:9 → aspectA → max(A,B).
+  const mediaReady = !!(dimsA && dimsB);
+
   // Timeline covers the LONGER of the two so the user can scrub anywhere.
   const duration = Math.max(durationA, durationB);
+
+  // ── Zoom + pan (wheel-anchored scale; drag to pan when zoomed) ─────────────
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<{ mx: number; my: number; px: number; py: number }>({ mx: 0, my: 0, px: 0, py: 0 });
+
+  const resetZoom = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // Only zoom if ctrl/meta held OR if the user is clearly over the video
+    // (default wheel should still scroll the page outside the frame).
+    // For compare we claim all wheel inside the frame.
+    e.preventDefault();
+    const frame = frameRef.current;
+    if (!frame) return;
+    const r = frame.getBoundingClientRect();
+    const cx = e.clientX - r.left;
+    const cy = e.clientY - r.top;
+
+    const delta = -e.deltaY * 0.0015;
+    setZoom((prevZoom) => {
+      const newZoom = Math.max(1, Math.min(5, prevZoom * (1 + delta)));
+      // Anchor zoom around cursor: keep the point under the cursor stationary.
+      // Transform chain: translate(pan) → scale(zoom) around center.
+      // Content coord at cursor BEFORE: (cx - r.w/2 - pan.x) / prevZoom
+      // We want: after transform, same content coord maps to same cursor position.
+      setPan((prevPan) => {
+        if (newZoom === 1) return { x: 0, y: 0 }; // snap to center when fully zoomed out
+        const contentX = (cx - r.width / 2 - prevPan.x) / prevZoom;
+        const contentY = (cy - r.height / 2 - prevPan.y) / prevZoom;
+        const newPanX = (cx - r.width / 2) - contentX * newZoom;
+        const newPanY = (cy - r.height / 2) - contentY * newZoom;
+        // Clamp so the zoomed content edges don't slide past the frame edges
+        const maxPanX = ((newZoom - 1) * r.width) / 2;
+        const maxPanY = ((newZoom - 1) * r.height) / 2;
+        return {
+          x: Math.max(-maxPanX, Math.min(maxPanX, newPanX)),
+          y: Math.max(-maxPanY, Math.min(maxPanY, newPanY)),
+        };
+      });
+      return newZoom;
+    });
+  }, []);
+
+  const handleFrameMouseDown = useCallback((e: React.MouseEvent) => {
+    // Skip if user clicked the slider handle — let its own handler run.
+    if ((e.target as HTMLElement).closest('[data-slider-handle]')) return;
+    if (zoom <= 1) return;
+    e.preventDefault();
+    setIsPanning(true);
+    panStartRef.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y };
+  }, [zoom, pan.x, pan.y]);
+
+  useEffect(() => {
+    if (!isPanning) return;
+    const frame = frameRef.current;
+    const onMove = (e: MouseEvent) => {
+      const r = frame?.getBoundingClientRect();
+      if (!r) return;
+      const dx = e.clientX - panStartRef.current.mx;
+      const dy = e.clientY - panStartRef.current.my;
+      const maxPanX = ((zoom - 1) * r.width) / 2;
+      const maxPanY = ((zoom - 1) * r.height) / 2;
+      setPan({
+        x: Math.max(-maxPanX, Math.min(maxPanX, panStartRef.current.px + dx)),
+        y: Math.max(-maxPanY, Math.min(maxPanY, panStartRef.current.py + dy)),
+      });
+    };
+    const stop = () => setIsPanning(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('blur', stop);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('blur', stop);
+    };
+  }, [isPanning, zoom]);
+
+  // Reset zoom when switching versions or view mode (context change)
+  useEffect(() => { resetZoom(); }, [selectedIdA, selectedIdB, viewMode, resetZoom]);
 
   // Active side = the master for playback sync (user listens to it).
   const masterRef = useCallback((): HTMLVideoElement | null => {
@@ -348,12 +437,18 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     return () => ro.disconnect();
   }, [sharedAspect]);
 
+  // Zoom/pan transform applied to BOTH videos identically so the split stays
+  // aligned. Order matters: translate first, then scale around the result.
+  const mediaTransform: React.CSSProperties = zoom === 1
+    ? {}
+    : { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center' };
+
   const videoStyleA: React.CSSProperties = viewMode === 'slider'
-    ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipA }
-    : { position: 'absolute', top: 0, left: 0, width: '50%', height: '100%' };
+    ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipA, ...mediaTransform }
+    : { position: 'absolute', top: 0, left: 0, width: '50%', height: '100%', ...mediaTransform };
   const videoStyleB: React.CSSProperties = viewMode === 'slider'
-    ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipB }
-    : { position: 'absolute', top: 0, left: '50%', width: '50%', height: '100%' };
+    ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipB, ...mediaTransform }
+    : { position: 'absolute', top: 0, left: '50%', width: '50%', height: '100%', ...mediaTransform };
 
   const handleMetaA = () => {
     const v = videoARef.current;
@@ -446,55 +541,74 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
         <div className="relative flex-1 min-h-0 overflow-hidden select-none flex items-center justify-center" ref={containerRef}>
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
-          {/* Shared display rect (see audit doc for why JS-sized) */}
+          {/* Shared display rect (see audit doc for why JS-sized). Wheel zoom and
+              mouse-drag pan live at this level so both videos move in lockstep. */}
           <div
             ref={frameRef}
-            className="relative"
+            className={`relative ${zoom > 1 ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
             style={{
               width: frameSize?.w ?? '100%',
               height: frameSize?.h ?? '100%',
+              overflow: 'hidden',
             }}
+            onWheel={isVideo || isImage ? handleWheel : undefined}
+            onMouseDown={handleFrameMouseDown}
+            onDoubleClick={zoom > 1 ? resetZoom : undefined}
           >
-            {isVideo ? (
-              <>
-                <video
-                  ref={videoBRef}
-                  src={urlB}
-                  className="object-contain"
-                  style={videoStyleB}
-                  muted={activeSide !== 'B' || muted}
-                  playsInline
-                  preload="auto"
-                  onLoadedMetadata={handleMetaB}
-                />
-                <video
-                  ref={videoARef}
-                  src={urlA}
-                  className="object-contain"
-                  style={videoStyleA}
-                  muted={activeSide !== 'A' || muted}
-                  playsInline
-                  preload="auto"
-                  onLoadedMetadata={handleMetaA}
-                />
-              </>
-            ) : isImage ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={urlB} alt={`V${assetB.version}`} className="object-contain" style={videoStyleB} draggable={false} onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth) setDimsB({ w: t.naturalWidth, h: t.naturalHeight }); }} />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={urlA} alt={`V${assetA.version}`} className="object-contain" style={videoStyleA} draggable={false} onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth) setDimsA({ w: t.naturalWidth, h: t.naturalHeight }); }} />
-              </>
-            ) : null}
+            {/* Opacity gate: keep media hidden until both dimensions are known so
+                the frame doesn't visibly rubber-band as metadata arrives. */}
+            <div
+              className={`absolute inset-0 transition-opacity duration-200 ${mediaReady ? 'opacity-100' : 'opacity-0'}`}
+            >
+              {isVideo ? (
+                <>
+                  <video
+                    ref={videoBRef}
+                    src={urlB}
+                    className="object-contain"
+                    style={videoStyleB}
+                    muted={activeSide !== 'B' || muted}
+                    playsInline
+                    preload="auto"
+                    onLoadedMetadata={handleMetaB}
+                  />
+                  <video
+                    ref={videoARef}
+                    src={urlA}
+                    className="object-contain"
+                    style={videoStyleA}
+                    muted={activeSide !== 'A' || muted}
+                    playsInline
+                    preload="auto"
+                    onLoadedMetadata={handleMetaA}
+                  />
+                </>
+              ) : isImage ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={urlB} alt={`V${assetB.version}`} className="object-contain" style={videoStyleB} draggable={false} onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth) setDimsB({ w: t.naturalWidth, h: t.naturalHeight }); }} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={urlA} alt={`V${assetA.version}`} className="object-contain" style={videoStyleA} draggable={false} onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth) setDimsA({ w: t.naturalWidth, h: t.naturalHeight }); }} />
+                </>
+              ) : null}
+            </div>
+
+            {/* Loading spinner shown only until media is ready */}
+            {!mediaReady && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
+              </div>
+            )}
 
             {/* Slider handle */}
             {viewMode === 'slider' && (
               <>
                 <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none" style={{ left: `${sliderPos * 100}%` }} />
                 <div
+                  data-slider-handle
                   className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 bg-white rounded-full shadow-xl flex items-center justify-center cursor-ew-resize z-10"
                   style={{ left: `${sliderPos * 100}%` }}
-                  onMouseDown={handleMouseDown}
+                  onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e); }}
                   onTouchStart={handleTouchStart}
                 >
                   <div className="flex gap-0.5">
@@ -508,6 +622,44 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
             {/* Side-by-side divider */}
             {viewMode === 'side-by-side' && (
               <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-white/15 pointer-events-none" />
+            )}
+
+            {/* Zoom controls — appear bottom-right of the frame */}
+            {(isVideo || isImage) && (
+              <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg p-1 pointer-events-auto">
+                <button
+                  onClick={() => {
+                    const r = frameRef.current?.getBoundingClientRect();
+                    if (!r) return;
+                    handleWheel({ preventDefault: () => {}, deltaY: -150, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 } as any);
+                  }}
+                  title="Zoom in"
+                  className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded transition-colors"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[10px] font-mono text-white/60 tabular-nums w-10 text-center">{(zoom * 100).toFixed(0)}%</span>
+                <button
+                  onClick={() => {
+                    const r = frameRef.current?.getBoundingClientRect();
+                    if (!r) return;
+                    handleWheel({ preventDefault: () => {}, deltaY: 150, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 } as any);
+                  }}
+                  title="Zoom out"
+                  className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded transition-colors"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                {zoom > 1 && (
+                  <button
+                    onClick={resetZoom}
+                    title="Reset zoom (double-click anywhere)"
+                    className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded transition-colors"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Labels — pinned to the FRAME corners (so they stay next to the video even with pillarbox) */}
