@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { canInviteCollaborator, canRemoveCollaborator } from '@/lib/permissions';
+import type { Project } from '@/types';
 
 interface RouteParams {
   params: { projectId: string };
@@ -16,8 +18,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('projects').doc(params.projectId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const project = doc.data() as any;
-    if (project.ownerId !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const project = { id: doc.id, ...doc.data() } as Project;
+    if (!canInviteCollaborator(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { email, role } = await request.json();
     if (!email || !role) return NextResponse.json({ error: 'Email and role required' }, { status: 400 });
@@ -28,6 +32,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const invitedUser = { id: usersSnap.docs[0].id, ...usersSnap.docs[0].data() } as any;
     const collaborator = {
       userId: invitedUser.id,
@@ -38,6 +43,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Remove existing entry if any
     const existing = project.collaborators || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filtered = existing.filter((c: any) => c.userId !== invitedUser.id);
     filtered.push(collaborator);
 
@@ -61,11 +67,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('projects').doc(params.projectId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const project = doc.data() as any;
-    if (project.ownerId !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const project = { id: doc.id, ...doc.data() } as Project;
+    if (!canRemoveCollaborator(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { userId } = await request.json();
     const collaborators = (project.collaborators || []).filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (c: any) => c.userId !== userId
     );
 

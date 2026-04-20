@@ -3,6 +3,12 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { deleteFile } from '@/lib/gcs';
 import { Timestamp } from 'firebase-admin/firestore';
+import {
+  canAccessProject,
+  canRenameProject,
+  canDeleteProject,
+} from '@/lib/permissions';
+import type { Project } from '@/types';
 
 interface RouteParams {
   params: { projectId: string };
@@ -17,11 +23,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('projects').doc(params.projectId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const project = { id: doc.id, ...doc.data() } as any;
-    const hasAccess =
-      project.ownerId === user.id ||
-      project.collaborators?.some((c: { userId: string }) => c.userId === user.id);
-    if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const project = { id: doc.id, ...doc.data() } as Project;
+    if (!canAccessProject(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     return NextResponse.json({ project });
   } catch {
@@ -38,8 +43,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('projects').doc(params.projectId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const project = doc.data() as any;
-    if (project.ownerId !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const project = { id: doc.id, ...doc.data() } as Project;
+    if (!canRenameProject(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const rawUpdates = await request.json();
     // Whitelist: only owner-changeable metadata. Never allow changing ownerId
@@ -73,8 +80,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('projects').doc(params.projectId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const project = doc.data() as any;
-    if (project.ownerId !== user.id && user.role !== 'admin') {
+    const project = { id: doc.id, ...doc.data() } as Project;
+    if (!canDeleteProject(user, project)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -96,6 +103,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const assetsSnap = await db.collection('assets').where('projectId', '==', params.projectId).get();
     const blobPaths: string[] = [];
     for (const d of assetsSnap.docs) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const a = d.data() as any;
       if (a.gcsPath) blobPaths.push(a.gcsPath);
       if (a.thumbnailGcsPath) blobPaths.push(a.thumbnailGcsPath);
