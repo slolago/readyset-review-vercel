@@ -10,26 +10,21 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Current Milestone: v1.6 Polish & UX Refinement
+## Current Milestone: v1.7 Review UX & Access Rewrite
 
-**Goal:** Address user-reported bugs and UX gaps — fix broken interactions (compare slider, resolved comments, annotations leaking, context menus) and add missing capabilities (comment editing, range comments, clickable links, hover preview, version dates).
+**Goal:** Rewrite the access/permissions model end-to-end (platform + review links), harden version-stack management so any version can be stacked or detached freely, and raise review UX to production quality (in/out comments, GIF/MP4 export, loop, selection hierarchy, comments-count integrity).
 
 **Target features:**
-- FPS detection fix — still showing 31fps on new uploads
-- Show-all-versions fix — single-video mode only shows 1 version; folder mode flattens structure
-- Resolved comments — show checkmark instead of disappearing
-- Annotation cleanup — drawings should not persist when switching versions
-- Arrow tool fix — should not conflict with freehand selection/movement
-- Compare slider fix — freezes / plays only one video
-- Context menu fix — right-click "review link" opens folder instead of showing menu
-- Comment links — render as clickable + fix overflow
-- Version selector dates — show upload date/time in dropdown
-- Comment editing — only by original author
-- VU meter width — widen for number legibility
-- Compare audio indicator — clear audio source indicator + easy switching
-- Range comments — in-out markers on timeline (not just single timecode)
-- Video hover preview — cursor scrubbing over thumbnails
-- Review links on videos — not just folders
+- Stack/unstack audit — stack any version onto any other, detach any version from any stack, all via drag-and-drop or menu; no silent data loss
+- Rename projects — currently only description is editable; add inline/modal rename with collision handling
+- Access + admin rewrite — full audit of platform roles (admin/manager/editor/viewer), project roles (owner/editor/reviewer), review-link permissions (allowComments/allowDownloads/allowApprovals/showAllVersions/password), and admin UI; rewrite endpoints and UI where needed
+- In/out range comments — set in-point and out-point on a comment, highlighted range on timeline (supersedes v1.6 CMT-04)
+- Video export — modal with format (GIF or MP4), in/out selection on a trim bar, filename, destination; reproducible, server-side ffmpeg
+- Selection hierarchy redesign — visual hierarchy for selected/hovered/focused states so nested containers (project → folder → asset → version) read clearly
+- Comments count integrity — badge must match real count; drawings without comment text cannot be saved (or are attached to an auto-created comment)
+- Loop button — per-video loop that loops the whole asset, or the marked in/out range when set
+
+**Supersedes:** v1.6 (paper-only, never executed — see [milestones/v1.6-archive/README.md](milestones/v1.6-archive/README.md))
 
 ## Current State (v1.4 — shipped 2026-04-14)
 
