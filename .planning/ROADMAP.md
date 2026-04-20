@@ -274,91 +274,14 @@ Plans:
 
 </details>
 
-### 🚧 v1.7 — Review UX & Access Rewrite (In Progress)
+<details>
+<summary>✅ v1.7 — Review UX & Access Rewrite (Phases 43–48) - SHIPPED 2026-04-20</summary>
 
-**Milestone goal:** Rewrite the access/permissions model end-to-end (platform + review links), harden version-stack management so any version can be stacked or detached freely, and raise review UX to production quality (in/out comments, GIF/MP4 export, loop, selection hierarchy, comments-count integrity).
+See [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) for full phase details.
 
-**Phases (6):**
+6 phases: version-stack-rewrite, access-model-enforcement, admin-ui-and-project-rename, comments-integrity-and-range, video-export-pipeline, playback-loop-and-selection-hierarchy.
 
-- [ ] **Phase 43: version-stack-rewrite** — Any-version stacking, detaching, reordering without data loss
-- [ ] **Phase 44: access-model-enforcement** — Platform + project + review-link role matrices codified and enforced end-to-end with passing tests
-- [ ] **Phase 45: admin-ui-and-project-rename** — Admin surfaces for auditing permissions, suspending/revoking users, orphan cleanup, and owner project rename
-- [ ] **Phase 46: comments-integrity-and-range** — In/out range comments, accurate comment count badge, no orphan drawings
-- [ ] **Phase 47: video-export-pipeline** — Server-side ffmpeg trim export to GIF or MP4 with observable progress
-- [ ] **Phase 48: playback-loop-and-selection-hierarchy** — Player loop button and a legible selection/hover hierarchy for nested containers
-
-#### Phase Details
-
-### Phase 43: version-stack-rewrite
-**Goal**: Users have full control over version stacks — any version can be stacked onto any asset, any version can be detached, and no operation silently loses data
-**Depends on**: Nothing (first phase of v1.7)
-**Requirements**: STACK-01, STACK-02, STACK-03, STACK-04
-**Success Criteria** (what must be TRUE):
-  1. User can drag any asset (including one that is already part of a version group) onto any other asset (singleton or group) and the two groups merge into one with contiguous version numbers
-  2. User can detach any version — not just the topmost — from a stack via the version stack modal, and the detached asset keeps its comments, annotations, and review-link references intact
-  3. User can drag versions to reorder them within a stack and version numbers renumber atomically and gaplessly
-  4. If a stack/unstack/reorder operation would lose data (e.g. dangling review-link reference, orphaned comment), the user is warned before commit and no partial write lands in Firestore
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 44: access-model-enforcement
-**Goal**: Platform roles, project roles, and review-link permission flags each have a single documented matrix that is enforced on both API and UI paths, and a test suite proves the enforcement
-**Depends on**: Phase 43
-**Requirements**: ACCESS-01, ACCESS-02, ACCESS-03, ACCESS-07
-**Success Criteria** (what must be TRUE):
-  1. Every API route reads from a single platform-role matrix (admin/manager/editor/viewer) and a single project-role matrix (owner/editor/reviewer) — there is no route that defines its own ad-hoc role check
-  2. Every review-link permission flag (allowComments, allowDownloads, allowApprovals, showAllVersions, password) is enforced both on the read API (data is filtered/blocked server-side) and on the render path (UI does not show controls the user cannot use)
-  3. Attempting a disallowed action as each role returns a 4xx response with a clear error, never a silent success or a fallthrough to allow
-  4. The access-control test suite covers platform-level, project-level, and review-link-level permissions for every role and every matrix cell, and passes
-**Plans**: TBD
-
-### Phase 45: admin-ui-and-project-rename
-**Goal**: Admins can audit permission state, suspend/revoke users, and clean up orphaned accounts from the admin UI; project owners and admins can rename projects
-**Depends on**: Phase 44
-**Requirements**: ACCESS-04, ACCESS-05, ACCESS-06, PROJ-01
-**Success Criteria** (what must be TRUE):
-  1. Admin UI shows, for any project, the full list of collaborators with their project roles, the full list of review links with their permission flags, and any pending invites — in a single view
-  2. Admin can suspend any user in-app; a suspended user's existing sessions are revoked and they cannot establish a new session until unsuspended
-  3. Admin UI exposes an "orphaned/uninvited users" view that lists users in Firestore that were never explicitly invited, and admin can delete or suspend them from there
-  4. A project owner or platform admin can rename a project via inline edit or modal; a name collision within that owner's projects is detected and the save is blocked with a clear error
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 46: comments-integrity-and-range
-**Goal**: Comments are trustworthy — the count badge matches what the user can actually see, range comments with in/out markers work on the timeline, and annotation drawings cannot be persisted without comment text
-**Depends on**: Phase 43
-**Requirements**: CMT-01, CMT-02, CMT-03
-**Success Criteria** (what must be TRUE):
-  1. User can set an in-point and out-point on a comment; the timeline renders a highlighted range for that comment; clicking the range comment seeks to the in-point
-  2. The comment count badge on grid cards and in the viewer equals the number of user-visible comments for that asset — drawings without text are not counted, deleted comments do not linger
-  3. Attempting to save an annotation drawing without comment text is prevented — either the Save button is disabled until text is entered, or cancelling discards the drawing; no orphan drawings are written to Firestore
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 47: video-export-pipeline
-**Goal**: Users can trim a clip to GIF or MP4 from the player via a server-side ffmpeg pipeline and download the result
-**Depends on**: Phase 43
-**Requirements**: EXPORT-01, EXPORT-02, EXPORT-03
-**Success Criteria** (what must be TRUE):
-  1. User can open an Export modal from the video player, pick GIF or MP4, set in/out on a trim bar, name the file, and submit — the job runs server-side
-  2. Exported MP4 uses stream-copy when the codec/container allows, otherwise re-encodes cleanly as H.264 + AAC for the trim range; exported GIF is looping with a reasonable frame rate and optimized palette
-  3. Export job status is observable in the UI as it moves queued → encoding → ready, and when ready the user can download the result via a signed URL
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 48: playback-loop-and-selection-hierarchy
-**Goal**: Player has a working loop toggle tied to in/out markers, and nested selection/hover states across the project/folder/asset/version hierarchy are visually legible
-**Depends on**: Phase 46
-**Requirements**: PLAY-01, UX-01
-**Success Criteria** (what must be TRUE):
-  1. User can toggle a loop button in the player controls; when no in/out markers are set, the whole video loops; when in/out markers are set (via range comments or export trim bar), the loop honors those bounds
-  2. Loop state resets when the user switches asset or version (it is per-session, not persisted)
-  3. When a project, folder, asset, and version are nested and one is selected, the selected-parent vs selected-child vs hovered-child states are visually distinguishable at a glance — no ambiguity about which level the user's action will target
-**Plans**: 1 plan
-
-Plans:
-- [ ] 48-01-PLAN.md — Loop toggle in VideoPlayer + selectionStyle helper applied to cards and sidebar tree
-**UI hint**: yes
+</details>
 
 ## Progress
 

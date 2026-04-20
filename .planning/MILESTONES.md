@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.7 Review UX & Access Rewrite (Shipped: 2026-04-20)
+
+**Phases completed:** 6 phases (43–48), 6 plans, 66 commits
+**Files changed (src/):** 56 files, +3,251 / -364 lines
+**Timeline:** Single-day sprint, 2026-04-20
+
+**Key accomplishments:**
+
+1. **Phase 43 — version-stack-rewrite:** New `src/lib/version-groups.ts` helper centralizes legacy-root handling; merge, unstack, reorder APIs refactored to use it. Fixed 4 audit bugs: legacy-root drop on merge, ghost-group on unstack root, ad-hoc legacy fallback, reorder partial-input. Added `StackOntoModal` context-menu affordance from grid. Regression script `scripts/verify-stack-integrity.ts`.
+2. **Phase 44 — access-model-enforcement:** Stood up Vitest from zero; created `src/lib/permissions.ts` as single source of truth for platform + project + review-link permissions; refactored 22 API routes to delegate; closed 7 concrete security holes (reviewer-write bypass, allowComments bypass on guest POST, expiry/password bypass on guest writes, admin override on projects, project-owner review-link revocation). **116/116 tests green.**
+3. **Phase 45 — admin-ui-and-project-rename:** New admin surfaces — `ProjectPermissionsPanel` (audit collaborators + review-link holders + flags), `OrphanUsersPanel` (uninvited cleanup), `UserSessionActions` (suspend + revoke). Three new admin API routes. `RenameProjectModal` + server-side collision check on PUT `/api/projects/:id`.
+4. **Phase 46 — comments-integrity-and-range:** Range-comment timeline tooltips polished; `CommentItem` shows range badge + click-to-seek to in-point; composer state + pendingAnnotation cleared on asset switch; `_commentCount` derivation fixed (skip replies + empty text); sidebar tab count matches grid badge; OUT<IN guard + pulsing OUT hint.
+5. **Phase 47 — video-export-pipeline:** New `ExportJob` model; POST `/api/exports` runs ffmpeg inline — MP4 (stream-copy with re-encode fallback), GIF (two-pass palettegen/paletteuse); GET `/api/exports/[jobId]` returns fresh signed URL; `ExportModal` with trim bar + format toggle + filename; wired into internal viewer (hidden on review-link pages). `next.config.mjs` updated for Vercel bundling.
+6. **Phase 48 — playback-loop-and-selection-hierarchy:** Lifted in/out markers from CommentSidebar to viewer parent; new `loop` toggle in VideoPlayer controls — loops whole video when no range set, clamps to in/out when set (with one-cycle grace on manual seek); new `src/lib/selectionStyle.ts` helper; applied to ProjectCard / FolderCard / AssetCard + sidebar tree parent-of-selected indicator.
+
+**New files (high-value):** `src/lib/permissions.ts`, `src/lib/version-groups.ts`, `src/lib/selectionStyle.ts`, `src/lib/exports.ts`, `src/lib/ffmpeg-resolve.ts`, `tests/permissions.test.ts`, `tests/permissions-api.test.ts`, `src/components/admin/{ProjectPermissionsPanel,OrphanUsersPanel,UserSessionActions}.tsx`, `src/components/viewer/ExportModal.tsx`, `src/components/projects/RenameProjectModal.tsx`, `src/components/files/StackOntoModal.tsx`, 3 admin API routes + exports API routes.
+
+**Pending:** Human verification walkthroughs for phases 43, 45, 46, 47, 48 (automated verification passed all; live-environment checks require running dev server).
+
+---
+
 ## v1.3 Video Review Polish (Shipped: 2026-04-08)
 
 **Phases completed:** 6 phases (23–28), 8 plans
