@@ -65,13 +65,9 @@ export async function GET(request: NextRequest) {
 
       const reviewLinkId = linkDoc.id;
       const snap = await db.collection('comments').where('assetId', '==', assetId).get();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const comments = snap.docs
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((d) => ({ id: d.id, ...d.data() } as any))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((c: any) => c.reviewLinkId === reviewLinkId)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .sort((a: any, b: any) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
       return NextResponse.json({ comments });
     }
@@ -89,7 +85,6 @@ export async function GET(request: NextRequest) {
 
     const assetDoc = await db.collection('assets').doc(assetId).get();
     if (!assetDoc.exists) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const asset = assetDoc.data() as any;
 
     const projDoc = await db.collection('projects').doc(asset.projectId).get();
@@ -104,7 +99,6 @@ export async function GET(request: NextRequest) {
 
     const snap = await db.collection('comments').where('assetId', '==', assetId).get();
     const comments = snap.docs
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((d) => ({ id: d.id, ...d.data() } as any))
       .sort((a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0));
     return NextResponse.json({ comments });
@@ -141,7 +135,6 @@ export async function POST(request: NextRequest) {
     // Verify the asset exists and its projectId matches what the client claims
     const assetDoc = await db.collection('assets').doc(assetId).get();
     if (!assetDoc.exists) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const asset = assetDoc.data() as any;
     if (asset.projectId !== projectId) {
       return NextResponse.json({ error: 'projectId mismatch' }, { status: 400 });
@@ -157,7 +150,6 @@ export async function POST(request: NextRequest) {
         authorId = decoded.uid;
         const userDoc = await db.collection('users').doc(decoded.uid).get();
         if (userDoc.exists) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           resolvedAuthorName = (userDoc.data() as any).name || resolvedAuthorName;
         }
       } catch (err) {

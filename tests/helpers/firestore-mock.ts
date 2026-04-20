@@ -13,7 +13,6 @@
  * avoid those paths (or sort in memory).
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Data = Record<string, any>;
 
 export interface MockDoc {
@@ -337,7 +336,6 @@ export function seedComment(
 interface MockRequestOpts {
   method?: string;
   url?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   body?: any;
   headers?: Record<string, string>;
 }
@@ -346,7 +344,6 @@ export function makeRequest(opts: MockRequestOpts = {}) {
   const url = opts.url ?? 'http://localhost/api/test';
   const method = opts.method ?? 'GET';
   const headers = new Headers(opts.headers ?? {});
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const body = opts.body;
 
   const req = {

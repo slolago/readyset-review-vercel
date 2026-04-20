@@ -34,7 +34,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
     // Load user doc to evaluate platform-admin override via canAccessProject.
     const userDoc = await db.collection('users').doc(uid).get();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userObj = userDoc.exists ? ({ id: userDoc.id, ...userDoc.data() } as any) : null;
     if (!userObj || !canAccessProject(userObj, project)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

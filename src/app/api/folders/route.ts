@@ -32,15 +32,11 @@ export async function GET(request: NextRequest) {
   try {
     const db = getAdminDb();
     const snap = await db.collection('folders').where('projectId', '==', projectId).get();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allFolders = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
     const folders = all
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? allFolders.sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis())
       : allFolders
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .filter((f: any) => (f.parentId ?? null) === parentId)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .sort((a: any, b: any) => a.createdAt?.toMillis() - b.createdAt?.toMillis());
 
     return NextResponse.json({ folders });
@@ -69,7 +65,6 @@ export async function POST(request: NextRequest) {
     if (parentId) {
       const parentDoc = await db.collection('folders').doc(parentId).get();
       if (parentDoc.exists) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const parent = parentDoc.data() as any;
         path = [...(parent.path || []), parentId];
       }

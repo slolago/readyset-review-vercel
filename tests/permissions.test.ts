@@ -44,7 +44,6 @@ function makeUser(overrides: Partial<User> & { id?: string; role?: PlatformRole 
     name: 'User',
     avatar: '',
     role: overrides.role ?? 'viewer',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createdAt: { toMillis: () => 0, toDate: () => new Date(0) } as any,
     ...overrides,
   };
@@ -70,9 +69,7 @@ function makeProject(
     ownerId: opts.ownerId ?? 'owner-id',
     collaborators,
     color: 'purple',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createdAt: {} as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     updatedAt: {} as any,
   };
 }
@@ -81,7 +78,6 @@ function tsFromDate(d: Date) {
   return {
     toMillis: () => d.getTime(),
     toDate: () => d,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
 
@@ -95,7 +91,6 @@ function makeReviewLink(overrides: Partial<ReviewLink> = {}): ReviewLink {
     createdBy: 'owner-id',
     expiresAt: null,
     allowComments: true,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createdAt: {} as any,
     ...overrides,
   };
@@ -111,7 +106,6 @@ function makeComment(overrides: Partial<Comment> = {}): Comment {
     text: 'hi',
     resolved: false,
     parentId: null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createdAt: {} as any,
     ...overrides,
   };

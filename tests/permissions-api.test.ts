@@ -131,7 +131,6 @@ async function loadProjectRoutes() {
 // ---------- Tests: project endpoints ----------
 
 describe('API enforcement — projects', () => {
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   async function call(
     handler: any,
     uid: string | null,
@@ -145,7 +144,6 @@ describe('API enforcement — projects', () => {
     });
     return handler(req, { params: { projectId } });
   }
-  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   it('GET /api/projects/[id] matrix', async () => {
     const { GET_ID } = await loadProjectRoutes();
@@ -213,7 +211,6 @@ describe('API enforcement — projects', () => {
 
 // ---------- Tests: folder endpoints ----------
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 describe('API enforcement — folders', () => {
   async function callList(handler: any, uid: string | null, url: string, body?: unknown) {
     const req = makeRequest({
@@ -602,5 +599,4 @@ describe('API enforcement — comments', () => {
     expect(res.status).toBe(403);
   });
 });
-/* eslint-enable @typescript-eslint/no-explicit-any */
 

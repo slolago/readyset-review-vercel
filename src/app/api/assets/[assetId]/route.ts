@@ -27,7 +27,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('assets').doc(params.assetId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const asset = { id: doc.id, ...doc.data() } as any;
     const project = await loadProject(asset.projectId);
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -47,7 +46,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Fetch all versions in the same group via shared helper (handles legacy-root)
     const groupId = resolveGroupId(asset, params.assetId);
     const groupMembers = await fetchGroupMembers(db, groupId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const versionDocs = groupMembers.map((m) => ({ id: m.id, ...m.data } as any));
 
     const versions = await Promise.all(
@@ -82,7 +80,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('assets').doc(params.assetId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const asset = doc.data() as any;
     const project = await loadProject(asset.projectId);
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -141,7 +138,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('assets').doc(params.assetId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const asset = doc.data() as any;
     const project = await loadProject(asset.projectId);
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });

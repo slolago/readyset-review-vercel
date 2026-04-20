@@ -32,7 +32,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const invitedUser = { id: usersSnap.docs[0].id, ...usersSnap.docs[0].data() } as any;
     const collaborator = {
       userId: invitedUser.id,
@@ -43,7 +42,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Remove existing entry if any
     const existing = project.collaborators || [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filtered = existing.filter((c: any) => c.userId !== invitedUser.id);
     filtered.push(collaborator);
 
@@ -74,7 +72,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { userId } = await request.json();
     const collaborators = (project.collaborators || []).filter(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (c: any) => c.userId !== userId
     );
 

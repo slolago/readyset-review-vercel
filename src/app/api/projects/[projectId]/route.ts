@@ -103,7 +103,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const assetsSnap = await db.collection('assets').where('projectId', '==', params.projectId).get();
     const blobPaths: string[] = [];
     for (const d of assetsSnap.docs) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const a = d.data() as any;
       if (a.gcsPath) blobPaths.push(a.gcsPath);
       if (a.thumbnailGcsPath) blobPaths.push(a.thumbnailGcsPath);

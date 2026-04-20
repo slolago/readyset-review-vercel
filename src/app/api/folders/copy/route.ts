@@ -17,7 +17,6 @@ export async function POST(request: NextRequest) {
     const doc = await db.collection('folders').doc(folderId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const source = doc.data() as any;
     const projDoc = await db.collection('projects').doc(source.projectId).get();
     if (!projDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -35,7 +34,6 @@ export async function POST(request: NextRequest) {
     if (destinationParentId) {
       const parentDoc = await db.collection('folders').doc(destinationParentId).get();
       if (parentDoc.exists) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const parent = parentDoc.data() as any;
         path = [...(parent.path || []), destinationParentId];
       }

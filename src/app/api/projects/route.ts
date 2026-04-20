@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { canAccessProject } from '@/lib/permissions';
+import type { Project } from '@/types';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -14,14 +16,12 @@ export async function GET(request: NextRequest) {
     const ownedIds = new Set(ownedSnap.docs.map((d) => d.id));
     const ownedProjects = ownedSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    // Fetch all projects to find ones where user is a collaborator but not the owner
+    // Fetch remaining projects and filter via canAccessProject (handles admin + collaborators)
     const allSnap = await db.collection('projects').get();
     const collaboratorProjects = allSnap.docs
       .filter((d) => !ownedIds.has(d.id))
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((p: any) =>
-        p.collaborators?.some((c: { userId: string }) => c.userId === user.id)
-      );
+      .map((d) => ({ id: d.id, ...d.data() }) as Project)
+      .filter((p) => canAccessProject(user, p));
 
     const projects = [...ownedProjects, ...collaboratorProjects];
 

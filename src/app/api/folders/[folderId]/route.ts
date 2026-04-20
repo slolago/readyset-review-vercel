@@ -19,9 +19,7 @@ async function loadProject(projectId: string): Promise<Project | null> {
 function serializeDoc(data: Record<string, unknown>, id: string): Record<string, unknown> {
   const out: Record<string, unknown> = { id };
   for (const [k, v] of Object.entries(data)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (v !== null && typeof v === 'object' && typeof (v as any).toDate === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       out[k] = (v as any).toDate().toISOString();
     } else {
       out[k] = v;
@@ -76,7 +74,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('folders').doc(params.folderId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const folder = doc.data() as any;
     const project = await loadProject(folder.projectId);
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -99,7 +96,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (typeof updates.parentId === 'string') {
       const newParent = await db.collection('folders').doc(updates.parentId as string).get();
       if (!newParent.exists) return NextResponse.json({ error: 'Parent folder not found' }, { status: 400 });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((newParent.data() as any).projectId !== folder.projectId) {
         return NextResponse.json({ error: 'Cannot move folder to a different project' }, { status: 400 });
       }
@@ -121,7 +117,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const doc = await db.collection('folders').doc(params.folderId).get();
     if (!doc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const folder = doc.data() as any;
     const project = await loadProject(folder.projectId);
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
+import { canAccessProject } from '@/lib/permissions';
+import type { Project } from '@/types';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -12,11 +14,8 @@ export async function GET(request: NextRequest) {
     // Get all projects user has access to
     const projectsSnap = await db.collection('projects').get();
     const userProjects = projectsSnap.docs
-      .map(d => ({ id: d.id, ...d.data() } as any))
-      .filter((p: any) =>
-        p.ownerId === user.id ||
-        p.collaborators?.some((c: any) => c.userId === user.id)
-      );
+      .map((d) => ({ id: d.id, ...d.data() }) as Project)
+      .filter((p) => canAccessProject(user, p));
     const projectMap: Record<string, string> = {};
     for (const p of userProjects) projectMap[p.id] = p.name;
     const projectIds = userProjects.map((p: any) => p.id);
