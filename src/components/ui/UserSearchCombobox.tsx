@@ -18,6 +18,11 @@ interface UserSearchComboboxProps {
   exclude?: string[];
   placeholder?: string;
   disabled?: boolean;
+  /**
+   * When true, selecting a user clears the input instead of filling it with
+   * their name. Use in multi-select contexts where the parent renders chips.
+   */
+  clearOnSelect?: boolean;
 }
 
 export function UserSearchCombobox({
@@ -26,6 +31,7 @@ export function UserSearchCombobox({
   exclude = [],
   placeholder = 'Search by name or email...',
   disabled = false,
+  clearOnSelect = false,
 }: UserSearchComboboxProps) {
   const { getIdToken } = useAuth();
   const [query, setQuery] = useState('');
@@ -83,7 +89,11 @@ export function UserSearchCombobox({
   };
 
   const handleSelect = (user: UserResult) => {
-    setQuery(user.name);
+    if (clearOnSelect) {
+      setQuery('');
+    } else {
+      setQuery(user.name);
+    }
     setResults([]);
     setOpen(false);
     onSelect(user);
