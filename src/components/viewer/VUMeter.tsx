@@ -248,7 +248,40 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
       rmsSmoothed.current = [MIN_DB, MIN_DB];
       peakDisp.current    = [MIN_DB, MIN_DB];
       peakTime.current    = [0, 0];
-    }, [activeIndex]);
+
+      // Force-rebuild the newly active side's analysis graph.
+      //
+      // Why: Chrome drops the audio track from captureStream() when video.muted
+      // is true at capture time. In compare, the inactive side is muted at
+      // mount, so its initial captureStream has zero audio tracks → source node
+      // binds to silence forever. When the user switches to that side (React
+      // unmutes the video), the existing node doesn't pick up the newly
+      // available track. Tearing down and rebuilding while the video is now
+      // unmuted gets us a real audio source.
+      const ctx = sharedCtx;
+      if (!ctx) return;
+      const video = videoRefs[activeIndex]?.current;
+      if (!video) return;
+
+      // React's muted prop update and this effect both run post-commit, so
+      // video.muted should already reflect the new active side. If for some
+      // reason it's still muted, defer to the next paint so the DOM settles.
+      const rebuild = () => {
+        const old = graphsRef.current[activeIndex];
+        if (old) {
+          try { old.source.disconnect(); } catch {}
+        }
+        const fresh = buildAnalysisGraph(ctx, video);
+        graphsRef.current[activeIndex] = fresh;
+      };
+
+      if (video.muted) {
+        // Shouldn't happen — but defer one frame if it does.
+        const id = requestAnimationFrame(rebuild);
+        return () => cancelAnimationFrame(id);
+      }
+      rebuild();
+    }, [activeIndex, videoRefs]);
 
     useEffect(() => {
       const canvas = canvasRef.current;

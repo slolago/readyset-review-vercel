@@ -8,7 +8,7 @@ import { SafeZonesOverlay } from './SafeZonesOverlay';
 import { SafeZoneSelector } from './SafeZoneSelector';
 import { VUMeter, type VUMeterHandle } from './VUMeter';
 import { formatDuration } from '@/lib/utils';
-import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize, Download } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize, Download, Activity } from 'lucide-react';
 import { forceDownload } from '@/lib/utils';
 
 interface VideoPlayerProps {
@@ -67,6 +67,14 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const [hoveredComment, setHoveredComment] = useState<Comment | null>(null);
   const [tooltipPct, setTooltipPct] = useState(0);
   const [timecodeMode, setTimecodeMode] = useState<'mmss' | 'smpte'>('mmss');
+  const [showVU, setShowVU] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('player-vumeter') !== 'off';
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('player-vumeter', showVU ? 'on' : 'off');
+  }, [showVU]);
   const [activeSafeZone, setActiveSafeZone] = useState<string | null>(null);
   const [safeZoneOpacity, setSafeZoneOpacity] = useState(1);
 
@@ -448,10 +456,14 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         )}
       </div>
 
-      {/* VU Meter — right side strip */}
-      <div className="flex-shrink-0 w-24 flex flex-col bg-[#0a0a0a] border-l border-white/5">
-        <VUMeter ref={vuMeterRef} videoRefs={[videoRef]} isPlaying={playing} />
-      </div>
+      {/* VU Meter — right side strip (toggleable) */}
+      {showVU && (
+        <div className="flex-shrink-0 w-24 flex flex-col bg-[#0a0a0a] border-l border-white/5">
+          <div className={`flex-1 min-h-0 flex flex-col transition-opacity ${muted ? 'opacity-30' : 'opacity-100'}`}>
+            <VUMeter ref={vuMeterRef} videoRefs={[videoRef]} isPlaying={playing && !muted} />
+          </div>
+        </div>
+      )}
 
       </div>{/* end flex-row */}
 
@@ -621,6 +633,15 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               style={{ background: `linear-gradient(to right, #7a00df 0%, #7a00df ${(muted ? 0 : volume) * 100}%, rgba(255,255,255,0.15) ${(muted ? 0 : volume) * 100}%, rgba(255,255,255,0.15) 100%)` }}
             />
           </div>
+
+          {/* VU meter toggle */}
+          <button
+            onClick={() => setShowVU((v) => !v)}
+            title={`${showVU ? 'Hide' : 'Show'} VU meter`}
+            className={`transition-colors ${showVU ? 'text-frame-accent hover:text-frame-accentHover' : 'text-white/40 hover:text-white/70'}`}
+          >
+            <Activity className="w-4 h-4" />
+          </button>
 
           {/* Speed */}
           <select
