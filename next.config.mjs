@@ -32,6 +32,14 @@ const nextConfig = {
         './node_modules/ffmpeg-static/**',
         './node_modules/@ffprobe-installer/**',
       ],
+      '/api/exports': [
+        './node_modules/ffmpeg-static/**',
+        './node_modules/@ffmpeg-installer/**',
+      ],
+      '/api/exports/*': [
+        './node_modules/ffmpeg-static/**',
+        './node_modules/@ffmpeg-installer/**',
+      ],
     },
   },
 };
