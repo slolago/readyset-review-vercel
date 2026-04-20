@@ -10,7 +10,7 @@ import { VUMeter, type VUMeterHandle } from './VUMeter';
 import { PlayerBgPicker } from './PlayerBgPicker';
 import { usePlayerBg } from '@/hooks/usePlayerBg';
 import { formatDuration } from '@/lib/utils';
-import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize, Download, Activity, Scissors } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronLeft, ChevronRight, Pencil, X, Maximize, Download, Activity, Scissors, Repeat } from 'lucide-react';
 import { forceDownload } from '@/lib/utils';
 
 interface VideoPlayerProps {
@@ -397,7 +397,18 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           onPlay={() => { setPlaying(true); setBuffering(false); }}
           onPlaying={() => setBuffering(false)}
           onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
+          onEnded={() => {
+            const v = videoRef.current;
+            if (loop && v) {
+              // If a loop range is set, restart at loopIn; otherwise restart at 0.
+              const target = typeof loopIn === 'number' ? loopIn : 0;
+              v.currentTime = target;
+              v.play().catch(() => {});
+              setPlaying(true);
+            } else {
+              setPlaying(false);
+            }
+          }}
           onWaiting={() => setBuffering(true)}
           onStalled={() => setBuffering(true)}
           onCanPlay={() => setBuffering(false)}
@@ -699,6 +710,15 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 
           {/* Background color picker */}
           <PlayerBgPicker value={playerBg} onChange={setPlayerBg} />
+
+          {/* Loop toggle — per-session, resets on asset/version switch */}
+          <button
+            onClick={() => setLoop((v) => !v)}
+            title={`Loop ${loop ? 'on' : 'off'}`}
+            className={`transition-colors ${loop ? 'text-frame-accent hover:text-frame-accentHover' : 'text-white/40 hover:text-white/70'}`}
+          >
+            <Repeat className="w-4 h-4" />
+          </button>
 
           {/* Speed */}
           <select
