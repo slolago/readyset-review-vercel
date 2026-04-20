@@ -180,3 +180,25 @@ export interface UploadItem {
   assetId?: string;
   error?: string;
 }
+
+// ---------- Export jobs (Phase 47) ----------
+
+export type ExportFormat = 'mp4' | 'gif';
+export type ExportStatus = 'queued' | 'encoding' | 'ready' | 'failed';
+
+export interface ExportJob {
+  id: string;
+  userId: string;
+  assetId: string;
+  projectId: string;
+  format: ExportFormat;
+  inPoint: number;   // seconds
+  outPoint: number;  // seconds
+  filename: string;  // user-provided, without extension
+  status: ExportStatus;
+  gcsPath?: string;
+  signedUrl?: string;         // filled transiently by GET endpoint, not stored
+  createdAt: Timestamp;
+  completedAt?: Timestamp;
+  error?: string;
+}
