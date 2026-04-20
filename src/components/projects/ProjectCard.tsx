@@ -7,6 +7,7 @@ import { Dropdown } from '@/components/ui/Dropdown';
 import { formatRelativeTime, getProjectColor } from '@/lib/utils';
 import type { Project } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { selectionStyle } from '@/lib/selectionStyle';
 import toast from 'react-hot-toast';
 import { RenameProjectModal } from './RenameProjectModal';
 
@@ -61,7 +62,7 @@ export function ProjectCard({ project, onDeleted }: ProjectCardProps) {
   ];
 
   return (
-    <div className="group bg-frame-card border border-frame-border hover:border-frame-borderLight rounded-xl overflow-hidden transition-all hover:bg-frame-cardHover">
+    <div className={`group bg-frame-card rounded-xl overflow-hidden transition-all hover:bg-frame-cardHover ${selectionStyle('project', 'idle')}`}>
       {/* Color bar */}
       <div className="h-1" style={{ backgroundColor: color }} />
 

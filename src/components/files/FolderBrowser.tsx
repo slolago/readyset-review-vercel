@@ -39,6 +39,7 @@ import {
 import type { Folder as FolderType, UploadItem } from '@/types';
 import type { ReviewStatus } from '@/types';
 import { getProjectColor, formatBytes, forceDownload } from '@/lib/utils';
+import { selectionStyle } from '@/lib/selectionStyle';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { ContextMenu } from '@/components/ui/ContextMenu';
 import type { MenuItem } from '@/components/ui/ContextMenu';
@@ -1540,13 +1541,11 @@ const FolderCard = React.memo(function FolderCard({
       data-selectable={folder.id}
       draggable
       onDragStart={onDragStart}
-      className={`group relative bg-frame-card border rounded-xl p-3 cursor-pointer transition-all hover:bg-frame-cardHover ${
-        isDropTarget
-          ? 'border-frame-accent ring-2 ring-frame-accent bg-frame-accent/10'
-          : isSelected
-          ? 'border-frame-accent ring-1 ring-frame-accent'
-          : 'border-frame-border hover:border-frame-borderLight'
-      }`}
+      className={[
+        'group relative bg-frame-card rounded-xl p-3 cursor-pointer transition-all hover:bg-frame-cardHover',
+        selectionStyle('folder', (isDropTarget || isSelected) ? 'selected' : 'idle'),
+        isDropTarget ? 'ring-2 ring-frame-accent bg-frame-accent/10' : '',
+      ].filter(Boolean).join(' ')}
       onClick={(e) => {
         if (e.button !== 0) return; // ignore right-click
         const url = `/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`;

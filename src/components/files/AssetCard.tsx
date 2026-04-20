@@ -15,6 +15,7 @@ import { VersionStackModal } from './VersionStackModal';
 import { StackOntoModal } from './StackOntoModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useUpload } from '@/hooks/useAssets';
+import { selectionStyle, type SelectionState } from '@/lib/selectionStyle';
 import toast from 'react-hot-toast';
 
 interface AssetCardProps {
@@ -318,15 +319,16 @@ export const AssetCard = memo(function AssetCard({
         e.stopPropagation();
         setContextMenu({ x: e.clientX, y: e.clientY });
       }}
-      className={`group bg-frame-card border rounded-xl overflow-hidden transition-all ${
-        isUploading
-          ? 'opacity-70 border-frame-border cursor-wait'
-          : isDropTarget
-          ? 'border-frame-accent ring-2 ring-frame-accent bg-frame-accent/10 cursor-pointer'
-          : isSelected
-          ? 'border-frame-accent ring-1 ring-frame-accent hover:bg-frame-cardHover cursor-pointer'
-          : 'border-frame-border hover:border-frame-borderLight hover:bg-frame-cardHover cursor-pointer'
-      }`}
+      className={[
+        'group bg-frame-card rounded-xl overflow-hidden transition-all',
+        isUploading ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-frame-cardHover',
+        selectionStyle(
+          'asset',
+          (isDropTarget || isSelected ? 'selected' : 'idle') as SelectionState
+        ),
+        // Preserve drop-target ring-2 emphasis so it dominates plain selection.
+        isDropTarget ? 'ring-2 ring-frame-accent bg-frame-accent/10' : '',
+      ].filter(Boolean).join(' ')}
     >
       {/* Thumbnail */}
       <div
