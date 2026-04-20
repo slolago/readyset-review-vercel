@@ -40,6 +40,20 @@ export async function POST(request: NextRequest) {
       updates.thumbnailGcsPath = thumbnailGcsPath;
     }
 
+    // For image assets: if client didn't provide width/height, fall back to
+    // server-side extraction from the GCS object header.
+    if (asset.type === 'image') {
+      const hasDims = typeof updates.width === 'number' && typeof updates.height === 'number';
+      if (!hasDims && asset.gcsPath) {
+        const { extractImageMetadata } = await import('@/lib/image-metadata');
+        const meta = await extractImageMetadata(asset.gcsPath);
+        if (meta?.width) updates.width = meta.width;
+        if (meta?.height) updates.height = meta.height;
+      }
+      // Images do not go through ffprobe — mark probed:true so UI hides Probe button.
+      updates.probed = true;
+    }
+
     await db.collection('assets').doc(assetId).update(updates);
 
     const updated = await db.collection('assets').doc(assetId).get();
@@ -50,7 +64,7 @@ export async function POST(request: NextRequest) {
     // If probe fails, the Probe button in the info panel can be used manually.
     const origin = request.nextUrl.origin;
     const authHeader = request.headers.get('Authorization');
-    if (authHeader) {
+    if (asset.type === 'video' && authHeader) {
       fetch(`${origin}/api/assets/${assetId}/probe`, {
         method: 'POST',
         headers: { Authorization: authHeader },
