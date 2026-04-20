@@ -36,6 +36,10 @@ export interface Folder {
   name: string;
   path: string[];
   createdAt: Timestamp;
+  /** Soft-delete marker — set by DELETE endpoint, cleared by restore. Absent on live docs. */
+  deletedAt?: Timestamp;
+  /** User id of the user who soft-deleted the item. Absent on live docs. */
+  deletedBy?: string;
 }
 
 export type AssetStatus = 'uploading' | 'ready';
@@ -67,6 +71,10 @@ export interface Asset {
   _commentCount?: number;
   frameRate?: number;
   reviewStatus?: ReviewStatus;
+  /** Soft-delete marker — set by DELETE endpoint, cleared by restore. Absent on live docs. */
+  deletedAt?: Timestamp;
+  /** User id of the user who soft-deleted the item. Absent on live docs. */
+  deletedBy?: string;
 
   // Accurate metadata populated by server-side ffprobe after upload. Absent
   // on assets uploaded before the probe pipeline existed — use the /probe
