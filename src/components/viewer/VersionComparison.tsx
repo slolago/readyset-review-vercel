@@ -204,7 +204,12 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     });
   }, []);
 
+  // Track mousedown position so handleFrameClick can distinguish a real click
+  // from a drag/pan (drags shouldn't toggle play).
+  const mouseDownAt = useRef<{ x: number; y: number } | null>(null);
+
   const handleFrameMouseDown = useCallback((e: React.MouseEvent) => {
+    mouseDownAt.current = { x: e.clientX, y: e.clientY };
     // Skip if user clicked the slider handle — let its own handler run.
     if ((e.target as HTMLElement).closest('[data-slider-handle]')) return;
     if (zoom <= 1) return;
@@ -212,6 +217,26 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     setIsPanning(true);
     panStartRef.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y };
   }, [zoom, pan.x, pan.y]);
+
+  // togglePlay is declared below; use a ref so handleFrameClick can call the
+  // latest version without creating a TDZ forward-reference.
+  const togglePlayRef = useRef<() => void>(() => {});
+
+  const handleFrameClick = useCallback((e: React.MouseEvent) => {
+    // Ignore clicks on interactive overlays (handle, buttons, pickers, etc.)
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-slider-handle]')) return;
+    if (target.closest('button')) return;
+    if (target.closest('[data-picker]')) return;
+    // Ignore if this was a drag rather than a click
+    const start = mouseDownAt.current;
+    if (start) {
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (dx * dx + dy * dy > 25) return; // >5px moved = drag, not click
+    }
+    togglePlayRef.current();
+  }, []);
 
   useEffect(() => {
     if (!isPanning) return;
@@ -349,6 +374,10 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
       setIsPlaying(false);
     }
   }, [masterRef, slaveRef]);
+
+  // Keep the ref pointed at the latest togglePlay so the click handler always
+  // invokes a fresh closure (master/slave state, etc.)
+  useEffect(() => { togglePlayRef.current = togglePlay; }, [togglePlay]);
 
   const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const t = parseFloat(e.target.value);
@@ -567,7 +596,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
               mouse-drag pan live at this level so both videos move in lockstep. */}
           <div
             ref={frameRef}
-            className={`relative ${zoom > 1 ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+            className={`relative ${zoom > 1 ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : isVideo ? 'cursor-pointer' : ''}`}
             style={{
               width: frameSize?.w ?? '100%',
               height: frameSize?.h ?? '100%',
@@ -575,6 +604,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
             }}
             onWheel={isVideo || isImage ? handleWheel : undefined}
             onMouseDown={handleFrameMouseDown}
+            onClick={isVideo ? handleFrameClick : undefined}
             onDoubleClick={zoom > 1 ? resetZoom : undefined}
           >
             {/* Opacity gate: keep media hidden until both dimensions are known so

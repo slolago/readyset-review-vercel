@@ -281,7 +281,12 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
         return () => cancelAnimationFrame(id);
       }
       rebuild();
-    }, [activeIndex, videoRefs]);
+    // videoRefs is a new array literal on every parent render; including it in
+    // deps would retrigger the rebuild every tick → canvas blink.
+    // The refs themselves are stable, so reading videoRefs[activeIndex].current
+    // at effect time is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeIndex]);
 
     useEffect(() => {
       const canvas = canvasRef.current;
