@@ -210,7 +210,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           {
             const newMuted = !muted;
             setMuted(newMuted);
-            vuMeterRef.current?.setMuted(newMuted);
+            if (videoRef.current) videoRef.current.muted = newMuted;
           }
           break;
         case 'f':
@@ -296,16 +296,18 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseFloat(e.target.value);
     setVolume(v); setMuted(v === 0);
-    // Route through VUMeter — it owns volume/mute when Web Audio is active,
-    // and falls back to native video.volume when Web Audio init failed.
-    vuMeterRef.current?.setVolume(v);
-    vuMeterRef.current?.setMuted(v === 0);
+    // VUMeter now uses captureStream for analysis, not MediaElementSource.
+    // So audibility is controlled natively via video.volume / video.muted.
+    if (videoRef.current) {
+      videoRef.current.volume = v;
+      videoRef.current.muted = v === 0;
+    }
   };
 
   const toggleMute = () => {
     const newMuted = !muted;
     setMuted(newMuted);
-    vuMeterRef.current?.setMuted(newMuted);
+    if (videoRef.current) videoRef.current.muted = newMuted;
   };
 
   const setRate = (rate: number) => {

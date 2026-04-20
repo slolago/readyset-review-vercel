@@ -252,8 +252,9 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     return activeSide === 'A' ? videoBRef.current : videoARef.current;
   }, [activeSide]);
 
-  // Mute state → VU meter (its analyser stays pre-gain; visual is dimmed on mute via props)
-  useEffect(() => { vuRef.current?.setMuted(muted); }, [muted]);
+  // Audio in compare is controlled by video.muted (declaratively on each
+  // <video> below). VUMeter no longer owns playback routing — it reads a
+  // captureStream() side-channel for analysis only.
 
   // Close picker on outside click
   useEffect(() => {
@@ -319,9 +320,9 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     return () => vB.removeEventListener('loadedmetadata', onLoaded);
   }, []);
 
-  // Play / pause — drives both sides from the master event listeners above.
-  // Keep this SYNCHRONOUS up to the play() calls so the browser sees the whole
-  // chain as a single user gesture (Chrome invalidates activation across awaits).
+  // Play / pause — audibility is handled by video.muted declaratively; Web Audio
+  // is analysis-only so no context-resume dance needed. Kept synchronous to
+  // keep the user gesture intact for play().
   const togglePlay = useCallback(() => {
     const vA = videoARef.current;
     const vB = videoBRef.current;
@@ -332,12 +333,9 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     if (master.paused) {
       const slave = slaveRef();
       if (slave) slave.currentTime = master.currentTime;
-      // Defensive: force audible state on the active side (React's muted prop
-      // might not have propagated yet if activeSide just changed).
       vA.volume = 1;
       vB.volume = 1;
-      // Fire-and-forget resume — don't await so play() fires in the same gesture.
-      vuRef.current?.resume();
+      vuRef.current?.resume();   // resume analyser context so the meter updates
       Promise.all([vA.play(), vB.play()])
         .then(() => setIsPlaying(true))
         .catch((e) => {
@@ -452,16 +450,18 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     ? {}
     : { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center' };
 
-  // Side-by-side gap: 6px each side = 12px total black gap between the two videos.
-  // Using left/right positioning (not width) so object-contain has the correct
-  // half-panel to letterbox into.
-  const SBS_GAP_PX = 6;
+  // Side-by-side: explicit width on each half with a 12px gap between them.
+  // Using width (not left+right) because some browsers are inconsistent when
+  // `left` + `right` are both set alongside object-fit — explicit width avoids
+  // any ambiguity in how the element's box is sized.
+  const SBS_GAP_PX = 12;
+  const SBS_HALF_OFFSET = SBS_GAP_PX / 2;  // 6px on each side of center
   const videoStyleA: React.CSSProperties = viewMode === 'slider'
     ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipA, ...mediaTransform }
-    : { position: 'absolute', top: 0, left: 0, right: `calc(50% + ${SBS_GAP_PX}px)`, height: '100%', ...mediaTransform };
+    : { position: 'absolute', top: 0, left: 0, width: `calc(50% - ${SBS_HALF_OFFSET}px)`, height: '100%', ...mediaTransform };
   const videoStyleB: React.CSSProperties = viewMode === 'slider'
     ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipB, ...mediaTransform }
-    : { position: 'absolute', top: 0, left: `calc(50% + ${SBS_GAP_PX}px)`, right: 0, height: '100%', ...mediaTransform };
+    : { position: 'absolute', top: 0, left: `calc(50% + ${SBS_HALF_OFFSET}px)`, width: `calc(50% - ${SBS_HALF_OFFSET}px)`, height: '100%', ...mediaTransform };
 
   const handleMetaA = () => {
     const v = videoARef.current;
@@ -578,6 +578,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
                   <video
                     ref={videoBRef}
                     src={urlB}
+                    crossOrigin="anonymous"
                     className="object-contain"
                     style={videoStyleB}
                     muted={activeSide !== 'B' || muted}
@@ -588,6 +589,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
                   <video
                     ref={videoARef}
                     src={urlA}
+                    crossOrigin="anonymous"
                     className="object-contain"
                     style={videoStyleA}
                     muted={activeSide !== 'A' || muted}

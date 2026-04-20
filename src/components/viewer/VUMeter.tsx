@@ -3,30 +3,40 @@
 import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle, memo } from 'react';
 
 /**
- * Precise stereo audio meter driven by the Web Audio API.
+ * Precise stereo audio meter.
  *
- * Reads real sample data from one or more <video> elements and displays:
- *   - Filled bar: true RMS in dBFS with VU-like ballistics (attack + release).
- *   - Peak marker: true instantaneous peak (max |sample| per frame) with hold + decay.
+ * Architecture (rewritten): we use `video.captureStream()` to get a MediaStream
+ * from each monitored video element, then feed those streams into
+ * `MediaStreamAudioSourceNode → AnalyserNode`. Critically, we do NOT route
+ * through `ctx.destination`, and we never call `createMediaElementSource()`.
  *
- * Supports multi-source monitoring for Version Compare: pass multiple video refs and
- * switch the monitored source via `activeIndex`. Non-active sources are silenced by
- * the meter's own GainNodes (don't also set video.muted — the meter owns volume).
+ * Why this matters:
+ *   - `createMediaElementSource(video)` HIJACKS the video's native audio path.
+ *     Once called, the browser routes audio exclusively through Web Audio.
+ *     If the AudioContext is suspended (Chrome's autoplay policy) or we misroute
+ *     gain at the wrong moment, the video plays silently — even though
+ *     `video.muted = false`.
+ *   - `video.captureStream()` is a SIDE CHANNEL. The native audio path stays
+ *     intact: `video.muted` and `video.volume` directly control what you hear.
+ *     We only use the captured stream to read sample data for the meter.
+ *
+ * Browser support: Chrome ✓, Firefox ✓ (mozCaptureStream), Safari 16+ ✓.
+ * If captureStream is unavailable or fails, the meter shows no signal but
+ * audio playback is unaffected (it's native).
  */
+
 export interface VUMeterHandle {
-  /** Resume AudioContext. Fire-and-forget — must be called inside a user
-   *  gesture call stack but doesn't need to be awaited (state transitions
-   *  synchronously in practice, and awaiting between gesture and play()
-   *  can consume the activation token on some Chrome versions). */
+  /** No-op kept for API compatibility. Kept so older callers can safely invoke it. */
   resume: () => void;
+  /** No-op — use video.volume directly. */
   setVolume: (v: number) => void;
+  /** No-op — use video.muted directly. */
   setMuted: (m: boolean) => void;
 }
 
 interface VUMeterProps {
-  /** One or more video elements to monitor. First ref is monitored if `activeIndex` is omitted. */
   videoRefs: React.RefObject<HTMLVideoElement>[];
-  /** Index into `videoRefs` — the source currently being listened to. Others are silenced. */
+  /** Index into videoRefs — only the active source is monitored. */
   activeIndex?: number;
   isPlaying: boolean;
 }
@@ -35,23 +45,15 @@ interface VUMeterProps {
 const MIN_DB   = -60;
 const MAX_DB   = 3;
 const DB_RANGE = MAX_DB - MIN_DB;
-
 const DB_MARKS = [0, -3, -6, -9, -12, -18, -24, -40, -60] as const;
 
-// Peak-hold ballistics: instantaneous rise, slow decay after a hold window.
 const PEAK_HOLD_MS  = 1200;
-const PEAK_DECAY_DB = 0.25; // dB per frame after hold window
-
-// Bar ballistics (PPM-style): near-instant attack so peaks actually show,
-// moderate release so the eye can read the level.
-const BAR_ATTACK_ALPHA  = 1.0;   // bar rises to peak immediately
-const BAR_RELEASE_ALPHA = 0.15;  // fall rate — ~400ms to drop 20dB visually
-
-// RMS smoothing for optional RMS-tick overlay
+const PEAK_DECAY_DB = 0.25;
+const BAR_ATTACK_ALPHA  = 1.0;
+const BAR_RELEASE_ALPHA = 0.15;
 const RMS_ATTACK_ALPHA  = 0.85;
 const RMS_RELEASE_ALPHA = 0.12;
 
-// Canvas layout (pixels — rendered at 2× for crispness)
 const LABEL_W = 40;
 const SEP_W   = 2;
 const BAR_GAP = 4;
@@ -62,10 +64,8 @@ function dbToY(db: number, h: number): number {
   return ((MAX_DB - clamped) / DB_RANGE) * h;
 }
 
-/** Compute RMS dBFS and true peak dBFS for a single analyser in one pass. */
 function analyse(analyser: AnalyserNode | null, buf: Float32Array): { rmsDb: number; peakDb: number } {
   if (!analyser) return { rmsDb: MIN_DB, peakDb: MIN_DB };
-  // Cast away the ArrayBuffer/SharedArrayBuffer variance mismatch some TS lib versions complain about
   analyser.getFloatTimeDomainData(buf as unknown as Float32Array<ArrayBuffer>);
   let sumSq = 0;
   let peak = 0;
@@ -81,31 +81,20 @@ function analyse(analyser: AnalyserNode | null, buf: Float32Array): { rmsDb: num
   return { rmsDb, peakDb };
 }
 
-interface AudioGraph {
-  source: MediaElementAudioSourceNode;
-  gain: GainNode;
+interface AnalysisGraph {
+  source: MediaStreamAudioSourceNode;
   analyserL: AnalyserNode;
   analyserR: AnalyserNode;
   bufL: Float32Array;
   bufR: Float32Array;
+  stream: MediaStream;
 }
 
-/**
- * Module-level singleton state. Two reasons:
- *
- *   1. `createMediaElementSource(video)` can only be called ONCE per <video>
- *      element for its entire lifetime. In React StrictMode / HMR, effects
- *      double-invoke; a naive implementation would throw InvalidStateError on
- *      the second attempt and silently produce no audio. Caching the graph
- *      per video element avoids the retry.
- *   2. Browsers cap the number of AudioContexts (Chrome ~6). A singleton
- *      prevents resource leaks when VUMeter remounts.
- *
- * Cleanup intentionally does NOT close the context or destroy graphs — they
- * live for the lifetime of the <video> elements they're bound to.
- */
+// ── Module-level singletons ──────────────────────────────────────────────────
+// Shared AudioContext (one per page load; reuses across VUMeter mounts).
+// Graphs are cached per video element via WeakMap so remounts don't rebuild.
 let sharedCtx: AudioContext | null = null;
-const graphCache = new WeakMap<HTMLVideoElement, AudioGraph>();
+const graphCache = new WeakMap<HTMLVideoElement, AnalysisGraph>();
 
 function getOrCreateAudioContext(): AudioContext | null {
   if (sharedCtx && sharedCtx.state !== 'closed') return sharedCtx;
@@ -119,140 +108,144 @@ function getOrCreateAudioContext(): AudioContext | null {
   } catch { return null; }
 }
 
-function getOrCreateGraph(ctx: AudioContext, video: HTMLVideoElement): AudioGraph | null {
+function captureAudioStream(video: HTMLVideoElement): MediaStream | null {
+  // Try the standard API first, then vendor-prefixed variants.
+  const cs = (video as any).captureStream
+    || (video as any).mozCaptureStream
+    || (video as any).webkitCaptureStream;
+  if (typeof cs !== 'function') return null;
+  try {
+    const stream: MediaStream = cs.call(video);
+    return stream ?? null;
+  } catch (e) {
+    console.warn('[VUMeter] captureStream failed', e);
+    return null;
+  }
+}
+
+function getOrCreateAnalysisGraph(ctx: AudioContext, video: HTMLVideoElement): AnalysisGraph | null {
   const cached = graphCache.get(video);
   if (cached) return cached;
+
+  const stream = captureAudioStream(video);
+  if (!stream) return null;
+
   try {
-    const source   = ctx.createMediaElementSource(video);
-    const gain     = ctx.createGain();
+    const source = ctx.createMediaStreamSource(stream);
     const splitter = ctx.createChannelSplitter(2);
     const aL = ctx.createAnalyser();
     const aR = ctx.createAnalyser();
     aL.fftSize = 2048; aL.smoothingTimeConstant = 0;
     aR.fftSize = 2048; aR.smoothingTimeConstant = 0;
 
-    source.connect(gain);
-    gain.connect(ctx.destination);
+    // Analysis only — do NOT connect to destination. Native <video> audio path
+    // handles playback; we only tap the stream for metering.
     source.connect(splitter);
     splitter.connect(aL, 0);
     splitter.connect(aR, 1);
 
-    gain.gain.value = 1;
-    video.volume = 1;
-
-    const graph: AudioGraph = {
-      source, gain, analyserL: aL, analyserR: aR,
+    const graph: AnalysisGraph = {
+      source, analyserL: aL, analyserR: aR,
       bufL: new Float32Array(aL.fftSize),
       bufR: new Float32Array(aR.fftSize),
+      stream,
     };
     graphCache.set(video, graph);
     return graph;
   } catch (e) {
-    console.warn('[VUMeter] createMediaElementSource failed', e);
+    console.warn('[VUMeter] analysis graph creation failed', e);
     return null;
   }
 }
 
+// ── Component ────────────────────────────────────────────────────────────────
 export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
   function VUMeter({ videoRefs, activeIndex = 0, isPlaying }, ref) {
-    const canvasRef   = useRef<HTMLCanvasElement>(null);
-    const ctxRef      = useRef<AudioContext | null>(null);
-    const graphsRef   = useRef<(AudioGraph | null)[]>([]);
-    const activeRef   = useRef(activeIndex);
-    const volumeRef   = useRef(1);
-    const mutedRef    = useRef(false);
-    const rafRef      = useRef(0);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const graphsRef = useRef<(AnalysisGraph | null)[]>([]);
+    const activeRef = useRef(activeIndex);
+    const rafRef    = useRef(0);
 
-    // Display state (dB domain)
-    const barLevel    = useRef<[number, number]>([MIN_DB, MIN_DB]);  // what the filled bar shows
-    const rmsSmoothed = useRef<[number, number]>([MIN_DB, MIN_DB]);  // RMS overlay
-    const peakDisp    = useRef<[number, number]>([MIN_DB, MIN_DB]);  // peak-hold marker
+    const barLevel    = useRef<[number, number]>([MIN_DB, MIN_DB]);
+    const rmsSmoothed = useRef<[number, number]>([MIN_DB, MIN_DB]);
+    const peakDisp    = useRef<[number, number]>([MIN_DB, MIN_DB]);
     const peakTime    = useRef<[number, number]>([0, 0]);
 
-    // ── Public handle ────────────────────────────────────────────────────────
-    // Each source has its own gain node connected to destination. For multi-source
-    // (compare), audibility is gated by video.muted (which silences the source's
-    // output per Web Audio spec). Volume/mute here is a global user control.
-    const applyGains = useCallback(() => {
-      const effective = mutedRef.current ? 0 : volumeRef.current;
-      graphsRef.current.forEach((g) => {
-        if (!g) return;
-        g.gain.gain.value = effective;
-      });
-    }, []);
-
-    const resume = useCallback(() => {
-      const ctx = ctxRef.current;
-      if (!ctx) return;
-      if (ctx.state !== 'running') {
-        // Don't await — keep the user-gesture chain intact for the subsequent play() calls.
-        ctx.resume().catch((e) => console.warn('[VUMeter] AudioContext resume failed', e));
+    // Public handle — volume/mute are now no-ops (callers control the video
+    // element directly). resume() does still matter for the analyser: when the
+    // AudioContext is suspended the analyser samples stop updating, so the
+    // meter freezes at its last reading. Audio plays regardless (native path).
+    const resume    = useCallback(() => {
+      const ctx = sharedCtx;
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
       }
     }, []);
-
-    const setVolume = useCallback((v: number) => {
-      volumeRef.current = v;
-      applyGains();
-      // Keep video.volume at 1 so the analyser reads full-level source signal
-      videoRefs.forEach((r) => { if (r.current) r.current.volume = 1; });
-    }, [videoRefs, applyGains]);
-
-    const setMuted = useCallback((m: boolean) => {
-      mutedRef.current = m;
-      applyGains();
-      // Note: video.muted is managed by the parent via props (it gates audibility
-      // of each source independently). We don't touch it here.
-    }, [applyGains]);
-
+    const setVolume = useCallback((_v: number) => { /* no-op */ }, []);
+    const setMuted  = useCallback((_m: boolean) => { /* no-op */ }, []);
     useImperativeHandle(ref, () => ({ resume, setVolume, setMuted }), [resume, setVolume, setMuted]);
 
-    // ── Build audio graph (one per video, shared via module-level cache) ─────
-    // See the singleton doc above the cache definitions for why we cache
-    // at module scope instead of per-instance.
+    // Build analysis graphs once per mount. Graphs are cached per video element,
+    // so remounts reuse without re-capturing.
     useEffect(() => {
       const ctx = getOrCreateAudioContext();
       if (!ctx) return;
-      ctxRef.current = ctx;
 
-      const graphs: (AudioGraph | null)[] = videoRefs.map((vr) => {
+      // captureStream can return an empty-track stream if called before the video
+      // has any decoded data. Retry on canplay/loadedmetadata if the first attempt
+      // yields a graph with no active audio tracks.
+      const tryBuild = () => {
+        graphsRef.current = videoRefs.map((vr) => {
+          const video = vr.current;
+          if (!video) return null;
+          const graph = getOrCreateAnalysisGraph(ctx, video);
+          return graph;
+        });
+      };
+      tryBuild();
+
+      // Also wake the context on mount (harmless if already running).
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+      // Listen for loadedmetadata on each video — if the first captureStream
+      // happened before metadata, this will retry.
+      const listeners: Array<() => void> = [];
+      videoRefs.forEach((vr, i) => {
         const video = vr.current;
-        if (!video) return null;
-        const graph = getOrCreateGraph(ctx, video);
-        // For single-source callers, clear video.muted so the source isn't born silent.
-        // Multi-source (compare) callers manage video.muted declaratively per side.
-        if (graph && videoRefs.length === 1) video.muted = false;
-        return graph;
+        if (!video) return;
+        const handler = () => {
+          if (!graphsRef.current[i]) {
+            const graph = getOrCreateAnalysisGraph(ctx, video);
+            if (graph) graphsRef.current[i] = graph;
+          }
+        };
+        video.addEventListener('loadedmetadata', handler);
+        video.addEventListener('canplay', handler);
+        listeners.push(() => {
+          video.removeEventListener('loadedmetadata', handler);
+          video.removeEventListener('canplay', handler);
+        });
       });
 
-      graphsRef.current = graphs;
-      applyGains();
-
       return () => {
-        // Cancel the RAF loop; do NOT close the context or discard graphs
-        // (they're cached module-wide and bound to the video elements).
         cancelAnimationFrame(rafRef.current);
         graphsRef.current = [];
+        listeners.forEach((fn) => fn());
       };
-    // Rebuild only if the set of video refs changes (stable across renders in practice)
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ── Track activeIndex changes ────────────────────────────────────────────
     useEffect(() => {
       activeRef.current = activeIndex;
-      applyGains();
-      // Reset display so the meter doesn't show stale peaks from the other source
       barLevel.current    = [MIN_DB, MIN_DB];
       rmsSmoothed.current = [MIN_DB, MIN_DB];
       peakDisp.current    = [MIN_DB, MIN_DB];
       peakTime.current    = [0, 0];
-    }, [activeIndex, applyGains]);
+    }, [activeIndex]);
 
-    // ── Draw loop ────────────────────────────────────────────────────────────
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-
       const c = canvas.getContext('2d');
       if (!c) return;
 
@@ -284,18 +277,14 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
           const truePeak = ch === 0 ? L.peakDb : R.peakDb;
           const rms      = ch === 0 ? L.rmsDb  : R.rmsDb;
 
-          // Bar tracks TRUE PEAK with near-instant attack, gentle release.
-          // This is what you see "full" — no gap between the bar and the peak marker.
           const prevBar = barLevel.current[ch];
           const barAlpha = truePeak > prevBar ? BAR_ATTACK_ALPHA : BAR_RELEASE_ALPHA;
           barLevel.current[ch] = truePeak * barAlpha + prevBar * (1 - barAlpha);
 
-          // RMS overlay (a subtle inner tick showing integrated level)
           const prevRms = rmsSmoothed.current[ch];
           const rmsAlpha = rms > prevRms ? RMS_ATTACK_ALPHA : RMS_RELEASE_ALPHA;
           rmsSmoothed.current[ch] = rms * rmsAlpha + prevRms * (1 - rmsAlpha);
 
-          // Peak hold: bright line at max-recent peak, decays after hold window
           if (truePeak >= peakDisp.current[ch]) {
             peakDisp.current[ch] = truePeak;
             peakTime.current[ch] = now;
@@ -329,7 +318,6 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
 
 VUMeter.displayName = 'VUMeter';
 
-// ── Layout helpers ───────────────────────────────────────────────────────────
 const barWidth = (w: number) => Math.floor((w - L_X - BAR_GAP) / 2);
 const rXOf     = (w: number) => L_X + barWidth(w) + BAR_GAP;
 
@@ -371,9 +359,9 @@ function drawStatic(c: CanvasRenderingContext2D, w: number, h: number) {
 
 function drawBar(
   c: CanvasRenderingContext2D,
-  barDb: number,      // fills up to here (near-instant peak)
-  rmsDb: number,      // subtle inner tick
-  peakHoldDb: number, // peak-hold marker
+  barDb: number,
+  rmsDb: number,
+  peakHoldDb: number,
   x: number,
   barW: number,
   h: number,
@@ -381,8 +369,6 @@ function drawBar(
   const levelY = dbToY(barDb, h);
 
   if (levelY < h - 0.5) {
-    // Gradient fills the active region. Same color zones as before but now the
-    // bar's top always equals the current peak — no visible gap vs the peak marker.
     const grad = c.createLinearGradient(0, 0, 0, h);
     const y0  = dbToY(MAX_DB, h) / h;
     const y3  = dbToY(0,   h) / h;
@@ -394,7 +380,6 @@ function drawBar(
     grad.addColorStop(y20, '#eab308');
     grad.addColorStop(1,   '#22c55e');
 
-    // Rounded top for a softer look
     const radius = Math.min(3, barW / 2);
     c.fillStyle = grad;
     c.beginPath();
@@ -407,12 +392,10 @@ function drawBar(
     c.closePath();
     c.fill();
 
-    // Subtle highlight line at the very top of the bar to define the edge
     c.fillStyle = 'rgba(255,255,255,0.35)';
     c.fillRect(x + radius / 2, levelY, barW - radius, 1);
   }
 
-  // RMS inner tick — thin dark line showing integrated level (inside the filled bar)
   if (rmsDb > MIN_DB + 2) {
     const rmsY = dbToY(rmsDb, h);
     if (rmsY < h - 1) {
@@ -421,7 +404,6 @@ function drawBar(
     }
   }
 
-  // Peak hold marker — colored line sitting at the max recent peak
   if (peakHoldDb > MIN_DB + 2) {
     const pkY = dbToY(peakHoldDb, h);
     c.fillStyle = peakHoldDb >= 0
