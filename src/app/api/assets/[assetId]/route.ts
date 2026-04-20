@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { deleteFile, generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
-import { FieldValue } from 'firebase-admin/firestore';
+import { generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { fetchGroupMembers, resolveGroupId } from '@/lib/version-groups';
 import { canAccessProject, canRenameAsset, canDeleteAsset } from '@/lib/permissions';
 import type { Project } from '@/types';
@@ -145,27 +145,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Delete all associated GCS blobs — file, thumbnail, sprite — in parallel.
-    await Promise.all([
-      asset.gcsPath ? deleteFile(asset.gcsPath).catch(console.error) : null,
-      asset.thumbnailGcsPath ? deleteFile(asset.thumbnailGcsPath).catch(console.error) : null,
-      asset.spriteStripGcsPath ? deleteFile(asset.spriteStripGcsPath).catch(console.error) : null,
-    ]);
-
-    // Cascade: delete all comments attached to this asset so they don't
-    // orphan in Firestore. Use batched deletes (max 500 per commit).
-    const commentsSnap = await db.collection('comments').where('assetId', '==', params.assetId).get();
-    const BATCH_LIMIT = 400;
-    for (let i = 0; i < commentsSnap.docs.length; i += BATCH_LIMIT) {
-      const batch = db.batch();
-      commentsSnap.docs.slice(i, i + BATCH_LIMIT).forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-    }
-
-    await db.collection('assets').doc(params.assetId).delete();
-    return NextResponse.json({ success: true, commentsDeleted: commentsSnap.size });
+    // Soft-delete: mark deletedAt/deletedBy. GCS blobs and comments stay
+    // intact so restore is lossless. Permanent destruction happens via
+    // /api/trash/permanent-delete.
+    await db.collection('assets').doc(params.assetId).update({
+      deletedAt: Timestamp.now(),
+      deletedBy: user.id,
+    });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Asset delete error:', err);
+    console.error('Asset soft-delete error:', err);
     return NextResponse.json({ error: 'Failed to delete asset' }, { status: 500 });
   }
 }
