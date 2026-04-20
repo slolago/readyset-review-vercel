@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, memo } from 'react';
-import { Play, Pause, Volume2, VolumeX, ChevronDown, Columns2, SplitSquareHorizontal, AudioLines, AlertCircle, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, ChevronDown, Columns2, SplitSquareHorizontal, AudioLines, AlertCircle, ZoomIn, ZoomOut, Maximize2, Activity } from 'lucide-react';
 import { formatDuration } from '@/lib/utils';
 import { VUMeter, type VUMeterHandle } from './VUMeter';
 import type { Asset } from '@/types';
@@ -141,6 +141,16 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const [muted, setMuted] = useState(false);
   const [dimsA, setDimsA] = useState<{ w: number; h: number } | null>(null);
   const [dimsB, setDimsB] = useState<{ w: number; h: number } | null>(null);
+
+  // VU meter show/hide — user preference persisted across sessions.
+  const [showVU, setShowVU] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('compare-vumeter') !== 'off';
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('compare-vumeter', showVU ? 'on' : 'off');
+  }, [showVU]);
 
   // Ready = both dims known (or skipped for images — onLoad fires quickly).
   // Until ready we render the media at opacity-0 behind a spinner, so the user
@@ -310,7 +320,9 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   }, []);
 
   // Play / pause — drives both sides from the master event listeners above.
-  const togglePlay = useCallback(async () => {
+  // Keep this SYNCHRONOUS up to the play() calls so the browser sees the whole
+  // chain as a single user gesture (Chrome invalidates activation across awaits).
+  const togglePlay = useCallback(() => {
     const vA = videoARef.current;
     const vB = videoBRef.current;
     if (!vA || !vB) return;
@@ -318,24 +330,21 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     if (!master) return;
 
     if (master.paused) {
-      // Sync slave before starting so they line up
       const slave = slaveRef();
       if (slave) slave.currentTime = master.currentTime;
-      await vuRef.current?.resume();
-      try {
-        const results = await Promise.allSettled([vA.play(), vB.play()]);
-        // If either rejected, keep UI honest — don't pretend we're playing.
-        const bothOk = results.every((r) => r.status === 'fulfilled');
-        if (bothOk) setIsPlaying(true);
-        else {
+      // Defensive: force audible state on the active side (React's muted prop
+      // might not have propagated yet if activeSide just changed).
+      vA.volume = 1;
+      vB.volume = 1;
+      // Fire-and-forget resume — don't await so play() fires in the same gesture.
+      vuRef.current?.resume();
+      Promise.all([vA.play(), vB.play()])
+        .then(() => setIsPlaying(true))
+        .catch((e) => {
+          console.warn('[Compare] play() failed', e);
           setIsPlaying(false);
-          // Pause whichever might have started
           vA.pause(); vB.pause();
-        }
-      } catch {
-        setIsPlaying(false);
-        vA.pause(); vB.pause();
-      }
+        });
     } else {
       vA.pause();
       vB.pause();
@@ -443,12 +452,16 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     ? {}
     : { transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center' };
 
+  // Side-by-side gap: 6px each side = 12px total black gap between the two videos.
+  // Using left/right positioning (not width) so object-contain has the correct
+  // half-panel to letterbox into.
+  const SBS_GAP_PX = 6;
   const videoStyleA: React.CSSProperties = viewMode === 'slider'
     ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipA, ...mediaTransform }
-    : { position: 'absolute', top: 0, left: 0, width: '50%', height: '100%', ...mediaTransform };
+    : { position: 'absolute', top: 0, left: 0, right: `calc(50% + ${SBS_GAP_PX}px)`, height: '100%', ...mediaTransform };
   const videoStyleB: React.CSSProperties = viewMode === 'slider'
     ? { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', clipPath: clipB, ...mediaTransform }
-    : { position: 'absolute', top: 0, left: '50%', width: '50%', height: '100%', ...mediaTransform };
+    : { position: 'absolute', top: 0, left: `calc(50% + ${SBS_GAP_PX}px)`, right: 0, height: '100%', ...mediaTransform };
 
   const handleMetaA = () => {
     const v = videoARef.current;
@@ -619,10 +632,8 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
               </>
             )}
 
-            {/* Side-by-side divider */}
-            {viewMode === 'side-by-side' && (
-              <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-white/15 pointer-events-none" />
-            )}
+            {/* No explicit divider needed in side-by-side — the 12px black gap
+                between the two videos is already a clear separator. */}
 
             {/* Zoom controls — appear bottom-right of the frame */}
             {(isVideo || isImage) && (
@@ -686,10 +697,12 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
           </div>
         </div>
 
-        {/* VU meter strip */}
-        {isVideo && (
+        {/* VU meter strip — toggleable. When hidden, VUMeter is NOT mounted so
+            it doesn't consume resources, but the audio still routes through the
+            cached Web Audio graph (created on first mount via the singleton). */}
+        {isVideo && showVU && (
           <div className="flex-shrink-0 w-24 flex flex-col bg-[#0a0a0a] border-l border-white/5">
-            <div className={`flex-1 transition-opacity ${muted ? 'opacity-30' : 'opacity-100'}`}>
+            <div className={`flex-1 min-h-0 flex flex-col transition-opacity ${muted ? 'opacity-30' : 'opacity-100'}`}>
               <VUMeter
                 ref={vuRef}
                 videoRefs={[videoARef, videoBRef]}
@@ -757,6 +770,14 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
             className="text-white/60 hover:text-white transition-colors"
           >
             {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+
+          <button
+            onClick={() => setShowVU((v) => !v)}
+            title={`${showVU ? 'Hide' : 'Show'} VU meter`}
+            className={`transition-colors ${showVU ? 'text-frame-accent hover:text-frame-accentHover' : 'text-white/40 hover:text-white/70'}`}
+          >
+            <Activity className="w-4 h-4" />
           </button>
         </div>
       )}

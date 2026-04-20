@@ -14,7 +14,11 @@ import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle, memo }
  * the meter's own GainNodes (don't also set video.muted — the meter owns volume).
  */
 export interface VUMeterHandle {
-  resume: () => Promise<void>;
+  /** Resume AudioContext. Fire-and-forget — must be called inside a user
+   *  gesture call stack but doesn't need to be awaited (state transitions
+   *  synchronously in practice, and awaiting between gesture and play()
+   *  can consume the activation token on some Chrome versions). */
+  resume: () => void;
   setVolume: (v: number) => void;
   setMuted: (m: boolean) => void;
 }
@@ -177,11 +181,12 @@ export const VUMeter = memo(forwardRef<VUMeterHandle, VUMeterProps>(
       });
     }, []);
 
-    const resume = useCallback(async () => {
+    const resume = useCallback(() => {
       const ctx = ctxRef.current;
       if (!ctx) return;
       if (ctx.state !== 'running') {
-        try { await ctx.resume(); } catch (e) { console.warn('[VUMeter] AudioContext resume failed', e); }
+        // Don't await — keep the user-gesture chain intact for the subsequent play() calls.
+        ctx.resume().catch((e) => console.warn('[VUMeter] AudioContext resume failed', e));
       }
     }, []);
 
