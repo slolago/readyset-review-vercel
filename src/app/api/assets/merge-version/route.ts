@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
+import { fetchGroupMembers, resolveGroupId } from '@/lib/version-groups';
 
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -39,49 +40,22 @@ export async function POST(request: NextRequest) {
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     // Resolve group IDs
-    const sourceGroupId: string = source.versionGroupId || sourceId;
-    const targetGroupId: string = target.versionGroupId || targetId;
+    const sourceGroupId = resolveGroupId(source, sourceId);
+    const targetGroupId = resolveGroupId(target, targetId);
 
     // Same-group check
     if (sourceGroupId === targetGroupId) {
       return NextResponse.json({ error: 'Assets are already in the same version stack' }, { status: 400 });
     }
 
-    // Fetch all members of source group
-    const sourceGroupSnap = await db.collection('assets')
-      .where('versionGroupId', '==', sourceGroupId)
-      .get();
-
-    let sourceMembers: Array<{ id: string; version: number }> = sourceGroupSnap.docs.map((d) => ({
-      id: d.id,
-      version: (d.data() as any).version || 1,
-    }));
-
-    // Root asset may not have versionGroupId set — include it if not already in results
-    if (!sourceMembers.some((m) => m.id === sourceId)) {
-      sourceMembers.push({ id: sourceId, version: source.version || 1 });
-    }
-
-    // Fetch all members of target group
-    const targetGroupSnap = await db.collection('assets')
-      .where('versionGroupId', '==', targetGroupId)
-      .get();
-
-    let targetMembers: Array<{ id: string; version: number }> = targetGroupSnap.docs.map((d) => ({
-      id: d.id,
-      version: (d.data() as any).version || 1,
-    }));
-
-    // Root asset may not have versionGroupId set — include it if not already in results
-    if (!targetMembers.some((m) => m.id === targetId)) {
-      targetMembers.push({ id: targetId, version: target.version || 1 });
-    }
+    // Helper handles legacy-root inclusion authoritatively for both groups
+    const sourceMembers = await fetchGroupMembers(db, sourceGroupId);
+    const targetMembers = await fetchGroupMembers(db, targetGroupId);
 
     // Calculate max version in target group
     const maxTargetVersion = Math.max(...targetMembers.map((m) => m.version));
 
-    // Sort source members ascending by version
-    sourceMembers.sort((a, b) => a.version - b.version);
+    // sourceMembers already sorted ascending by version (helper guarantees this)
 
     // Atomic batch: reassign all source members to target group with new version numbers
     const batch = db.batch();
