@@ -179,9 +179,9 @@ export function CommentSidebar({
         >
           <MessageSquare className="w-3.5 h-3.5" />
           Comments
-          {comments.length > 0 && activeTab === 'comments' && (
+          {topLevel.length > 0 && activeTab === 'comments' && (
             <span className="ml-0.5 text-xs bg-frame-accent/20 text-frame-accent px-1.5 py-0.5 rounded-full">
-              {comments.length}
+              {topLevel.length}
             </span>
           )}
         </button>
