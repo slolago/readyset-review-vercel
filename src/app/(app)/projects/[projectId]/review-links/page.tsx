@@ -61,10 +61,11 @@ export default function ReviewLinksListPage() {
         const res = await fetch(`/api/review-links?projectId=${projectId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (!res.ok) throw new Error('Failed to load');
         const data = await res.json();
         setLinks(data.links ?? []);
-      } catch {
-        // silently fail — empty state will show
+      } catch (err) {
+        console.error('review-links list fetch failed:', err);
       } finally {
         setLoading(false);
       }

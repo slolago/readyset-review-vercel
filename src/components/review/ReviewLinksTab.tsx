@@ -28,6 +28,7 @@ export function ReviewLinksTab({ projectId }: ReviewLinksTabProps) {
       const res = await fetch(`/api/review-links?projectId=${projectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) throw new Error('Failed to load review links');
       const data = await res.json();
       setLinks(data.links ?? []);
     } catch {
