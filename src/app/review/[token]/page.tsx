@@ -51,6 +51,9 @@ export default function ReviewPage() {
   const [activeAnnotationCommentId, setActiveAnnotationCommentId] = useState<string | null>(null);
   const [displayShapes, setDisplayShapes] = useState<string | null>(null);
   const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
+  // In/out range — lifted from CommentSidebar so VideoPlayer can loop on the same values.
+  const [rangeIn, setRangeIn] = useState<number | undefined>(undefined);
+  const [rangeOut, setRangeOut] = useState<number | undefined>(undefined);
 
   const { user, loading: authLoading } = useAuth();
 
@@ -108,6 +111,8 @@ export default function ReviewPage() {
     setActiveAnnotationCommentId(null);
     setDisplayShapes(null);
     setSelectedCommentId(null);
+    setRangeIn(undefined);
+    setRangeOut(undefined);
   }, [selectedAsset?.id]);
 
   const fetchComments = useCallback(async (assetId: string) => {
@@ -344,6 +349,8 @@ export default function ReviewPage() {
                         ? ((selectedAsset as any).downloadUrl ?? (selectedAsset as any).signedUrl)
                         : undefined
                     }
+                    loopIn={rangeIn}
+                    loopOut={rangeOut}
                   />
                 ) : (
                   <ImageViewer
@@ -379,6 +386,10 @@ export default function ReviewPage() {
               onDeleteComment={async () => false}
               onSeek={handleSeek}
               onSelectComment={setSelectedCommentId}
+              inPoint={rangeIn}
+              outPoint={rangeOut}
+              onInPointChange={setRangeIn}
+              onOutPointChange={setRangeOut}
               readOnly={!data.reviewLink.allowComments}
               guestName={guestInfo?.name}
             />

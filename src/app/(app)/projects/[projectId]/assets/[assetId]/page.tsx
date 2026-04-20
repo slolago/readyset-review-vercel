@@ -47,6 +47,10 @@ export default function AssetViewerPage() {
   const [displayShapes, setDisplayShapes] = useState<string | null>(null);
   const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
 
+  // In/out range — lifted from CommentSidebar so VideoPlayer can loop on the same values.
+  const [rangeIn, setRangeIn] = useState<number | undefined>(undefined);
+  const [rangeOut, setRangeOut] = useState<number | undefined>(undefined);
+
   // Sync activeVersion when asset loads or URL changes
   useEffect(() => {
     if (asset) setActiveVersion(asset);
@@ -60,6 +64,8 @@ export default function AssetViewerPage() {
     setActiveAnnotationCommentId(null);
     setDisplayShapes(null);
     setSelectedCommentId(null);
+    setRangeIn(undefined);
+    setRangeOut(undefined);
   }, [displayAsset?.id]);
 
   const handleRequestAnnotation = useCallback(() => {
@@ -300,6 +306,8 @@ export default function AssetViewerPage() {
               onCommentClick={handleCommentClickFromTimeline}
               onAnnotationStarted={() => window.dispatchEvent(new CustomEvent('focus-comment-input'))}
               onRequestExport={() => setShowExportModal(true)}
+              loopIn={rangeIn}
+              loopOut={rangeOut}
             />
           ) : displayAsset ? (
             <ImageViewer
@@ -335,6 +343,10 @@ export default function AssetViewerPage() {
           onEditComment={editComment}
           onSeek={handleSeek}
           onSelectComment={setSelectedCommentId}
+          inPoint={rangeIn}
+          outPoint={rangeOut}
+          onInPointChange={setRangeIn}
+          onOutPointChange={setRangeOut}
         />
       </div>
 

@@ -30,6 +30,9 @@ interface VideoPlayerProps {
   downloadUrl?: string;
   /** When provided, an Export button appears in the player controls (internal viewers only). */
   onRequestExport?: () => void;
+  /** Range loop bounds lifted from the viewer parent (shared with CommentSidebar in/out). */
+  loopIn?: number;
+  loopOut?: number;
 }
 
 export interface VideoPlayerHandle {
@@ -48,6 +51,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   isAnnotationMode, displayShapes,
   onRequestAnnotation, onAnnotationCapture, onAnnotationCancel,
   onCommentClick, onAnnotationStarted, downloadUrl, onRequestExport,
+  loopIn, loopOut,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -82,6 +86,14 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const [activeSafeZone, setActiveSafeZone] = useState<string | null>(null);
   const [safeZoneOpacity, setSafeZoneOpacity] = useState(1);
   const [playerBg, setPlayerBg] = usePlayerBg();
+  // Per-session loop toggle. Resets when the viewed asset (or version) changes:
+  // the viewer parent passes a fresh `asset.id` per version because the page keys
+  // VideoPlayer on displayAsset.id, so this effect covers version switches too.
+  const [loop, setLoop] = useState(false);
+  useEffect(() => { setLoop(false); }, [asset.id]);
+  // Tracks whether the last rAF tick was inside [loopIn, loopOut]. Used to give
+  // a one-cycle grace when the user seeks outside the range during loop playback.
+  const insideRangeRef = useRef(true);
 
   useImperativeHandle(ref, () => ({
     seekTo: (time: number) => {

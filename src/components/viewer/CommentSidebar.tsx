@@ -25,6 +25,11 @@ interface CommentSidebarProps {
   onShowAnnotation: (commentId: string, shapes: string, timestamp?: number) => void;
   onHideAnnotation: () => void;
   onSelectComment?: (id: string) => void;
+  /** Controlled in/out range (lifted to viewer parent so VideoPlayer can loop on it). */
+  inPoint?: number;
+  outPoint?: number;
+  onInPointChange?: (v: number | undefined) => void;
+  onOutPointChange?: (v: number | undefined) => void;
   onAddComment: (
     data: {
       text: string;
@@ -54,6 +59,7 @@ export function CommentSidebar({
   activeAnnotationCommentId, selectedCommentId, onShowAnnotation, onHideAnnotation,
   onAddComment, onResolveComment, onDeleteComment, onEditComment, onSeek,
   onSelectComment,
+  inPoint: inPointProp, outPoint: outPointProp, onInPointChange, onOutPointChange,
   readOnly = false, guestName,
 }: CommentSidebarProps) {
   const { user } = useAuth();
@@ -62,8 +68,14 @@ export function CommentSidebar({
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'comments' | 'info'>('comments');
   const [submitting, setSubmitting] = useState(false);
-  const [inPoint, setInPoint] = useState<number | undefined>(undefined);
-  const [outPoint, setOutPoint] = useState<number | undefined>(undefined);
+  // Fallback local state when parent doesn't control the range (back-compat).
+  const [localInPoint, setLocalInPoint] = useState<number | undefined>(undefined);
+  const [localOutPoint, setLocalOutPoint] = useState<number | undefined>(undefined);
+  const isControlled = onInPointChange !== undefined && onOutPointChange !== undefined;
+  const inPoint = isControlled ? inPointProp : localInPoint;
+  const outPoint = isControlled ? outPointProp : localOutPoint;
+  const setInPoint = (v: number | undefined) => isControlled ? onInPointChange!(v) : setLocalInPoint(v);
+  const setOutPoint = (v: number | undefined) => isControlled ? onOutPointChange!(v) : setLocalOutPoint(v);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -79,9 +91,13 @@ export function CommentSidebar({
   // preference) and activeTab are intentionally preserved.
   useEffect(() => {
     setText('');
-    setInPoint(undefined);
-    setOutPoint(undefined);
     setReplyTo(null);
+    if (!isControlled) {
+      setLocalInPoint(undefined);
+      setLocalOutPoint(undefined);
+    }
+    // Parent controls the range in the controlled path — it resets on asset change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asset.id]);
 
   // Scroll to + highlight comment when selected via timeline marker
