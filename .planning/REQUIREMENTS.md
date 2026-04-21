@@ -1,36 +1,48 @@
 # Requirements: readyset-review
 
-**Defined:** 2026-04-21 (v2.2 — dashboard & annotation UX fixes)
+**Defined:** 2026-04-21 (v2.3 — app-wide performance polish)
 **Core Value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## v2.2 Requirements
+## v2.3 Requirements
 
-9 UI/UX bugs reported from hands-on use of the dashboard file browser, inline rename flow, and drawing-mode canvas. Grouped by UI surface.
+Synthesized from a 4-stream app-wide perf audit (pages, viewer/player, data layer, bundle). v2.1 fixed the dashboard specifically — v2.3 attacks every OTHER surface.
 
-### Context menu behavior
+### Viewer critical path (Phase 74)
 
-- [x] **CTX-02**: In grid view, a right-click context menu on an asset or folder stays inside the viewport regardless of position. When the natural anchor would push the menu off-screen (e.g. asset rows sitting below folder rows push the menu past the bottom edge), the menu flips up/left so every item remains clickable.
-- [x] **CTX-03**: Left-clicking anywhere outside an open context menu (empty space, another card, the sidebar, the header) closes the menu. Right-clicking on a different object replaces the open menu instead of stacking — only one context menu can be open at a time. Escape also closes.
-- [x] **CTX-04**: The right-click context menu exposes the full action set for the clicked target. The floating bottom selection bar may remain a curated shortcut of common actions, but the right-click menu is always the superset. When an asset + folder are both in the current selection, right-clicking either one opens the same menu (a consistent intersection, or the full set with target-appropriate actions disabled) — not two different menus depending on which card the cursor lands on.
-- [x] **CTX-05**: Right-clicking a folder opens the context menu and each menu item runs its action (Rename, Duplicate, Move, Copy, Delete, Share, etc.). Clicking an item never falls through to the folder's default double-click "open" behavior. The same menu that works via the three-dots button works via right-click.
+- [ ] **PERF-10**: `<video>` element uses `preload="metadata"` instead of `preload="auto"`. Eliminates 1–3s of full-file download before first paint on slow connections.
+- [ ] **PERF-11**: `<video>` element sets `poster={asset.thumbnailUrl}` so the first frame is visible instantly instead of a black box while metadata loads.
+- [ ] **PERF-12**: `fabric.js` is pre-warmed via a fire-and-forget dynamic import on viewer mount — the first click of "Annotate" no longer waits 200–400ms for the module to download + parse. Still code-split out of the initial bundle.
+- [ ] **PERF-13**: `VUMeter` + its `AudioContext` + `captureStream()` initialize on first play (or first interaction), not on viewer mount. No 20–50ms wasted on cold load for users who never enable audio metering.
+- [ ] **PERF-14**: Asset viewer page renders `<VideoPlayer>` as soon as `useAsset()` resolves — comments load in a Suspense boundary with a skeleton, in parallel. Video becomes interactive before the comment thread arrives. (Covers the asset viewer + review page flows.)
 
-### Grid / list affordances
+### Page loading + Server Components (Phase 75)
 
-- [x] **VIEW-01**: The list/grid view toggle is available and functional when the current folder contains only folders (no assets). Switching to list view renders folders as rows matching the existing list view for mixed contents.
-- [x] **VIEW-02**: On an asset card in grid view, the three-dots overflow button is reachable and clickable. Hovering the card shows the button; moving the cursor over the button keeps it visible and interactive. The real-time hover preview does not consume pointer events over the three-dots hit region (z-order, pointer-events, or an explicit hover-preview exclusion zone) so the button behaves identically to the three-dots on folder cards.
+- [ ] **PERF-15**: `loading.tsx` skeletons added for `/projects`, `/projects/[id]`, `/projects/[id]/folders/[folderId]`, `/projects/[id]/trash`, and `/admin`. The nested-folder Suspense `fallback={null}` is replaced with a skeleton. No blank white screens on drill-down.
+- [ ] **PERF-16**: 10 pure presentational components flip from Client to Server: `Avatar`, `Badge`, `Spinner`, `Breadcrumb`, `FileTypeCard`, `ReviewHeader`, `CommentTimestamp`, `ReviewStatusBadge`, `Button` (when rendered without `onClick`), `ProjectCard` shell. Each removes hydration cost for a frequently-rendered primitive.
+- [ ] **PERF-17**: Admin panel eagerly fetches both users AND projects tabs on mount (currently the Projects tab fetches on first click → ~500ms blank state). Layout uses `Promise.all` to fire both on the server component where possible.
 
-### Inline edit + mutations
+### Asset viewer restructure (Phase 76)
 
-- [x] **EDIT-01**: When renaming a folder or asset via the inline rename input, clicking anywhere outside the input (another card, empty space, sidebar, header) cancels the rename and reverts the name. Only the confirm affordance (check icon or Enter key) commits the new name. Only one rename input can be active across the whole file browser at any time — opening rename on object B while A is still editing cancels A first.
-- [x] **FS-01**: Selecting "Duplicate" on a folder (via three-dots or right-click) creates a real duplicate of the folder — same contents, new id, "(copy)" naming treatment or whatever rule the asset duplicate uses — and the duplicate appears in the current folder listing. The success toast only fires after the duplicate actually persists. Parity with asset duplicate behavior.
+- [ ] **PERF-18**: Heavy modals are `next/dynamic`-imported with `{ ssr: false }` + skeleton fallback — `ExportModal`, `AssetCompareModal`, `VersionStackModal`, `CreateReviewLinkModal`, `UserDrawer`. Each removes 15–30KB from the route that hosts the trigger until the modal actually opens.
+- [ ] **PERF-19**: `useComments.addComment` performs optimistic insert into local state; the POST response reconciles the temp ID. No more 100–300ms latency between submit and the comment appearing. Failure rolls back.
+- [ ] **PERF-20**: `AnnotationCanvas` only mounts its read-only overlay when `displayShapes` is non-empty AND non-`'[]'`. Fabric dispose runs in a dedicated `useEffect` cleanup so rapid comment-switching doesn't accumulate canvas instances. `ExportModal` defers its preview `<video>` `src` until the modal is actually open.
+- [ ] **PERF-21**: `VersionComparison` dual-player mount uses stable React keys (`compare-A-${assetA.id}` / `compare-B-${assetB.id}`) so toggling compare ↔ single cleanly unmounts and re-mounts each `AnnotationCanvas` + `VUMeter`. No dangling refs, no memory creep.
 
-### Drawing mode
+### Folder browser decomposition (Phase 77)
 
-- [x] **DRAW-01**: In drawing mode over an asset, selecting a single object (text, arrow, freehand vector) with the selection tool shows the Fabric.js bounding box with working scale + rotation handles. Dragging a corner handle scales the object; dragging the rotation handle rotates it. Single-object transforms match multi-object transforms — the controls are not movement-only.
+- [ ] **PERF-22**: `useProject(projectId)` fires `fetchProject()` + `fetchFolders(null)` in **parallel** via `Promise.all`, not serially. Eliminates the 200–400ms waterfall on every project root landing.
+- [ ] **PERF-23**: `FolderBrowser` monolith (2,291 LOC) is decomposed: `AssetGrid`, `AssetListView`, breadcrumb, and header extracted into `React.memo`-wrapped subcomponents so rename-state changes don't cascade through 200+ asset cards. `RenameProvider` scope narrows to wrap only the grid/list surface, not the breadcrumb + header.
+
+### Data layer + bundle + network (Phase 78)
+
+- [ ] **PERF-24**: `/api/admin/users`, `/api/admin/projects`, and `/api/review-links/all` use `limit(N)` + cursor-based pagination (`startAfter`). Admin surfaces no longer do unbounded scans; users with 500+ review links no longer OOM.
+- [ ] **PERF-25**: Firestore composite index added and deployed for comments `(assetId ASC, reviewLinkId ASC)` — kills the in-memory fallback in `src/app/api/comments/route.ts:83–103`. Review-link contents route uses `db.getAll(...)` instead of `Promise.all(.map(doc.get))` for N folder reads (N RPCs → 1). Asset signed-URL fan-out in `/api/review-links/[token]/contents` chunks by 20 instead of unbounded `Promise.all`. `/api/assets` GET adds `Cache-Control: public, max-age=300, stale-while-revalidate=600`.
+- [ ] **PERF-26**: Google Fonts move from `@import url('https://fonts.googleapis.com/...')` in `globals.css` to `next/font/google` in `src/app/layout.tsx` with `display: swap` — non-blocking font delivery. `next.config.mjs` gets `modularizeImports` for `lucide-react` so each route only bundles the icons it imports.
+- [ ] **PERF-27**: `<link rel="preconnect">` hints for `firestore.googleapis.com` + `storage.googleapis.com` in `src/app/layout.tsx`. Remaining raw `<img>` tags in `Sidebar.tsx`, `ReviewHeader.tsx`, and `AssetListView.tsx` (outside the v2.1 logo migration) migrate to `next/image`. `date-fns` duration formatting (the only use that's on a hot path) swaps to native `Intl.NumberFormat` or a ~100-line helper — cuts `date-fns` off the critical bundle entirely.
 
 ## Absorbed from prior milestones
 
-See `.planning/MILESTONES.md` — v1.7 through v2.1 shipped.
+See `.planning/MILESTONES.md` — v1.7 through v2.2 shipped.
 
 ## v3 / Future Requirements
 
@@ -60,21 +72,30 @@ See `.planning/MILESTONES.md` — v1.7 through v2.1 shipped.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTX-02 | Phase 70 | Complete |
-| CTX-03 | Phase 70 | Complete |
-| CTX-04 | Phase 70 | Complete |
-| CTX-05 | Phase 70 | Complete |
-| VIEW-01 | Phase 71 | Complete |
-| VIEW-02 | Phase 71 | Complete |
-| EDIT-01 | Phase 72 | Complete |
-| FS-01 | Phase 72 | Complete |
-| DRAW-01 | Phase 73 | Complete |
+| PERF-10 | Phase 74 | Pending |
+| PERF-11 | Phase 74 | Pending |
+| PERF-12 | Phase 74 | Pending |
+| PERF-13 | Phase 74 | Pending |
+| PERF-14 | Phase 74 | Pending |
+| PERF-15 | Phase 75 | Pending |
+| PERF-16 | Phase 75 | Pending |
+| PERF-17 | Phase 75 | Pending |
+| PERF-18 | Phase 76 | Pending |
+| PERF-19 | Phase 76 | Pending |
+| PERF-20 | Phase 76 | Pending |
+| PERF-21 | Phase 76 | Pending |
+| PERF-22 | Phase 77 | Pending |
+| PERF-23 | Phase 77 | Pending |
+| PERF-24 | Phase 78 | Pending |
+| PERF-25 | Phase 78 | Pending |
+| PERF-26 | Phase 78 | Pending |
+| PERF-27 | Phase 78 | Pending |
 
 **Coverage:**
-- v2.2 requirements: 9 total
-- Mapped to phases: 9 (100%)
+- v2.3 requirements: 18 total
+- Mapped to phases: 18 (100%)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-21*
-*Last updated: 2026-04-21 — v2.2 roadmap created, all 9 REQs mapped to phases 70–73*
+*Last updated: 2026-04-21 — synthesized from 4-stream app-wide perf audit*

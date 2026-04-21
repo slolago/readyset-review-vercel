@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.2
-milestone_name: Dashboard & Annotation UX Fixes
-status: shipped
-stopped_at: All 4 phases shipped; live UI verification pending
-last_updated: "2026-04-21T22:30:00.000Z"
+milestone: v2.3
+milestone_name: App-Wide Performance Polish
+status: roadmap_ready
+stopped_at: Roadmap created — 5 phases (74–78), ready for autonomous
+last_updated: "2026-04-21T22:45:00.000Z"
 last_activity: 2026-04-21
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
@@ -21,25 +21,45 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-21)
 
 **Core value:** Fast, accurate video review
-**Current focus:** v2.2 shipped; awaiting next milestone
+**Current focus:** v2.3 App-Wide Performance Polish — 18 REQs across 5 phases
 
 ## Current Position
 
-Phase: All v2.2 phases shipped (70, 71, 72, 73)
-Status: Milestone complete — 4/4 phases, 6/6 plans, 9/9 REQs
-Last activity: 2026-04-21 — Phase 73 executed; commits `787f7982..b62b64b3`
+Phase: 74 (viewer-critical-path) — not started
+Plan: —
+Status: Roadmap ready, awaiting `/gsd:autonomous`
+Last activity: 2026-04-21 — 4-stream audit synthesized into v2.3 roadmap
 
-Progress: [██████████] 100% (4/4 phases)
+## v2.3 Phase Structure
+
+| Phase | Name | Requirements |
+|-------|------|--------------|
+| 74 | viewer-critical-path | PERF-10, PERF-11, PERF-12, PERF-13, PERF-14 |
+| 75 | page-loading-and-server-components | PERF-15, PERF-16, PERF-17 |
+| 76 | asset-viewer-restructure | PERF-18, PERF-19, PERF-20, PERF-21 |
+| 77 | folder-browser-decomposition | PERF-22, PERF-23 |
+| 78 | data-layer-bundle-and-network | PERF-24, PERF-25, PERF-26, PERF-27 |
+
+**Coverage:** 18/18 requirements mapped.
+
+## Audit Findings (Source Material)
+
+Synthesized from 4 parallel explore agents:
+- **Pages audit** — 10 routes checked; 3 CRITICAL (asset viewer, review page, folder browser), 2 HIGH (admin, /projects), 3 MEDIUM
+- **Viewer audit** — 12 concrete bottlenecks, 3 CRITICAL on the video element itself (`preload="auto"`, no poster, sync Fabric load)
+- **Data-layer audit** — 10 findings beyond v2.0/v2.1's fixes; top offenders are admin pagination + missing comments index for review links
+- **Bundle audit** — Google Fonts blocking, no `modularizeImports`, no `next/dynamic` usage in the entire app, 10 components could flip to Server Components
 
 ## Accumulated Context
 
-### Key decisions (v2.2)
+### Key decisions (carried from prior milestones)
 
-- `ContextMenuProvider` holds one `{key, position, items} | null` state — two menus open at once is physically impossible
-- `buildFileBrowserActions('asset'|'folder'|'mixed', selection, ctx)` is the single source of truth for file-browser menu items — consumed by both the right-click menu and the three-dots Dropdown at 5 surfaces
-- `RenameController` context wraps `FolderBrowserInner`; all 4 rename-capable surfaces consume the controller so only one rename is active at a time
-- `deepCopyFolder` writes `deletedAt: null` on every `.set()` to match the Phase 63 composite-index filter contract (`where('deletedAt', '==', null)`)
-- Fabric.js objects must have BOTH `selectable = true` AND `evented = true` to expose scale/rotation handles on single selection
+- `ContextMenuProvider` + `useContextMenuController` singleton pattern (v2.2) — reuse for any new provider work
+- `RenameController` context scope (v2.2) — narrowing its wrap is PERF-23's job
+- `deepCopyFolder` requires `deletedAt: null` on every `.set()` to honor the Phase 63 composite-index query
+- `fetchAccessibleProjects` (v2.1) is the reusable access-check pattern for any admin/list route
+- `src/lib/signed-url-cache.ts::getOrCreateSignedUrl` is the single entry point for signed-URL regeneration
+- `<InlineRename />` primitive is the source of truth for inline editing
 
 ### Recently shipped
 
@@ -49,22 +69,20 @@ Progress: [██████████] 100% (4/4 phases)
 
 ### Operational state
 
-- No new operational follow-ups for v2.2 — all fixes are code-only, no schema migrations, no backfills needed
-- `/api/folders/copy` side-effect fix: existing duplicated folders created before this fix may still be invisible in listings (they lack `deletedAt: null`). One-off backfill script could be added if user reports ghost folders.
-- Firestore composite indexes deployed (v1.9 + v2.0 + v2.1 batches all live)
+- Firestore composite indexes deployed (v1.9 + v2.0 + v2.1 batches live); PERF-25 will add one more for comments `(assetId, reviewLinkId)`
 - collaboratorIds backfilled on 18 existing projects
-- Sprite-v2 generated on 64/74 videos; 7 orphaned + 3 Hobby-plan timeouts
+- Review-link passwords auto-migrate plaintext → bcrypt on first verify
 
 ### Pending Todos
 
-None — v2.2 shipped end-to-end. Awaiting next feature/fix input from user.
+None — starting v2.3 autonomous execution.
 
 ### Blockers/Concerns
 
-- All 4 v2.2 phases flagged `human_needed` — structural code is correct, but final success criteria involve live browser events (pointer hit-testing, viewport geometry, Firestore round-trips, Fabric.js control-handle drag). Concrete test items are in each phase's VERIFICATION.md under `human_verification`.
+- PERF-25 requires a `firebase deploy --only firestore:indexes` after code lands — same operational step pattern as v2.0 and v2.1. Non-blocking for code commits.
 
 ## Session Continuity
 
 Last session: 2026-04-21
-Stopped at: v2.2 shipped — 6 milestones shipped this sprint (v1.7, v1.8, v1.9, v2.0, v2.1, v2.2)
+Stopped at: v2.3 roadmap defined; entering autonomous mode
 Resume file: None

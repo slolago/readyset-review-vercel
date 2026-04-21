@@ -13,8 +13,15 @@
 - ✅ **v2.0 — Architecture Hardening** - Phases 60–66 (shipped 2026-04-20)
 - ✅ **v2.1 — Dashboard Performance** - Phases 67–69 (shipped 2026-04-21)
 - ✅ **v2.2 — Dashboard & Annotation UX Fixes** - Phases 70–73 (shipped 2026-04-21)
+- 🚧 **v2.3 — App-Wide Performance Polish** - Phases 74–78 (active)
 
 ## Phases
+
+- [ ] **Phase 74: viewer-critical-path** — `preload="metadata"`, thumbnail poster, Fabric pre-warm, VUMeter lazy init, comments Suspense split (PERF-10..14)
+- [ ] **Phase 75: page-loading-and-server-components** — `loading.tsx` skeletons, 10 Server Component conversions, admin tab eager-fetch (PERF-15..17)
+- [ ] **Phase 76: asset-viewer-restructure** — dynamic-import heavy modals, optimistic comment add, AnnotationCanvas read-only cleanup, VersionComparison key structure (PERF-18..21)
+- [ ] **Phase 77: folder-browser-decomposition** — parallelize `useProject`, split FolderBrowser monolith with memoized subcomponents + narrowed RenameProvider scope (PERF-22..23)
+- [ ] **Phase 78: data-layer-bundle-and-network** — admin pagination, comments composite index + review-link batching + Cache-Control, `next/font` + `modularizeImports` + preconnect + `<img>`→`<Image>` + date-fns cleanup (PERF-24..27)
 
 <details>
 <summary>✅ v1.2 — Feature Expansion (Phases 1–22) - SHIPPED 2026-04-07</summary>
@@ -333,6 +340,63 @@ See [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md) for full phase deta
 
 </details>
 
+## Phase Details
+
+### Phase 74: viewer-critical-path
+**Goal**: Asset viewer reaches interactive state dramatically faster — no more 1–3s black video box, no synchronous Fabric parse, no eager AudioContext, no 500ms spinner waiting for comments
+**Depends on**: Nothing (isolated to viewer component surface)
+**Requirements**: PERF-10, PERF-11, PERF-12, PERF-13, PERF-14
+**Success Criteria** (what must be TRUE):
+  1. Opening a video asset shows the thumbnail poster within ~100ms and plays on click without downloading the whole file upfront
+  2. Clicking "Annotate" for the first time opens the Fabric canvas in <50ms (library is pre-warmed in background on mount)
+  3. VUMeter + AudioContext do not instantiate until the user actually presses play
+  4. The video becomes interactive before comments finish loading — the sidebar renders a skeleton that resolves in parallel
+**Plans**: TBD
+
+### Phase 75: page-loading-and-server-components
+**Goal**: Every route shows a meaningful skeleton on load instead of blank space; 10 pure presentational components flip from Client to Server to cut hydration cost; admin fetches all tab data eagerly
+**Depends on**: Nothing (independent surfaces)
+**Requirements**: PERF-15, PERF-16, PERF-17
+**Success Criteria** (what must be TRUE):
+  1. `/projects`, `/projects/[id]`, `/projects/[id]/folders/[folderId]`, `/projects/[id]/trash`, and `/admin` all show a skeleton while fetching — no blank white frames
+  2. Avatar / Badge / Spinner / Breadcrumb / FileTypeCard / ReviewHeader / CommentTimestamp / ReviewStatusBadge / Button / ProjectCard shell render without `"use client"`
+  3. Clicking the Projects tab in admin is instant — data was already fetched on mount
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 76: asset-viewer-restructure
+**Goal**: Heavy modals dynamic-import on demand, comments feel instant via optimistic updates, annotation overlay lifecycle is clean, version compare toggles without dangling resources
+**Depends on**: Phase 74 (reuses Suspense scaffolding for modal fallbacks)
+**Requirements**: PERF-18, PERF-19, PERF-20, PERF-21
+**Success Criteria** (what must be TRUE):
+  1. `ExportModal`, `AssetCompareModal`, `VersionStackModal`, `CreateReviewLinkModal`, `UserDrawer` are not in the initial bundle of the routes that host their triggers — verified via `next build` output
+  2. Submitting a comment makes it appear in the thread within ~50ms (optimistic) and reconciles with the server response; failure rolls back
+  3. Switching between comments with annotations does not accumulate Fabric canvas instances (dispose runs on each unmount); read-only AnnotationCanvas does not mount when `displayShapes` is empty
+  4. Toggling compare ↔ single mode leaves no dangling VUMeter / AudioContext / Fabric refs (verified via React DevTools or key-driven remount)
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 77: folder-browser-decomposition
+**Goal**: Project root + folder drill-down stop paying the full waterfall cost; FolderBrowser stops cascading re-renders across 200+ cards on every rename state change
+**Depends on**: Nothing (independent of other phases)
+**Requirements**: PERF-22, PERF-23
+**Success Criteria** (what must be TRUE):
+  1. Project root loads project metadata + folders in parallel — both resolve within a single round trip window, not sequentially
+  2. `AssetGrid`, `AssetListView`, breadcrumb, and header are `React.memo`-wrapped and do not re-render when rename state changes in a sibling
+  3. `RenameProvider` wraps only the grid/list surface, not the header or breadcrumb
+**Plans**: TBD
+
+### Phase 78: data-layer-bundle-and-network
+**Goal**: Admin surfaces scale past 500+ records without freezing; remaining Firestore / network hotspots stop leaking latency; client bundle sheds font blocking, icon bloat, and unused library weight
+**Depends on**: Nothing (independent surfaces; can land before or after folder browser work)
+**Requirements**: PERF-24, PERF-25, PERF-26, PERF-27
+**Success Criteria** (what must be TRUE):
+  1. `/api/admin/users`, `/api/admin/projects`, `/api/review-links/all` all return a bounded page of results with a cursor for the next page
+  2. Comments queries for review links use the new composite index (no in-memory fallback warning in logs); review-link contents route uses `db.getAll` for folder batch and chunks asset fan-out by 20
+  3. Google Fonts load via `next/font` with `display: swap` (no `@import url()` in `globals.css`); `lucide-react` imports are split per-route via `modularizeImports` in `next.config.mjs`
+  4. `<link rel="preconnect">` for Firebase + GCS endpoints ships in the root layout; all raw `<img>` tags in Sidebar/ReviewHeader/AssetListView migrate to `next/image`; `date-fns` no longer appears on any hot-path route's critical bundle
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -388,3 +452,8 @@ See [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md) for full phase deta
 | 71. grid-view-affordances | v2.2 | 1/1 | Human-verify | 2026-04-21 |
 | 72. inline-edit-and-folder-duplicate | v2.2 | 2/2 | Human-verify | 2026-04-21 |
 | 73. drawing-mode-transforms | v2.2 | 1/1 | Human-verify | 2026-04-21 |
+| 74. viewer-critical-path | v2.3 | 0/? | Not started | - |
+| 75. page-loading-and-server-components | v2.3 | 0/? | Not started | - |
+| 76. asset-viewer-restructure | v2.3 | 0/? | Not started | - |
+| 77. folder-browser-decomposition | v2.3 | 0/? | Not started | - |
+| 78. data-layer-bundle-and-network | v2.3 | 0/? | Not started | - |

@@ -10,11 +10,18 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Latest Milestone: v2.2 Dashboard & Annotation UX Fixes (Shipped 2026-04-21)
+## Current Milestone: v2.3 App-Wide Performance Polish
 
-9 UI/UX bugs closed across 4 phases (70–73) — context menu behavior, grid/list affordances, inline rename lifecycle, folder duplicate, and drawing-mode transforms. See [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md).
+**Goal:** Synthesize findings from a 4-stream app-wide perf audit into a coordinated set of fixes targeting every slow surface outside the dashboard (which v2.1 already addressed). Asset viewer + review page + folder browser + admin + data-layer + bundle — everything gets tuned.
 
-**Prior milestone (v2.1 Dashboard Performance):** Shipped 2026-04-21 — see [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md).
+**Target features (18 REQs across 5 phases):**
+- Viewer critical path — video `preload="metadata"`, thumbnail poster, Fabric pre-warm, VUMeter/AudioContext lazy init, Suspense split for comments
+- Page loading + Server Components — add `loading.tsx` skeletons on routes that show blank space, convert pure presentational components (Avatar/Badge/Spinner/Breadcrumb/FileTypeCard/etc.) to Server Components, eager-fetch admin tabs
+- Asset viewer restructure — dynamic-import heavy modals (ExportModal, AssetCompareModal, VersionStackModal, CreateReviewLinkModal, UserDrawer), optimistic comment add, AnnotationCanvas read-only cleanup, VersionComparison key structure
+- Folder browser decomposition — parallelize `useProject` fetches, split 2,291-LOC FolderBrowser into memoized sub-components, narrow RenameProvider scope
+- Data layer + bundle + network — admin pagination (users + projects + review-links/all), comments composite index for `(assetId, reviewLinkId)`, review-link contents chunking + folder `getAll` batch reads, Cache-Control on `/api/assets`, `next/font` for fonts, `modularizeImports` for lucide-react, preconnect hints, raw `<img>` → `<Image>`, date-fns duration → native Intl
+
+**Prior milestones:** v2.1 Dashboard Performance (shipped 2026-04-21), v2.2 Dashboard & Annotation UX Fixes (shipped 2026-04-21). See [milestones/](milestones/).
 
 **Goal:** Attack the 5 systemic architectural patterns surfaced by a deep pipeline-lifecycle + unhappy-path audit. Move the platform from "stack of features that work in happy cases" to "production-grade system that degrades gracefully under format weirdness, concurrent mutations, stale metadata, and unbounded asset counts". No new user-facing features — this milestone rebuilds foundations.
 
@@ -143,4 +150,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-21 — v2.2 shipped*
+*Last updated: 2026-04-21 — v2.3 milestone started*
