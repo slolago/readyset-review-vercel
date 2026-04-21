@@ -471,7 +471,8 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
     try {
       const token = await getIdToken();
       const assetIds = Array.from(selectedIds).filter(id => assets.some(a => a.id === id));
-      await Promise.all(
+      // BLK-03: use allSettled so one failure doesn't abort the rest
+      const results = await Promise.allSettled(
         assetIds.map(id =>
           fetch(`/api/assets/${id}`, {
             method: 'PUT',
@@ -480,7 +481,25 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           })
         )
       );
-      toast.success(reviewStatus ? `Status set for ${assetIds.length} asset(s)` : `Status cleared for ${assetIds.length} asset(s)`);
+
+      let ok = 0;
+      let fail = 0;
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value.ok) {
+          ok++;
+        } else {
+          fail++;
+          const id = assetIds[i];
+          const name = assets.find((a) => a.id === id)?.name ?? id;
+          console.error('Status update failed for', name, id, r.status === 'rejected' ? r.reason : r.value.status);
+        }
+      });
+
+      if (fail === 0) {
+        toast.success(reviewStatus ? `Status set for ${ok} asset(s)` : `Status cleared for ${ok} asset(s)`);
+      } else {
+        toast.error(`${ok} updated, ${fail} failed`);
+      }
       refetchAssets();
     } catch {
       toast.error('Failed to update status');
