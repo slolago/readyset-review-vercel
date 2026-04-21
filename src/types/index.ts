@@ -58,6 +58,14 @@ export interface Asset {
   url: string;
   gcsPath: string;
   thumbnailUrl: string;
+  /** GCS path to the generated thumbnail. Set by upload/complete + upload/thumbnail. Absent until first thumbnail is produced. */
+  thumbnailGcsPath?: string;
+  /** Public URL for the sprite strip (trickplay). Set by upload/thumbnail + generate-sprite. */
+  spriteStripUrl?: string;
+  /** GCS path for the sprite strip. Set by upload/thumbnail + generate-sprite. */
+  spriteStripGcsPath?: string;
+  /** Free-form user-supplied description. Writable via PUT /api/assets/[assetId]. */
+  description?: string;
   duration?: number;
   width?: number;
   height?: number;
@@ -121,6 +129,8 @@ export interface Comment {
   resolved: boolean;
   parentId: string | null;
   createdAt: Timestamp;
+  /** Per-comment approve/reject/in-review state. Set by SEC-06 comment POST when link allows approvals. */
+  approvalStatus?: ReviewStatus;
 }
 
 export interface ReviewLink {
