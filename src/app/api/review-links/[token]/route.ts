@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
+import { generateDownloadSignedUrl } from '@/lib/gcs';
+import { getOrCreateSignedUrl } from '@/lib/signed-url-cache';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import {
   assertReviewLinkActive,
@@ -84,15 +85,60 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return false;
     };
 
-    // Attach signed URLs on a raw asset doc
+    // Signed-URL write-back buffer (Phase 62 CACHE-02). Filled by decorate(),
+    // flushed before each terminal NextResponse.json() below.
+    const pendingUrlWrites: Array<{ id: string; patch: Record<string, unknown> }> = [];
+    const flushUrlWrites = async () => {
+      if (pendingUrlWrites.length === 0) return;
+      try {
+        const batch = db.batch();
+        for (const { id, patch } of pendingUrlWrites) {
+          batch.update(db.collection('assets').doc(id), patch);
+        }
+        await batch.commit();
+      } catch (err) {
+        console.error('[GET /api/review-links/[token]] signed URL cache write-back failed', err);
+      } finally {
+        pendingUrlWrites.length = 0;
+      }
+    };
+
+    // Attach signed URLs on a raw asset doc. Uses the signed-URL cache so a
+    // 200-asset link no longer fires 600 GCS sign calls per guest page load.
     const decorate = async (asset: any) => {
+      const patch: Record<string, unknown> = {};
+
       if (asset.gcsPath) {
-        try { asset.signedUrl = await generateReadSignedUrl(asset.gcsPath); } catch (err) {
+        try {
+          const res = await getOrCreateSignedUrl({
+            gcsPath: asset.gcsPath,
+            cached: asset.signedUrl,
+            cachedExpiresAt: asset.signedUrlExpiresAt,
+            ttlMinutes: 120,
+          });
+          asset.signedUrl = res.url;
+          if (res.fresh) {
+            patch.signedUrl = res.url;
+            patch.signedUrlExpiresAt = res.expiresAt;
+          }
+        } catch (err) {
           console.error('[GET /api/review-links/[token]] sign asset URL failed', err);
         }
       }
       if (asset.thumbnailGcsPath) {
-        try { asset.thumbnailSignedUrl = await generateReadSignedUrl(asset.thumbnailGcsPath); } catch (err) {
+        try {
+          const res = await getOrCreateSignedUrl({
+            gcsPath: asset.thumbnailGcsPath,
+            cached: asset.thumbnailSignedUrl,
+            cachedExpiresAt: asset.thumbnailSignedUrlExpiresAt,
+            ttlMinutes: 720,
+          });
+          asset.thumbnailSignedUrl = res.url;
+          if (res.fresh) {
+            patch.thumbnailSignedUrl = res.url;
+            patch.thumbnailSignedUrlExpiresAt = res.expiresAt;
+          }
+        } catch (err) {
           console.error('[GET /api/review-links/[token]] sign thumbnail URL failed', err);
         }
       }
@@ -100,6 +146,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         try { asset.downloadUrl = await generateDownloadSignedUrl(asset.gcsPath, asset.name); } catch (err) {
           console.error('[GET /api/review-links/[token]] sign download URL failed', err);
         }
+      }
+
+      if (Object.keys(patch).length > 0) {
+        pendingUrlWrites.push({ id: asset.id, patch });
       }
       return asset;
     };
@@ -148,6 +198,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .filter((d) => !(d.data() as any).deletedAt)
         .map((d) => ({ id: d.id, ...d.data() }));
 
+      await flushUrlWrites();
       const safeLink = serializeReviewLink(link);
       return NextResponse.json({ reviewLink: safeLink, assets, folders, projectName, currentFolderId: effectiveFolderRequest });
     }
@@ -236,6 +287,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Remove password from response
+    await flushUrlWrites();
     const safeLink = serializeReviewLink(link);
 
     return NextResponse.json({
