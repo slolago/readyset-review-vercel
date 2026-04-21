@@ -45,6 +45,9 @@ export async function deepCopyFolder(
     parentId: dstParentId ?? null,
     path: dstRootPath,
     createdAt: Timestamp.now(),
+    // Phase 63 (IDX-03): explicit null so the composite-indexed listing query
+    // at GET /api/folders (deletedAt == null) surfaces this new folder.
+    deletedAt: null,
   });
 
   let folderCount = 1;
@@ -126,6 +129,7 @@ export async function deepCopyFolder(
               parentId: dstId,
               path: newSubPath,
               createdAt: Timestamp.now(),
+              deletedAt: null, // Phase 63 (IDX-03): see root-folder comment above.
             }),
           );
           childNodes.push({ srcId: sub.id, dstId: newSubRef.id, dstPath: newSubPath });
