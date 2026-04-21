@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { canAccessProject, canCreateReviewLink } from '@/lib/permissions';
 import type { Project } from '@/types';
-import { serializeReviewLink } from '@/lib/review-links';
+import { serializeReviewLink, hashPassword } from '@/lib/review-links';
 import { Timestamp } from 'firebase-admin/firestore';
 import { customAlphabet } from 'nanoid';
 
@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
       expiresAt: expiresAt ? Timestamp.fromDate(new Date(expiresAt)) : null,
       createdAt: Timestamp.now(),
     };
-    if (password) data.password = password;
+    // SEC-20: hash at write — store bcrypt hash, never plaintext
+    if (password && typeof password === 'string') data.password = hashPassword(password);
 
     await db.collection('reviewLinks').doc(token).set(data);
     const doc = await db.collection('reviewLinks').doc(token).get();

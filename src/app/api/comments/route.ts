@@ -9,6 +9,8 @@ import {
   ReviewLinkDenied,
 } from '@/lib/permissions';
 import type { Project, ReviewLink, User } from '@/types';
+import { hashPassword } from '@/lib/review-links';
+import { extractReviewPassword } from '@/lib/review-password';
 
 function mapReviewLinkDenied(e: ReviewLinkDenied): NextResponse {
   switch (e.reason) {
@@ -38,7 +40,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const assetId = searchParams.get('assetId');
   const reviewToken = searchParams.get('reviewToken');
-  const reviewPassword = searchParams.get('password') ?? undefined;
+  // SEC-21: prefer x-review-password header; fall back to ?password= (deprecated).
+  const reviewPassword = extractReviewPassword(request);
 
   if (!assetId) return NextResponse.json({ error: 'assetId required' }, { status: 400 });
 
@@ -57,7 +60,13 @@ export async function GET(request: NextRequest) {
       const link = { id: linkDoc.id, ...linkDoc.data() } as ReviewLink;
 
       try {
-        assertReviewLinkActive(link, { providedPassword: reviewPassword });
+        const res = assertReviewLinkActive(link, { providedPassword: reviewPassword });
+        // SEC-20: fire-and-forget plaintext→bcrypt rehash when needed.
+        if (res.needsPasswordUpgrade && reviewPassword) {
+          const rehashed = hashPassword(reviewPassword);
+          db.collection('reviewLinks').doc(linkDoc.id).update({ password: rehashed })
+            .catch((err) => console.warn('[comments GET] password rehash failed', err));
+        }
       } catch (e) {
         if (e instanceof ReviewLinkDenied) return mapReviewLinkDenied(e);
         throw e;
@@ -200,8 +209,19 @@ export async function POST(request: NextRequest) {
       if (link.projectId !== projectId) {
         return NextResponse.json({ error: 'Review link does not match project' }, { status: 403 });
       }
+      // SEC-21: body-provided password preferred; fall back to header for clients
+      // that send password via header (GET path keeps the same header).
+      const effectivePassword =
+        typeof password === 'string' && password
+          ? password
+          : request.headers.get('x-review-password') ?? undefined;
       try {
-        assertReviewLinkActive(link, { providedPassword: password });
+        const res = assertReviewLinkActive(link, { providedPassword: effectivePassword });
+        if (res.needsPasswordUpgrade && effectivePassword) {
+          const rehashed = hashPassword(effectivePassword);
+          db.collection('reviewLinks').doc(linkDoc.id).update({ password: rehashed })
+            .catch((err) => console.warn('[comments POST] password rehash failed', err));
+        }
         assertReviewLinkAllows(link, 'comment');
         if (approvalStatus !== undefined) {
           assertReviewLinkAllows(link, 'approve');

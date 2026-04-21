@@ -8,6 +8,7 @@
  */
 
 import type { User, Project, ReviewLink, Comment, Collaborator } from '@/types';
+import { verifyPassword } from '@/lib/review-links';
 
 // ---------- Platform role ----------
 
@@ -240,10 +241,15 @@ function tsToMillis(ts: unknown): number | null {
   return null;
 }
 
+/**
+ * Enforce expiry and password gates. Returns `{ needsPasswordUpgrade }` so the
+ * caller can fire-and-forget a re-hash when the stored password was legacy
+ * plaintext (SEC-20 transparent migration).
+ */
 export function assertReviewLinkActive(
   link: ReviewLink,
   opts: { providedPassword?: string }
-): void {
+): { needsPasswordUpgrade: boolean } {
   if (link.expiresAt) {
     const expires = tsToMillis(link.expiresAt);
     if (expires !== null && expires < Date.now()) {
@@ -251,10 +257,14 @@ export function assertReviewLinkActive(
     }
   }
   if (link.password) {
-    if (!opts.providedPassword || opts.providedPassword !== link.password) {
+    if (!opts.providedPassword) {
       throw new ReviewLinkDenied('password');
     }
+    const { ok, needsUpgrade } = verifyPassword(opts.providedPassword, link.password);
+    if (!ok) throw new ReviewLinkDenied('password');
+    return { needsPasswordUpgrade: needsUpgrade };
   }
+  return { needsPasswordUpgrade: false };
 }
 
 export function assertReviewLinkAllows(

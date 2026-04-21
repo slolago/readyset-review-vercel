@@ -11,7 +11,8 @@ import {
 } from '@/lib/permissions';
 import type { Project, ReviewLink } from '@/types';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { serializeReviewLink } from '@/lib/review-links';
+import { serializeReviewLink, hashPassword } from '@/lib/review-links';
+import { extractReviewPassword } from '@/lib/review-password';
 
 interface RouteParams {
   params: { token: string };
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const db = getAdminDb();
     const { searchParams } = new URL(request.url);
-    const providedPassword = searchParams.get('password');
+    // SEC-21: prefer x-review-password header; fall back to ?password= (deprecated).
+    const providedPassword = extractReviewPassword(request) ?? null;
     const requestedFolderId = searchParams.get('folder') || null;
 
     // Find the review link — use direct doc lookup (token IS the doc ID)
@@ -33,9 +35,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Expiry + password via shared assertion (maps to 410/401)
     try {
-      assertReviewLinkActive(link as ReviewLink, {
+      const res = assertReviewLinkActive(link as ReviewLink, {
         providedPassword: providedPassword ?? undefined,
       });
+      // SEC-20: transparent plaintext→bcrypt migration. Fire-and-forget so the
+      // guest request isn't blocked on the rewrite.
+      if (res.needsPasswordUpgrade && providedPassword) {
+        const rehashed = hashPassword(providedPassword);
+        db.collection('reviewLinks').doc(params.token).update({ password: rehashed })
+          .catch((err) => console.warn('[review-links] password rehash failed', err));
+      }
     } catch (e) {
       if (e instanceof ReviewLinkDenied) {
         if (e.reason === 'expired') {
@@ -353,7 +362,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (body.password === '' || body.password === null || body.password === undefined) {
         update.password = FieldValue.delete();
       } else if (typeof body.password === 'string') {
-        update.password = body.password;
+        // SEC-20: hash at write — never store plaintext
+        update.password = hashPassword(body.password);
       } else {
         return NextResponse.json({ error: 'password must be a string or null' }, { status: 400 });
       }

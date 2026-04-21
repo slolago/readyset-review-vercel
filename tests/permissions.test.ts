@@ -417,9 +417,25 @@ describe('permissions — assertReviewLinkActive', () => {
     }
   });
 
-  it('password match = no throw', () => {
+  it('password match (legacy plaintext) = no throw + needsPasswordUpgrade=true', () => {
     const link = makeReviewLink({ password: 'secret' });
-    expect(() => assertReviewLinkActive(link, { providedPassword: 'secret' })).not.toThrow();
+    const res = assertReviewLinkActive(link, { providedPassword: 'secret' });
+    expect(res.needsPasswordUpgrade).toBe(true);
+  });
+
+  it('password match (bcrypt hash) = no throw + needsPasswordUpgrade=false', async () => {
+    const { hashPassword } = await import('@/lib/review-links');
+    const link = makeReviewLink({ password: hashPassword('secret') });
+    const res = assertReviewLinkActive(link, { providedPassword: 'secret' });
+    expect(res.needsPasswordUpgrade).toBe(false);
+  });
+
+  it('password mismatch (bcrypt hash) throws', async () => {
+    const { hashPassword } = await import('@/lib/review-links');
+    const link = makeReviewLink({ password: hashPassword('secret') });
+    expect(() => assertReviewLinkActive(link, { providedPassword: 'wrong' })).toThrowError(
+      ReviewLinkDenied
+    );
   });
 });
 
