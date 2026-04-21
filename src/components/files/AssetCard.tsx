@@ -19,6 +19,7 @@ import type { Asset, Folder } from '@/types';
 import type { ReviewStatus } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { useContextMenuController } from '@/components/ui/ContextMenu';
+import { buildFileBrowserActions } from './fileBrowserActions';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { SmartCopyModal } from './SmartCopyModal';
 import { VersionStackModal } from './VersionStackModal';
@@ -353,6 +354,43 @@ export const AssetCard = memo(function AssetCard({
       uploadDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     : '';
 
+  // Unified action list (three-dots dropdown + right-click menu consume this).
+  const assetActions = buildFileBrowserActions('asset', {
+    onOpen: onClick,
+    onRename: handleRename,
+    onDuplicate: handleDuplicate,
+    onCopyTo: openCopyTo,
+    onMoveTo: () => onRequestMove?.(),
+    onUploadVersion: handleUploadVersion,
+    onStackOnto: () => setShowStackOntoModal(true),
+    onManageVersions: () => setShowVersionModal(true),
+    onDownload: handleDownload,
+    onGetLink: handleGetLink,
+    onCreateReviewLink,
+    onAddToReviewLink,
+    onSetStatus: handleSetStatus,
+    onDelete: handleDelete,
+    icons: {
+      open: <ExternalLink className="w-4 h-4" />,
+      rename: <Pencil className="w-4 h-4" />,
+      duplicate: <CopyPlus className="w-4 h-4" />,
+      copyTo: <Copy className="w-4 h-4" />,
+      moveTo: <MoveIcon className="w-4 h-4" />,
+      uploadVersion: <Upload className="w-4 h-4" />,
+      stackOnto: <Layers className="w-4 h-4" />,
+      manageVersions: <Layers className="w-4 h-4" />,
+      download: <Download className="w-4 h-4" />,
+      getLink: <LinkIcon className="w-4 h-4" />,
+      createReviewLink: <LinkIcon className="w-4 h-4" />,
+      addToReviewLink: <LinkIcon className="w-4 h-4" />,
+      approved: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+      needsRevision: <AlertCircle className="w-4 h-4 text-yellow-400" />,
+      inReview: <Clock className="w-4 h-4 text-blue-400" />,
+      clearStatus: <X className="w-4 h-4 text-frame-textMuted" />,
+      delete: <Trash2 className="w-4 h-4" />,
+    },
+  });
+
   return (
     <>
       <input ref={fileInputRef} type="file" accept={FILE_INPUT_ACCEPT} className="hidden" onChange={handleFileSelected} />
@@ -367,25 +405,7 @@ export const AssetCard = memo(function AssetCard({
       onContextMenu={isUploading || hideActions ? undefined : (e) => {
         e.preventDefault();
         e.stopPropagation();
-        ctxMenu.open(`asset-${asset.id}`, { x: e.clientX, y: e.clientY }, [
-          { label: 'Open', icon: <ExternalLink className="w-4 h-4" />, onClick: () => onClick?.() },
-          { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRename },
-          { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: handleDuplicate },
-          { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
-          { label: 'Move to', icon: <MoveIcon className="w-4 h-4" />, onClick: () => onRequestMove?.() },
-          { label: 'Upload new version', icon: <Upload className="w-4 h-4" />, onClick: handleUploadVersion },
-          { label: 'Stack onto\u2026', icon: <Layers className="w-4 h-4" />, onClick: () => setShowStackOntoModal(true) },
-          { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
-          { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
-          { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
-          ...(onCreateReviewLink ? [{ label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink }] : []),
-          ...(onAddToReviewLink ? [{ label: 'Add to review link\u2026', icon: <LinkIcon className="w-4 h-4" />, onClick: onAddToReviewLink }] : []),
-          { label: 'Approved', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
-          { label: 'Needs Revision', icon: <AlertCircle className="w-4 h-4 text-yellow-400" />, onClick: () => handleSetStatus('needs_revision') },
-          { label: 'In Review', icon: <Clock className="w-4 h-4 text-blue-400" />, onClick: () => handleSetStatus('in_review') },
-          { label: 'Clear status', icon: <X className="w-4 h-4 text-frame-textMuted" />, onClick: () => handleSetStatus(null) },
-          { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
-        ]);
+        ctxMenu.open(`asset-${asset.id}`, { x: e.clientX, y: e.clientY }, assetActions);
       }}
       className={[
         'group bg-frame-card rounded-xl overflow-hidden transition-all',
@@ -600,71 +620,13 @@ export const AssetCard = memo(function AssetCard({
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
               }
-              items={[
-                {
-                  label: 'Rename',
-                  icon: <Pencil className="w-4 h-4" />,
-                  onClick: handleRename,
-                },
-                {
-                  label: 'Copy to',
-                  icon: <Copy className="w-4 h-4" />,
-                  onClick: openCopyTo,
-                },
-                {
-                  label: 'Move to',
-                  icon: <MoveIcon className="w-4 h-4" />,
-                  onClick: () => onRequestMove?.(),
-                },
-                {
-                  label: 'Duplicate',
-                  icon: <CopyPlus className="w-4 h-4" />,
-                  onClick: handleDuplicate,
-                },
-                {
-                  label: 'Upload new version',
-                  icon: <Upload className="w-4 h-4" />,
-                  onClick: handleUploadVersion,
-                },
-                {
-                  label: 'Manage version stack',
-                  icon: <Layers className="w-4 h-4" />,
-                  onClick: () => setShowVersionModal(true),
-                },
-                {
-                  label: 'Download',
-                  icon: <Download className="w-4 h-4" />,
-                  onClick: handleDownload,
-                },
-                {
-                  label: 'Approved',
-                  icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
-                  onClick: () => handleSetStatus('approved'),
-                  divider: true,
-                },
-                {
-                  label: 'Needs Revision',
-                  icon: <AlertCircle className="w-4 h-4 text-yellow-400" />,
-                  onClick: () => handleSetStatus('needs_revision'),
-                },
-                {
-                  label: 'In Review',
-                  icon: <Clock className="w-4 h-4 text-blue-400" />,
-                  onClick: () => handleSetStatus('in_review'),
-                },
-                {
-                  label: 'Clear status',
-                  icon: <X className="w-4 h-4 text-frame-textMuted" />,
-                  onClick: () => handleSetStatus(null),
-                },
-                {
-                  label: 'Delete',
-                  icon: <Trash2 className="w-4 h-4" />,
-                  onClick: handleDelete,
-                  danger: true,
-                  divider: true,
-                },
-              ]}
+              items={assetActions.map((a) => ({
+                label: a.label,
+                icon: a.icon,
+                onClick: a.onClick,
+                danger: a.danger,
+                divider: a.dividerBefore,
+              }))}
             />
           </div>
         )}

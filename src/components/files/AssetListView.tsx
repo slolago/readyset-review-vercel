@@ -26,6 +26,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { InlineRename } from '@/components/ui/InlineRename';
 import { useUpload } from '@/hooks/useAssets';
 import { useContextMenuController } from '@/components/ui/ContextMenu';
+import { buildFileBrowserActions } from './fileBrowserActions';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { SmartCopyModal } from './SmartCopyModal';
 import { VersionStackModal } from './VersionStackModal';
@@ -405,6 +406,40 @@ function AssetListRow({
       ? asset.createdAt.toDate()
       : new Date((asset.createdAt as any)?._seconds * 1000 || Date.now());
 
+  // Unified action list for the row right-click menu. List view does not
+  // currently surface "Stack onto" (no folder siblings in scope here), so
+  // onStackOnto is omitted — a deliberate parity decision with the existing
+  // behavior.
+  const assetActions = buildFileBrowserActions('asset', {
+    onOpen: () => router.push(`/projects/${projectId}/assets/${asset.id}`),
+    onRename: () => setIsRenaming(true),
+    onDuplicate: handleDuplicate,
+    onCopyTo: openCopyTo,
+    onMoveTo: () => onRequestMove?.(asset.id),
+    onUploadVersion: handleUploadVersion,
+    onManageVersions: () => setShowVersionModal(true),
+    onDownload: handleDownload,
+    onGetLink: handleGetLink,
+    onSetStatus: handleSetStatus,
+    onDelete: handleDelete,
+    icons: {
+      open: <ExternalLink className="w-4 h-4" />,
+      rename: <Pencil className="w-4 h-4" />,
+      duplicate: <CopyPlus className="w-4 h-4" />,
+      copyTo: <Copy className="w-4 h-4" />,
+      moveTo: <Move className="w-4 h-4" />,
+      uploadVersion: <Upload className="w-4 h-4" />,
+      manageVersions: <Layers className="w-4 h-4" />,
+      download: <Download className="w-4 h-4" />,
+      getLink: <LinkIcon className="w-4 h-4" />,
+      approved: <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />,
+      needsRevision: <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />,
+      inReview: <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />,
+      clearStatus: <span className="w-2 h-2 rounded-full bg-white/20 inline-block" />,
+      delete: <Trash2 className="w-4 h-4" />,
+    },
+  });
+
   return (
     <>
       <input ref={fileInputRef} type="file" accept={FILE_INPUT_ACCEPT} className="hidden" onChange={handleFileSelected} />
@@ -416,22 +451,7 @@ function AssetListRow({
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          ctxMenu.open(`row-${asset.id}`, { x: e.clientX, y: e.clientY }, [
-            { label: 'Open', icon: <ExternalLink className="w-4 h-4" />, onClick: () => router.push(`/projects/${projectId}/assets/${asset.id}`) },
-            { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: () => setIsRenaming(true) },
-            { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: handleDuplicate },
-            { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
-            { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.(asset.id) },
-            { label: 'Upload new version', icon: <Upload className="w-4 h-4" />, onClick: handleUploadVersion },
-            { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
-            { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
-            { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
-            { label: 'Approved', icon: <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
-            { label: 'In Review', icon: <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />, onClick: () => handleSetStatus('in_review') },
-            { label: 'Needs Revision', icon: <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />, onClick: () => handleSetStatus('needs_revision') },
-            { label: 'Clear status', icon: <span className="w-2 h-2 rounded-full bg-white/20 inline-block" />, onClick: () => handleSetStatus(null) },
-            { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
-          ]);
+          ctxMenu.open(`row-${asset.id}`, { x: e.clientX, y: e.clientY }, assetActions);
         }}
         className={`cursor-pointer hover:bg-frame-card/50 transition-colors border-b border-frame-border/40 ${
           isSelected ? 'bg-frame-accent/10' : ''

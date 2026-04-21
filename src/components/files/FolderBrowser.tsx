@@ -47,6 +47,7 @@ import { FILE_INPUT_ACCEPT } from '@/lib/file-types';
 import { selectionStyle } from '@/lib/selectionStyle';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { ContextMenuProvider, useContextMenuController } from '@/components/ui/ContextMenu';
+import { buildFileBrowserActions } from './fileBrowserActions';
 import toast from 'react-hot-toast';
 import { CreateReviewLinkModal } from '@/components/review/CreateReviewLinkModal';
 import { AddToReviewLinkModal } from '@/components/review/AddToReviewLinkModal';
@@ -1554,6 +1555,10 @@ const FolderCard = React.memo(function FolderCard({
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [showFolderCopyModal, setShowFolderCopyModal] = useState(false);
+  // CTX-05 defense: suppress the synthetic click some platforms fire
+  // immediately after contextmenu+mouseup (Linux Chromium is the usual
+  // offender). Set in onContextMenu, checked + cleared in onClick.
+  const suppressNextClickRef = useRef(false);
   const [preview, setPreview] = useState<
     Array<{ id: string; type: string; name: string; thumbnailSignedUrl?: string; signedUrl?: string }>
   >([]);
@@ -1614,6 +1619,29 @@ const FolderCard = React.memo(function FolderCard({
     }
   };
 
+  // Unified action list (three-dots dropdown + right-click menu consume this).
+  // Optional handlers are passed through verbatim so the helper omits unsupported items.
+  const folderActions = buildFileBrowserActions('folder', {
+    onOpen: () => router.push(`/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`),
+    onRename: handleRenameFolder,
+    onDuplicate: onDuplicate,
+    onCopyTo: handleOpenCopyModal,
+    onMoveTo: onRequestMove ? () => onRequestMove() : undefined,
+    onCreateReviewLink: onCreateReviewLink,
+    onAddToReviewLink: onAddToReviewLink,
+    onDelete: onDelete,
+    icons: {
+      open: <FolderOpen className="w-4 h-4" />,
+      rename: <Pencil className="w-4 h-4" />,
+      duplicate: <CopyPlus className="w-4 h-4" />,
+      copyTo: <Copy className="w-4 h-4" />,
+      moveTo: <Move className="w-4 h-4" />,
+      createReviewLink: <LinkIcon className="w-4 h-4" />,
+      addToReviewLink: <LinkIcon className="w-4 h-4" />,
+      delete: <Trash2 className="w-4 h-4" />,
+    },
+  });
+
   return (
     <div
       data-selectable={folder.id}
@@ -1624,24 +1652,33 @@ const FolderCard = React.memo(function FolderCard({
         selectionStyle('folder', (isDropTarget || isSelected) ? 'selected' : 'idle'),
         isDropTarget ? 'ring-2 ring-frame-accent bg-frame-accent/10' : '',
       ].filter(Boolean).join(' ')}
+      onMouseDown={(e) => {
+        // Prevent any default mousedown-initiated activation on right-click
+        // before contextmenu fires — belt + suspenders for CTX-05.
+        if (e.button === 2) e.preventDefault();
+      }}
       onClick={(e) => {
         if (e.button !== 0) return; // ignore right-click
+        // Swallow the synthetic click some platforms dispatch right after
+        // contextmenu+mouseup (CTX-05).
+        if (suppressNextClickRef.current) {
+          suppressNextClickRef.current = false;
+          return;
+        }
+        // Don't navigate when the click target is inside a portaled menu
+        // that happens to land over the card (portal lives at body, so this
+        // guard is cheap insurance + intent documentation).
+        const target = e.target as HTMLElement;
+        if (target.closest('[role="menu"]')) return;
         const url = `/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`;
         router.push(url);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        ctxMenu.open(`folder-${folder.id}`, { x: e.clientX, y: e.clientY }, [
-          { label: 'Open', icon: <FolderOpen className="w-4 h-4" />, onClick: () => router.push(`/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`) },
-          { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRenameFolder },
-          { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: onDuplicate ?? (() => {}) },
-          { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: handleOpenCopyModal },
-          { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.() },
-          { label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink ?? (() => {}) },
-          { label: 'Add to review link…', icon: <LinkIcon className="w-4 h-4" />, onClick: onAddToReviewLink ?? (() => {}) },
-          { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true, dividerBefore: true },
-        ]);
+        suppressNextClickRef.current = true;
+        setTimeout(() => { suppressNextClickRef.current = false; }, 300);
+        ctxMenu.open(`folder-${folder.id}`, { x: e.clientX, y: e.clientY }, folderActions);
       }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -1720,15 +1757,13 @@ const FolderCard = React.memo(function FolderCard({
                 <MoreHorizontal className="w-4 h-4" />
               </button>
             }
-            items={[
-              { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRenameFolder },
-              { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: handleOpenCopyModal },
-              { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.() },
-              { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: onDuplicate ?? (() => {}) },
-              { label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink ?? (() => {}), divider: true },
-              { label: 'Add to review link…', icon: <LinkIcon className="w-4 h-4" />, onClick: onAddToReviewLink ?? (() => {}) },
-              { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true, divider: true },
-            ]}
+            items={folderActions.map((a) => ({
+              label: a.label,
+              icon: a.icon,
+              onClick: a.onClick,
+              danger: a.danger,
+              divider: a.dividerBefore,
+            }))}
           />
         </div>
 
