@@ -82,6 +82,10 @@ export async function POST(request: NextRequest) {
       // SDC-03: never carry soft-delete markers onto a fresh copy
       delete copyData.deletedAt;
       delete copyData.deletedBy;
+      // Phase 63 (IDX-01/02): fresh copy — explicit null for indexed queries,
+      // zero comments until the copy starts its own conversation.
+      copyData.deletedAt = null;
+      copyData.commentCount = 0;
       batch.set(newRef, copyData);
     }
     await batch.commit();

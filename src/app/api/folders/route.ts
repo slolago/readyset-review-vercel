@@ -78,6 +78,9 @@ export async function POST(request: NextRequest) {
       parentId: parentId || null,
       path,
       createdAt: Timestamp.now(),
+      // Phase 63 (IDX-03): explicit null so composite-indexed queries filtering on
+      // deletedAt surface this folder. Pre-Phase-63 folders may lack this field.
+      deletedAt: null,
     });
 
     const doc = await ref.get();

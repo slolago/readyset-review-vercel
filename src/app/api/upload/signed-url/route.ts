@@ -123,6 +123,12 @@ export async function POST(request: NextRequest) {
           version: versionNumber,
           versionGroupId,
           createdAt: Timestamp.now(),
+          // Phase 63 (IDX-02): denormalized comment count. Kept in sync via
+          // transactional increment/decrement in the comments POST/DELETE routes.
+          commentCount: 0,
+          // Phase 63 (IDX-01): explicit null so composite-indexed queries
+          // that filter on deletedAt discover this asset.
+          deletedAt: null,
         });
       });
     } catch (txErr: any) {

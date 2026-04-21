@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   canAccessProject,
   canPostComment,
@@ -242,10 +242,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const ref = await db.collection('comments').add(commentData);
-    const doc = await ref.get();
+    // Phase 63 (IDX-02): write the comment + bump `asset.commentCount` in a single
+    // transaction so the denormalized count cannot drift from the comments collection.
+    // Only top-level comments with non-empty text are counted (matches the list
+    // endpoint's visibility rule).
+    const newRef = db.collection('comments').doc();
+    const countsTowardTotal =
+      !commentData.parentId && typeof commentData.text === 'string' && commentData.text.trim().length > 0;
 
-    return NextResponse.json({ comment: { id: ref.id, ...doc.data() } }, { status: 201 });
+    await db.runTransaction(async (tx) => {
+      tx.set(newRef, commentData);
+      if (countsTowardTotal) {
+        tx.update(db.collection('assets').doc(assetId), {
+          commentCount: FieldValue.increment(1),
+        });
+      }
+    });
+
+    const doc = await newRef.get();
+    return NextResponse.json({ comment: { id: newRef.id, ...doc.data() } }, { status: 201 });
   } catch (error) {
     console.error('Comment create error:', error);
     return NextResponse.json({ error: 'Failed to create comment' }, { status: 500 });

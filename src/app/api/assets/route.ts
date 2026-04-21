@@ -62,27 +62,47 @@ export async function GET(request: NextRequest) {
     // Sort by earliest version's createdAt (stack creation time) descending
     grouped.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
 
-    // Fetch comment counts for all assets in one query, grouped by assetId.
-    // Rule: count only top-level (parentId == null) comments with non-empty
-    // text. Replies and empty-text docs are excluded so the grid badge matches
-    // what the user sees in the sidebar tab.
-    const commentCountMap = new Map<string, number>();
-    try {
-      const commentsSnap = await db.collection('comments').where('projectId', '==', projectId).get();
-      for (const doc of commentsSnap.docs) {
-        const d = doc.data() as any;
-        const aid = d.assetId as string | undefined;
-        if (!aid) continue;
-        if (d.parentId) continue;                           // skip replies
-        if (!d.text || !String(d.text).trim()) continue;    // skip empty/whitespace
-        commentCountMap.set(aid, (commentCountMap.get(aid) ?? 0) + 1);
+    // Phase 63 (IDX-02): read the denormalized `commentCount` from each asset
+    // doc instead of scanning the comments collection per list request.
+    // Pre-Phase-63 assets may lack the field — lazy-backfill on first read by
+    // counting visible top-level comments once, then write the value so future
+    // list reads hit the cached count directly.
+    const backfillWrites: Array<{ id: string; count: number }> = [];
+    await Promise.all(
+      grouped.map(async (asset: any) => {
+        if (typeof asset.commentCount === 'number') {
+          asset._commentCount = asset.commentCount;
+          return;
+        }
+        try {
+          const cSnap = await db.collection('comments').where('assetId', '==', asset.id).get();
+          let count = 0;
+          for (const doc of cSnap.docs) {
+            const d = doc.data() as any;
+            if (d.parentId) continue;                            // skip replies
+            if (!d.text || !String(d.text).trim()) continue;     // skip empty/whitespace
+            count++;
+          }
+          asset._commentCount = count;
+          asset.commentCount = count;
+          backfillWrites.push({ id: asset.id, count });
+        } catch (err) {
+          console.error('[GET /api/assets] comment-count backfill failed for', asset.id, err);
+          asset._commentCount = 0;
+        }
+      })
+    );
+    if (backfillWrites.length > 0) {
+      try {
+        const batch = db.batch();
+        for (const { id, count } of backfillWrites) {
+          batch.update(db.collection('assets').doc(id), { commentCount: count });
+        }
+        await batch.commit();
+      } catch (err) {
+        // Non-fatal: next request will try the backfill again.
+        console.error('[GET /api/assets] commentCount backfill write failed', err);
       }
-    } catch (err) {
-      // Non-fatal: comment counts stay 0 if query fails
-      console.error('[GET /api/assets] comment count query failed', err);
-    }
-    for (const asset of grouped) {
-      asset._commentCount = commentCountMap.get(asset.id) ?? 0;
     }
 
     // Generate/reuse signed read URLs for all ready assets.

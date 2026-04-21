@@ -36,8 +36,8 @@ export interface Folder {
   name: string;
   path: string[];
   createdAt: Timestamp;
-  /** Soft-delete marker — set by DELETE endpoint, cleared by restore. Absent on live docs. */
-  deletedAt?: Timestamp;
+  /** Soft-delete marker — set by DELETE endpoint, cleared by restore. null on live docs (Phase 63+) or absent (pre-Phase 63). */
+  deletedAt?: Timestamp | null;
   /** User id of the user who soft-deleted the item. Absent on live docs. */
   deletedBy?: string;
 }
@@ -75,10 +75,17 @@ export interface Asset {
   createdAt: Timestamp;
   _versionCount?: number;
   _commentCount?: number;
+  /**
+   * Phase 63 (IDX-02) — denormalized comment count. Incremented on comment create,
+   * decremented on delete (both inside a transaction with the comment mutation).
+   * Lazy-backfilled on first list-read if absent on pre-Phase-63 assets.
+   * Counts top-level comments with non-empty text only (matches the list endpoint rule).
+   */
+  commentCount?: number;
   frameRate?: number;
   reviewStatus?: ReviewStatus;
-  /** Soft-delete marker — set by DELETE endpoint, cleared by restore. Absent on live docs. */
-  deletedAt?: Timestamp;
+  /** Soft-delete marker — set by DELETE endpoint, cleared by restore. null on live docs (Phase 63+) or absent (pre-Phase 63). */
+  deletedAt?: Timestamp | null;
   /** User id of the user who soft-deleted the item. Absent on live docs. */
   deletedBy?: string;
 

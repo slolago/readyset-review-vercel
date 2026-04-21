@@ -43,8 +43,11 @@ export async function POST(request: NextRequest) {
       : canRestoreFolder(user, project);
     if (!allowed) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+    // Phase 63 (IDX-01): write `null` instead of deleting the field so the
+    // restored doc remains indexable by `(projectId, folderId, deletedAt)`
+    // composite queries. A missing field would exclude it from those queries.
     const updates: Record<string, unknown> = {
-      deletedAt: FieldValue.delete(),
+      deletedAt: null,
       deletedBy: FieldValue.delete(),
     };
 

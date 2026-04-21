@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import {
   canResolveComment,
   canEditComment,
@@ -24,6 +25,29 @@ async function loadProject(projectId: string): Promise<Project | null> {
   const doc = await db.collection('projects').doc(projectId).get();
   if (!doc.exists) return null;
   return { id: doc.id, ...doc.data() } as Project;
+}
+
+/**
+ * Phase 63 (IDX-02): delete a comment and decrement `asset.commentCount` in
+ * a single transaction so the denormalized counter never drifts. Only counts
+ * visible top-level comments (matches the comment POST rule and the list
+ * endpoint's visibility filter).
+ */
+async function deleteCommentWithCountTx(
+  db: ReturnType<typeof getAdminDb>,
+  commentId: string,
+  comment: Comment
+): Promise<void> {
+  const countedForTotal =
+    !comment.parentId && typeof comment.text === 'string' && comment.text.trim().length > 0;
+  await db.runTransaction(async (tx) => {
+    tx.delete(db.collection('comments').doc(commentId));
+    if (countedForTotal && comment.assetId) {
+      tx.update(db.collection('assets').doc(comment.assetId), {
+        commentCount: FieldValue.increment(-1),
+      });
+    }
+  });
 }
 
 async function loadReviewLinkByToken(token: string): Promise<ReviewLink | null> {
@@ -167,7 +191,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
 
-      await db.collection('comments').doc(params.commentId).delete();
+      // Phase 63 (IDX-02): delete comment + decrement asset.commentCount in a tx.
+      await deleteCommentWithCountTx(db, params.commentId, comment);
       return NextResponse.json({ success: true });
     } catch (err) {
       console.error('[comments/guest] delete error:', err);
@@ -190,7 +215,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await db.collection('comments').doc(params.commentId).delete();
+    // Phase 63 (IDX-02): delete comment + decrement asset.commentCount in a tx.
+    await deleteCommentWithCountTx(db, params.commentId, comment);
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Comment delete error:', err);
