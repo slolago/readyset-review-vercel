@@ -1,33 +1,36 @@
 # Requirements: readyset-review
 
-**Defined:** 2026-04-21 (v2.1 — dashboard performance)
+**Defined:** 2026-04-21 (v2.2 — dashboard & annotation UX fixes)
 **Core Value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## v2.1 Requirements
+## v2.2 Requirements
 
-Synthesized from a focused dashboard perf audit (2026-04-21). 3 critical + 3 medium + 3 low findings; grouped by the natural cleave the audit proposed.
+9 UI/UX bugs reported from hands-on use of the dashboard file browser, inline rename flow, and drawing-mode canvas. Grouped by UI surface.
 
-### Query Optimizations (Phase 67)
+### Context menu behavior
 
-- [x] **PERF-01**: `/api/stats` and `/api/projects` no longer do full `projects` collection scans. Denormalize collaborator UIDs to `Project.collaboratorIds: string[]`, add a Firestore composite index, and query with `where('collaboratorIds', 'array-contains', user.id)` in parallel with the existing `where('ownerId', '==', user.id)`. Includes a one-off backfill script that populates `collaboratorIds` on existing project docs from the existing `collaborators` array.
-- [x] **PERF-02**: `/api/stats` asset-count loop runs in parallel via `Promise.all(projectIds.map(...))` instead of sequential `await` inside a `for`. Expected impact: cuts the dominant latency component from O(N projects × 100ms) to O(1 round trip).
-- [x] **PERF-03**: `/api/stats` review-link chunked-`in` queries run in parallel. Same fix pattern as PERF-02, applied to the `where('projectId', 'in', chunk)` loop.
-- [x] **PERF-04**: `/api/stats` response includes `Cache-Control: private, max-age=0, s-maxage=60, stale-while-revalidate=300`. Dashboard remounts within 60s serve the cached stats instantly; stale revalidation happens asynchronously.
+- [ ] **CTX-02**: In grid view, a right-click context menu on an asset or folder stays inside the viewport regardless of position. When the natural anchor would push the menu off-screen (e.g. asset rows sitting below folder rows push the menu past the bottom edge), the menu flips up/left so every item remains clickable.
+- [ ] **CTX-03**: Left-clicking anywhere outside an open context menu (empty space, another card, the sidebar, the header) closes the menu. Right-clicking on a different object replaces the open menu instead of stacking — only one context menu can be open at a time. Escape also closes.
+- [ ] **CTX-04**: The right-click context menu exposes the full action set for the clicked target. The floating bottom selection bar may remain a curated shortcut of common actions, but the right-click menu is always the superset. When an asset + folder are both in the current selection, right-clicking either one opens the same menu (a consistent intersection, or the full set with target-appropriate actions disabled) — not two different menus depending on which card the cursor lands on.
+- [ ] **CTX-05**: Right-clicking a folder opens the context menu and each menu item runs its action (Rename, Duplicate, Move, Copy, Delete, Share, etc.). Clicking an item never falls through to the folder's default double-click "open" behavior. The same menu that works via the three-dots button works via right-click.
 
-### Client Init Waterfall (Phase 68)
+### Grid / list affordances
 
-- [ ] **PERF-05**: `AuthContext` short-circuits the `/api/auth/session` POST when the Firebase token's UID already matches a cached user object in `sessionStorage`. Cache invalidates on UID change, on explicit logout, and after a TTL. Returning users see the app shell paint without waiting on the session round-trip.
-- [ ] **PERF-06**: Project list fetching is lifted to a shared `ProjectsContext`. Dashboard (via `useProjects`) and sidebar (`ProjectTreeNav` via `useProjectTree`) both consume the same state from the context instead of independently fetching `/api/projects` on mount. Single fetch, single Firestore cost, no duplicate network call.
+- [ ] **VIEW-01**: The list/grid view toggle is available and functional when the current folder contains only folders (no assets). Switching to list view renders folders as rows matching the existing list view for mixed contents.
+- [ ] **VIEW-02**: On an asset card in grid view, the three-dots overflow button is reachable and clickable. Hovering the card shows the button; moving the cursor over the button keeps it visible and interactive. The real-time hover preview does not consume pointer events over the three-dots hit region (z-order, pointer-events, or an explicit hover-preview exclusion zone) so the button behaves identically to the three-dots on folder cards.
 
-### SSR + Micro-Optimizations (Phase 69)
+### Inline edit + mutations
 
-- [ ] **PERF-07**: Dashboard page is split — a thin Server Component wrapper pre-fetches stats server-side (using the session cookie) and passes them as props to the client shell. First paint includes the numbers; no waterfall for the stats card grid.
-- [ ] **PERF-08**: `getAuthenticatedUser` in `src/lib/auth-helpers.ts` caches the user doc lookup in a module-level `Map<uid, {user, exp}>` with a 30s TTL. Concurrent API calls on the same request share one Firestore read instead of re-reading per call.
-- [ ] **PERF-09**: Sidebar logo is migrated from the external `readyset.co` CDN to a local static asset under `/public/`. Removes a blocking external fetch on cold load and lets Next.js Image optimize it.
+- [ ] **EDIT-01**: When renaming a folder or asset via the inline rename input, clicking anywhere outside the input (another card, empty space, sidebar, header) cancels the rename and reverts the name. Only the confirm affordance (check icon or Enter key) commits the new name. Only one rename input can be active across the whole file browser at any time — opening rename on object B while A is still editing cancels A first.
+- [ ] **FS-01**: Selecting "Duplicate" on a folder (via three-dots or right-click) creates a real duplicate of the folder — same contents, new id, "(copy)" naming treatment or whatever rule the asset duplicate uses — and the duplicate appears in the current folder listing. The success toast only fires after the duplicate actually persists. Parity with asset duplicate behavior.
+
+### Drawing mode
+
+- [ ] **DRAW-01**: In drawing mode over an asset, selecting a single object (text, arrow, freehand vector) with the selection tool shows the Fabric.js bounding box with working scale + rotation handles. Dragging a corner handle scales the object; dragging the rotation handle rotates it. Single-object transforms match multi-object transforms — the controls are not movement-only.
 
 ## Absorbed from prior milestones
 
-See `.planning/MILESTONES.md` — v1.7 through v2.0 shipped.
+See `.planning/MILESTONES.md` — v1.7 through v2.1 shipped.
 
 ## v3 / Future Requirements
 
@@ -38,6 +41,7 @@ See `.planning/MILESTONES.md` — v1.7 through v2.0 shipped.
 - AI auto-tagging + semantic search
 - Bulk export
 - Real-time project list updates via Firestore onSnapshot (would obsolete PERF-06's fetch-and-cache approach)
+- Middleware-based session cookie infra (unlocks true SSR prefetch on dashboard Server Component from v2.1)
 
 ## Out of Scope
 
@@ -56,21 +60,21 @@ See `.planning/MILESTONES.md` — v1.7 through v2.0 shipped.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PERF-01 | Phase 67 | Complete |
-| PERF-02 | Phase 67 | Complete |
-| PERF-03 | Phase 67 | Complete |
-| PERF-04 | Phase 67 | Complete |
-| PERF-05 | Phase 68 | Pending |
-| PERF-06 | Phase 68 | Pending |
-| PERF-07 | Phase 69 | Pending |
-| PERF-08 | Phase 69 | Pending |
-| PERF-09 | Phase 69 | Pending |
+| CTX-02 | TBD | Pending |
+| CTX-03 | TBD | Pending |
+| CTX-04 | TBD | Pending |
+| CTX-05 | TBD | Pending |
+| VIEW-01 | TBD | Pending |
+| VIEW-02 | TBD | Pending |
+| EDIT-01 | TBD | Pending |
+| FS-01 | TBD | Pending |
+| DRAW-01 | TBD | Pending |
 
 **Coverage:**
-- v2.1 requirements: 9 total
-- Mapped to phases: 9 (100%)
-- Unmapped: 0
+- v2.2 requirements: 9 total
+- Mapped to phases: 0 (roadmap pending)
+- Unmapped: 9 (will be filled by roadmapper)
 
 ---
 *Requirements defined: 2026-04-21*
-*Last updated: 2026-04-21 — synthesized from dashboard perf audit*
+*Last updated: 2026-04-21 — v2.2 UI/UX bug fixes*
