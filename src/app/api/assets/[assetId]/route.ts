@@ -5,6 +5,7 @@ import { generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { fetchGroupMembers, resolveGroupId } from '@/lib/version-groups';
 import { canAccessProject, canRenameAsset, canDeleteAsset } from '@/lib/permissions';
+import { validateAssetRename } from '@/lib/names';
 import type { Project } from '@/types';
 
 interface RouteParams {
@@ -97,6 +98,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
+    }
+
+    // DC-03: rename collision check. Scopes siblings by projectId + folderId,
+    // excludes self and soft-deleted, case-insensitive.
+    if (typeof updates.name === 'string') {
+      const result = await validateAssetRename(db, params.assetId, updates.name);
+      if (!result.ok) {
+        if (result.code === 'EMPTY_NAME') {
+          return NextResponse.json({ error: 'Name cannot be empty', code: result.code }, { status: 400 });
+        }
+        return NextResponse.json(
+          { error: `An asset named "${updates.name.trim()}" already exists here`, code: result.code },
+          { status: 409 }
+        );
+      }
+      updates.name = result.trimmed;
     }
 
     // When moving (folderId changes), update ALL versions in the group atomically

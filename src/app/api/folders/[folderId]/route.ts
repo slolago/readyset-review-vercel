@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { canAccessProject, canRenameFolder, canDeleteFolder } from '@/lib/permissions';
+import { validateFolderRename } from '@/lib/names';
 import type { Project } from '@/types';
 
 interface RouteParams {
@@ -93,6 +94,24 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
     }
+
+    // DC-03: rename collision check. Scoped to siblings at the CURRENT parent —
+    // if parentId also changes in the same PUT, move-collision at the new parent
+    // is out of scope (no UI emits that combo today).
+    if (typeof updates.name === 'string') {
+      const result = await validateFolderRename(db, params.folderId, updates.name);
+      if (!result.ok) {
+        if (result.code === 'EMPTY_NAME') {
+          return NextResponse.json({ error: 'Name cannot be empty', code: result.code }, { status: 400 });
+        }
+        return NextResponse.json(
+          { error: `A folder named "${updates.name.trim()}" already exists here`, code: result.code },
+          { status: 409 }
+        );
+      }
+      updates.name = result.trimmed;
+    }
+
     // If parentId changes, verify the new parent belongs to the same project
     if (typeof updates.parentId === 'string') {
       const newParent = await db.collection('folders').doc(updates.parentId as string).get();
