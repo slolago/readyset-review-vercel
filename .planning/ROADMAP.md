@@ -11,6 +11,7 @@
 - ✅ **v1.8 — Asset Pipeline & Visual Polish** - Phases 49–53 (shipped 2026-04-20)
 - ✅ **v1.9 — Hardening & Consistency Audit** - Phases 54–59 (shipped 2026-04-20)
 - ✅ **v2.0 — Architecture Hardening** - Phases 60–66 (shipped 2026-04-20)
+- 🚧 **v2.1 — Dashboard Performance** - Phases 67–69 (in progress)
 
 ## Phases
 
@@ -313,6 +314,50 @@ See [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) for full phase deta
 
 </details>
 
+### 🚧 v2.1 — Dashboard Performance (In Progress)
+
+**Milestone goal:** Dashboard load feels instant (< 500ms first paint for returning users). Fix the 9 concrete bottlenecks surfaced by a focused perf audit — full collection scans in `/api/stats` and `/api/projects`, sequential N+1 Firestore loops, blocking auth gate, duplicate fetches between dashboard and sidebar, no cache headers, no SSR prefetch.
+
+**Phases (3):**
+
+- [ ] **Phase 67: dashboard-query-optimizations** — `collaboratorIds` array-contains queries, Promise.all on stats loops, stale-while-revalidate cache headers
+- [ ] **Phase 68: client-init-waterfall** — AuthContext session short-circuit, ProjectsContext to unify dashboard + sidebar project fetches
+- [ ] **Phase 69: ssr-and-micro-optimizations** — Server Component dashboard with pre-fetched stats, in-process user cache in auth-helpers, local logo asset
+
+#### Phase Details
+
+### Phase 67: dashboard-query-optimizations
+**Goal**: Eliminate the dominant Firestore latency on the dashboard — full collection scans, sequential per-project queries, and lack of response caching — without touching UI or auth.
+**Depends on**: Nothing
+**Requirements**: PERF-01, PERF-02, PERF-03, PERF-04
+**Success Criteria** (what must be TRUE):
+  1. `/api/projects` and `/api/stats` use `where('collaboratorIds', 'array-contains', user.id)` for collaborator access; no route does a plain `db.collection('projects').get()` to find user projects
+  2. `/api/stats` fires all per-project asset queries via `Promise.all`, not sequential `await` in a `for` loop
+  3. `/api/stats` fires all chunked review-link `in` queries via `Promise.all` likewise
+  4. `/api/stats` response includes `Cache-Control: private, max-age=0, s-maxage=60, stale-while-revalidate=300`; back-to-back dashboard loads within 60s don't re-query Firestore
+  5. One-off backfill script has populated `collaboratorIds` on every existing project doc that has a non-empty `collaborators` array
+  6. A new Firestore composite index on `projects(collaboratorIds ARRAY, <something deterministic>)` is committed to `firestore.indexes.json`
+
+### Phase 68: client-init-waterfall
+**Goal**: Remove the ~700ms-1s blank-spinner gate on every page load, and eliminate the duplicate project-list fetch between the dashboard and the sidebar.
+**Depends on**: Phase 67 (not strict, but stats caching helps measure the win)
+**Requirements**: PERF-05, PERF-06
+**Success Criteria**:
+  1. `AuthContext` does NOT POST `/api/auth/session` when the Firebase-auth UID matches a cached user object in `sessionStorage`; cache invalidates on UID change or explicit logout or a reasonable TTL
+  2. Returning users see the app shell (sidebar + dashboard placeholders) render within 200ms of page load — no blank-spinner gate
+  3. Dashboard page and `ProjectTreeNav` both consume project list data from a single `ProjectsContext`; only ONE `/api/projects` fetch fires per page load (verifiable via Network tab)
+  4. Project list is refetched/revalidated on project create/rename/delete — context is not stale
+
+### Phase 69: ssr-and-micro-optimizations
+**Goal**: Polish tier — remove the client-side waterfall for stats, cache user doc lookups within a single request lifecycle, eliminate the external-CDN logo request.
+**Depends on**: Phase 67 (SSR prefetch is cheaper when `/api/stats` is already fast)
+**Requirements**: PERF-07, PERF-08, PERF-09
+**Success Criteria**:
+  1. Dashboard page is split into a Server Component wrapper (server-side pre-fetches stats via an internal/shared helper) + a client shell that receives stats as initial props; numbers visible in initial HTML, no hydration waterfall
+  2. `getAuthenticatedUser` caches user doc reads in a module-level `Map<uid, {user, exp}>` with a 30s TTL; concurrent API calls sharing a UID do one Firestore read total
+  3. Sidebar logo is a local asset under `/public/` (not a `readyset.co` external URL); `unoptimized` prop dropped where applicable
+  4. Lighthouse run on `/dashboard` for a returning user shows LCP < 1s on mid-tier hardware
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -361,3 +406,6 @@ See [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) for full phase deta
 | 64. format-edge-cases | v2.0 | 1/1 | Complete | 2026-04-20 |
 | 65. security-and-upload-validation | v2.0 | 1/1 | Complete   | 2026-04-21 |
 | 66. dead-data-and-contracts | v2.0 | 1/1 | Complete   | 2026-04-21 |
+| 67. dashboard-query-optimizations | v2.1 | 0/? | Not started | - |
+| 68. client-init-waterfall | v2.1 | 0/? | Not started | - |
+| 69. ssr-and-micro-optimizations | v2.1 | 0/? | Not started | - |

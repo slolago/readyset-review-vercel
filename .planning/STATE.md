@@ -1,83 +1,72 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Architecture Hardening
-status: shipped
-stopped_at: All 7 phases shipped; operational follow-ups documented in MILESTONES.md
-last_updated: "2026-04-21T14:50:00.000Z"
+milestone: v2.1
+milestone_name: Dashboard Performance
+status: active
+stopped_at: Roadmap created — Phase 67 (dashboard-query-optimizations) ready
+last_updated: "2026-04-21T16:00:00.000Z"
 last_activity: 2026-04-21
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-20)
+See: .planning/PROJECT.md (updated 2026-04-21)
 
 **Core value:** Fast, accurate video review
-**Current focus:** v2.0 shipped; awaiting next milestone
+**Current focus:** v2.1 Dashboard Performance — Phase 67 next
 
 ## Current Position
 
-Phase: All v2.0 phases shipped
-Status: Milestone v2.0 complete (7/7 phases, 31 REQs)
-Last activity: 2026-04-21 — Phase 66 executed; commits 2c6e4ad5..0540a76d pushed
+Phase: Phase 67 (dashboard-query-optimizations) — Not started
+Status: Roadmap created from focused dashboard perf audit
+Last activity: 2026-04-21 — v2.1 scaffolded (3 phases, 9 reqs)
 
-Progress: [██████████] 100% (7/7 phases)
-
-## Performance Metrics
-
-- v1.3: 9 plans / 6 phases
-- v1.4: 7 plans / 5 phases
-- v1.5: 9 plans / 8 phases
-- v1.6: archived, never executed
-- v1.7: 6 plans / 6 phases (shipped)
-- v1.8: 5 plans / 5 phases (shipped)
-- v1.9: 6 plans / 6 phases (shipped)
-- v2.0: 7 plans / 7 phases (shipped)
+Progress: [░░░░░░░░░░] 0% (0/3 phases)
 
 ## Accumulated Context
 
-### Key decisions
+### v2.1 audit source
 
-- Permissions: src/lib/permissions.ts single source of truth
-- Soft-delete via deletedAt/deletedBy, filtered via composite index (v2.0)
-- ffmpeg Hobby caps: 60s / 2048 MB; clip cap 45s
-- v2.0: Firestore `jobs` collection tracks probe/sprite/thumbnail/export lifecycle
-- v2.0: signed URLs cached on asset doc with 30-min expiry check
-- v2.0: all stack mutations run under runTransaction (no more batch races)
-- v2.0: review-link passwords stored as bcrypt hash with transparent legacy migration
-- v2.0: composite indexes on assets(projectId,folderId,deletedAt), folders(projectId,parentId,deletedAt), comments(assetId,parentId,createdAt)
-- v2.0: commentCount denormalized onto asset doc
-- v2.0: folder ancestry via Folder.path[] (O(1), no parentId walk)
+Single focused perf audit (2026-04-21), dashboard load path only. 3 critical + 3 medium + 3 low findings, cleanly split into 3 phases per auditor's recommendation.
+
+**Top 3 criticals:**
+1. `/api/stats` and `/api/projects` both do full `projects` collection scans to find collaborator access (Firestore read cost proportional to total project count in the system, not user's own)
+2. `/api/stats` asset-count loop is sequential `await` inside `for` — 15 projects = 15 serial Firestore RPCs = 750ms-2.5s
+3. `AuthContext` blocks all rendering with `/api/auth/session` POST on every page load — 700ms-1s blank spinner gate
+
+### Decisions
+
+- Phase 67 needs a `Project.collaboratorIds: string[]` denormalized field (maintained alongside `collaborators: Collaborator[]`) to enable `array-contains` queries
+- Phase 67 ships a one-off backfill script (pattern established in v2.0 for `deletedAt:null` and `commentCount`)
+- Phase 68 uses `sessionStorage` for cached user object (not localStorage — tab-scoped, auto-clears on close)
+- Phase 69 Server Component wrapper shares the stats-fetch helper with `/api/stats` (no logic duplication)
+- Firebase Admin SDK composite index on `projects(collaboratorIds ARRAY, name ASC)` or similar — define during Phase 67 planning
 
 ### Recently shipped
 
-- v2.0 Architecture Hardening (7 phases, shipped 2026-04-21)
-
-### Operational follow-ups
-
-- **Deploy Firestore indexes:** `firebase deploy --only firestore:indexes` — routes gracefully fallback with console.warn until deployed
-- **Review-link passwords:** self-migrate plaintext → bcrypt on first verify (transparent)
-- **No migration scripts needed** for any other v2.0 change
+- v2.0 Architecture Hardening (shipped 2026-04-21)
+- Sprite generation architectural rewrite (single-pass fps+tile filter, commit b6366552)
+- Deletedat backfill post-v2.0 (commit e84aaaa9)
 
 ### Pending Todos
 
-None — v2.0 shipped. Deep audit backlog fully addressed.
+None — ready for /gsd:plan-phase 67.
 
 ### Blockers/Concerns
 
-- IDX-02 commentCount on pre-v2.0 assets will be 0 until a comment mutation increments it. No backfill script shipped (pragma — assets with 0 comments aren't visually broken, badge just hidden on old docs until next mutation).
-- First verify of a plaintext review-link password is slightly slower (one extra write to hash it) — transparent to the user.
+- PERF-01 requires backfill + Firestore composite index deploy; without the index deploy the `array-contains` query fails with FAILED_PRECONDITION. Script needs `firebase deploy --only firestore:indexes` as a follow-up (same pattern as v2.0).
+- PERF-07 Server Component migration may require refactoring how the client dashboard component receives data (prop-drill vs context vs SWR seed) — needs thought in planning.
 
 ## Session Continuity
 
 Last session: 2026-04-21
-Stopped at: v2.0 shipped end-to-end — 4 milestones shipped in this multi-session sprint (v1.7 → v2.0)
+Stopped at: v2.1 scaffolded, ready for /gsd:plan-phase 67 or /gsd:autonomous
 Resume file: None

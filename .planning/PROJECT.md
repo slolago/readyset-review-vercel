@@ -10,7 +10,16 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Current Milestone: v2.0 Architecture Hardening
+## Current Milestone: v2.1 Dashboard Performance
+
+**Goal:** Make the dashboard load feel instant. Deep perf audit surfaced 9 concrete bottlenecks — a 700ms-1s auth gate, two full `projects` collection scans, an N+1 sequential loop in `/api/stats` per project, duplicate `/api/projects` fetches between dashboard + sidebar, no cache headers, no SSR prefetch. Target: first meaningful paint < 500ms for returning users.
+
+**Target features:**
+- Query optimizations in `/api/stats` + `/api/projects` — replace full collection scans with indexed `array-contains` queries, parallelize sequential loops, add `stale-while-revalidate` cache headers
+- Client init waterfall fix — short-circuit `/api/auth/session` POST when the Firebase token uid already matches the cached user; unify project list fetching between dashboard and sidebar via `ProjectsContext` so it loads once
+- SSR + micro-optimizations — dashboard as a Server Component that pre-fetches stats server-side (streams into HTML), in-process TTL cache on `getAuthenticatedUser`, move external-CDN logo to local static asset
+
+**Prior milestone (v2.0 Architecture Hardening):** Shipped 2026-04-21 — see [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md).
 
 **Goal:** Attack the 5 systemic architectural patterns surfaced by a deep pipeline-lifecycle + unhappy-path audit. Move the platform from "stack of features that work in happy cases" to "production-grade system that degrades gracefully under format weirdness, concurrent mutations, stale metadata, and unbounded asset counts". No new user-facing features — this milestone rebuilds foundations.
 

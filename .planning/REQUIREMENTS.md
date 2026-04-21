@@ -1,83 +1,50 @@
 # Requirements: readyset-review
 
-**Defined:** 2026-04-20 (v2.0 — architecture hardening)
+**Defined:** 2026-04-21 (v2.1 — dashboard performance)
 **Core Value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## v2.0 Requirements
+## v2.1 Requirements
 
-Synthesized from a deep pipeline-lifecycle + unhappy-path audit (2026-04-20). 5 critical + 8 medium + 4 low findings; grouped by systemic pattern, not by individual bug.
+Synthesized from a focused dashboard perf audit (2026-04-21). 3 critical + 3 medium + 3 low findings; grouped by the natural cleave the audit proposed.
 
-### Pipeline Observability (Phase 60)
+### Query Optimizations (Phase 67)
 
-- [ ] **OBS-01**: Processing jobs (probe, sprite, thumbnail, export) write a status doc to Firestore (`queued | running | ready | failed`, with `startedAt`, `completedAt`, `error?`) consumed by a minimal UI indicator on the asset card / viewer — no more silent `.catch(console.warn)`
-- [ ] **OBS-02**: Failed jobs can be retried from the UI; retry re-uses the same job doc id so history is preserved; 3-strike auto-abandon with a visible error state
-- [ ] **OBS-03**: Duplicate sprite triggers are eliminated — the client-side fire-and-forget in `useUpload` is removed; the server-side fire from `upload/complete` is the only trigger
-- [ ] **OBS-04**: `upload/complete` verifies the GCS object exists AND is non-zero before marking `status: 'ready'`; cancelled / zero-byte / MIME-spoofed uploads never land as ready assets
-- [ ] **OBS-05**: Sprite generation waits for probe to complete (or reads fresh `asset.duration` from Firestore at sprite time) so the frame-spacing uses the authoritative duration rather than the client-provided fallback
+- [ ] **PERF-01**: `/api/stats` and `/api/projects` no longer do full `projects` collection scans. Denormalize collaborator UIDs to `Project.collaboratorIds: string[]`, add a Firestore composite index, and query with `where('collaboratorIds', 'array-contains', user.id)` in parallel with the existing `where('ownerId', '==', user.id)`. Includes a one-off backfill script that populates `collaboratorIds` on existing project docs from the existing `collaborators` array.
+- [ ] **PERF-02**: `/api/stats` asset-count loop runs in parallel via `Promise.all(projectIds.map(...))` instead of sequential `await` inside a `for`. Expected impact: cuts the dominant latency component from O(N projects × 100ms) to O(1 round trip).
+- [ ] **PERF-03**: `/api/stats` review-link chunked-`in` queries run in parallel. Same fix pattern as PERF-02, applied to the `where('projectId', 'in', chunk)` loop.
+- [ ] **PERF-04**: `/api/stats` response includes `Cache-Control: private, max-age=0, s-maxage=60, stale-while-revalidate=300`. Dashboard remounts within 60s serve the cached stats instantly; stale revalidation happens asynchronously.
 
-### Transactional Mutations (Phase 61)
+### Client Init Waterfall (Phase 68)
 
-- [ ] **TXN-01**: `POST /api/assets/merge-version` wraps fetchGroupMembers + batch.commit in `db.runTransaction()` so two concurrent merges cannot produce duplicate `version` values in the same stack
-- [ ] **TXN-02**: `POST /api/assets/unstack-version` uses the same transaction guarantee — no partial unstacks under concurrent access
-- [ ] **TXN-03**: `POST /api/upload/signed-url` auto-versioning (name-collision → next version) runs under a transaction scoped to (projectId, folderId, filename); concurrent uploads of the same filename produce a correct stack, not two V1s
-- [ ] **TXN-04**: `POST /api/upload/signed-url` validates that the target `folderId` (if set) is live — if it's been soft-deleted, reject with 404 so the asset is never orphaned
+- [ ] **PERF-05**: `AuthContext` short-circuits the `/api/auth/session` POST when the Firebase token's UID already matches a cached user object in `sessionStorage`. Cache invalidates on UID change, on explicit logout, and after a TTL. Returning users see the app shell paint without waiting on the session round-trip.
+- [ ] **PERF-06**: Project list fetching is lifted to a shared `ProjectsContext`. Dashboard (via `useProjects`) and sidebar (`ProjectTreeNav` via `useProjectTree`) both consume the same state from the context instead of independently fetching `/api/projects` on mount. Single fetch, single Firestore cost, no duplicate network call.
 
-### Signed URL Caching (Phase 62)
+### SSR + Micro-Optimizations (Phase 69)
 
-- [ ] **CACHE-01**: Assets store `signedUrl` + `signedUrlExpiresAt` alongside `gcsPath`; list endpoints return the cached value when expiry is >30 min away, regenerate otherwise
-- [ ] **CACHE-02**: Review-link resolution (`GET /api/review-links/[token]`) uses the same cache — a 200-asset review link no longer fires 200 GCS signing calls per guest page load
-- [ ] **CACHE-03**: Thumbnail signed URLs + sprite signed URLs use the same caching strategy (same fields, longer TTL since they're less sensitive)
+- [ ] **PERF-07**: Dashboard page is split — a thin Server Component wrapper pre-fetches stats server-side (using the session cookie) and passes them as props to the client shell. First paint includes the numbers; no waterfall for the stats card grid.
+- [ ] **PERF-08**: `getAuthenticatedUser` in `src/lib/auth-helpers.ts` caches the user doc lookup in a module-level `Map<uid, {user, exp}>` with a 30s TTL. Concurrent API calls on the same request share one Firestore read instead of re-reading per call.
+- [ ] **PERF-09**: Sidebar logo is migrated from the external `readyset.co` CDN to a local static asset under `/public/`. Removes a blocking external fetch on cold load and lets Next.js Image optimize it.
 
-### Firestore Indexes & Denormalization (Phase 63)
+## Absorbed from prior milestones
 
-- [ ] **IDX-01**: Composite Firestore index on `assets(projectId, folderId, deletedAt)` deployed; `GET /api/assets` queries directly on (projectId, folderId) and excludes deleted assets in the same query — no more post-fetch in-memory filter
-- [ ] **IDX-02**: Comment count denormalized onto asset doc as `commentCount: number`; incremented on create, decremented on delete (via Firestore transaction); `GET /api/assets` no longer scans the `comments` collection per list request
-- [ ] **IDX-03**: Composite index on `folders(projectId, parentId)`; folder tree fetches use a single indexed query per level
-- [ ] **IDX-04**: Trash page + permanent-delete use a dedicated index on `(projectId, deletedAt)` and no longer walk every collection in memory
-
-### Format Edge Cases (Phase 64)
-
-- [x] **FMT-01**: Export route handles HEVC / AV1 / VP9 / ProRes source correctly — copy path's container check stops rejecting `.mov` with H.264, and the re-encode path works for any input codec
-- [x] **FMT-02**: Export jobs have a `startedAt` timestamp and a server-side sweeper that marks jobs stuck in `encoding` past a watermark as `failed` so SIGKILL'd functions don't leave permanent ghost jobs
-- [x] **FMT-03**: `src/lib/image-metadata.ts` falls back to ffprobe (already resolved server-side) when `image-size` returns null for HEIC / AVIF / HDR image inputs
-- [x] **FMT-04**: Sprite frame spacing adapts to very short (<3s) and very long (>1h) videos — no frame-timestamp clustering at boundaries; limits to 20 frames always but distributes intelligently
-
-### Security & Upload Validation (Phase 65)
-
-- [x] **SEC-20**: Review-link passwords are hashed with bcrypt (cost ≥10) at write; verification uses `bcrypt.compare`; existing plaintext passwords are migrated on first read (hash-then-replace)
-- [x] **SEC-21**: Guests submit the password in the POST body (not the `?password=` query string) so CDN and Vercel access logs stop capturing passwords; legacy query-param path removed after a migration window
-- [x] **SEC-22**: `POST /api/upload/complete` calls `bucket.file(gcsPath).getMetadata()` and rejects if the object is missing or size is 0 — zero-byte, cancelled, and MIME-spoofed uploads never become `ready` assets
-- [x] **SEC-23**: Server-side MIME validation on upload/complete — the Content-Type GCS reports must be on the accepted-MIME allow-list (from `src/lib/file-types.ts`); mismatch rejects with a clear error
-
-### Dead Data & Contract Cleanup (Phase 66)
-
-- [x] **CLN-01**: `Asset.url` (the stored public GCS URL) is removed from the type and stops being written by `signed-url`; the bucket is private and the field was never consumed
-- [x] **CLN-02**: Sprite URL naming unified — `spriteSignedUrl` is used consistently in both the list endpoint and the on-demand generate-sprite response; AssetCard reads one field name
-- [x] **CLN-03**: `UploadCompleteRequest` type in `src/types/index.ts` is expanded to include `frameRate?`, `thumbnailGcsPath?`, any other field the server actually reads
-- [x] **CLN-04**: `useAssets.fetchAssets` uses `AbortController` — folder switches no longer race stale responses over fresh ones
-- [x] **CLN-05**: `folderIsAccessible` in review-link resolution uses the `Folder.path[]` array (already stored) for O(1) ancestry check instead of walking `parentId` with N sequential Firestore reads
-- [x] **CLN-06**: Sprite generation cleanup: `writer.destroy()` + `reader.cancel()` awaited before the finally block tries `fs.rm`; no EBUSY on /tmp cleanup under size-exceeded path
-- [x] **CLN-07**: Client-side pre-upload dimensions are tagged `probed: false` until probe completes; features that read dims (export, sprite, viewer aspect) can surface "pending probe" UX in the 10-30s window where client values might be stale
-
-## Absorbed from audits
-
-All 37 REQs trace to concrete audit findings — 18 specific (C-1 to L-4) + 5 systemic patterns synthesized into architectural phases.
+See `.planning/MILESTONES.md` — v1.7 through v2.0 shipped.
 
 ## v3 / Future Requirements
 
-- Server-side cron: Trash auto-purge, stale job sweeper, orphan GCS object cleanup
-- Presence indicators (who is reviewing a link right now)
-- Notifications (email + in-app) for new comments / approval changes
-- Per-asset watermarks for client-facing review links
+- Server-side cron: Trash auto-purge, stale job sweeper, orphan GCS object cleanup, orphan asset cleanup (projectId references deleted project)
+- Presence indicators
+- Notifications (in-app + email)
+- Per-asset watermarks
 - AI auto-tagging + semantic search
-- Bulk export (folder → zip of N trims)
+- Bulk export
+- Real-time project list updates via Firestore onSnapshot (would obsolete PERF-06's fetch-and-cache approach)
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
 | Real-time collaborative cursors | Async workflow |
-| Offline mode | Real-time collaboration is core |
+| Offline mode | Real-time collab is core |
 | Mobile app | Web-first |
 | SSO beyond Google | Single entry point |
 | Custom role matrices | Fixed role set |
@@ -89,43 +56,21 @@ All 37 REQs trace to concrete audit findings — 18 specific (C-1 to L-4) + 5 sy
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OBS-01 | Phase 60 | Pending |
-| OBS-02 | Phase 60 | Pending |
-| OBS-03 | Phase 60 | Pending |
-| OBS-04 | Phase 60 | Pending |
-| OBS-05 | Phase 60 | Pending |
-| TXN-01 | Phase 61 | Pending |
-| TXN-02 | Phase 61 | Pending |
-| TXN-03 | Phase 61 | Pending |
-| TXN-04 | Phase 61 | Pending |
-| CACHE-01 | Phase 62 | Pending |
-| CACHE-02 | Phase 62 | Pending |
-| CACHE-03 | Phase 62 | Pending |
-| IDX-01 | Phase 63 | Pending |
-| IDX-02 | Phase 63 | Pending |
-| IDX-03 | Phase 63 | Pending |
-| IDX-04 | Phase 63 | Pending |
-| FMT-01 | Phase 64 | Complete |
-| FMT-02 | Phase 64 | Complete |
-| FMT-03 | Phase 64 | Complete |
-| FMT-04 | Phase 64 | Complete |
-| SEC-20 | Phase 65 | Complete |
-| SEC-21 | Phase 65 | Complete |
-| SEC-22 | Phase 65 | Complete |
-| SEC-23 | Phase 65 | Complete |
-| CLN-01 | Phase 66 | Complete |
-| CLN-02 | Phase 66 | Complete |
-| CLN-03 | Phase 66 | Complete |
-| CLN-04 | Phase 66 | Complete |
-| CLN-05 | Phase 66 | Complete |
-| CLN-06 | Phase 66 | Complete |
-| CLN-07 | Phase 66 | Complete |
+| PERF-01 | Phase 67 | Pending |
+| PERF-02 | Phase 67 | Pending |
+| PERF-03 | Phase 67 | Pending |
+| PERF-04 | Phase 67 | Pending |
+| PERF-05 | Phase 68 | Pending |
+| PERF-06 | Phase 68 | Pending |
+| PERF-07 | Phase 69 | Pending |
+| PERF-08 | Phase 69 | Pending |
+| PERF-09 | Phase 69 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 31 total
-- Mapped to phases: 31 (100%)
+- v2.1 requirements: 9 total
+- Mapped to phases: 9 (100%)
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-04-20*
-*Last updated: 2026-04-20 — traceability populated at roadmap creation*
+*Requirements defined: 2026-04-21*
+*Last updated: 2026-04-21 — synthesized from dashboard perf audit*
