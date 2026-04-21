@@ -1,5 +1,24 @@
 # Milestones
 
+## v1.8 Asset Pipeline & Visual Polish (Shipped: 2026-04-20)
+
+**Phases completed:** 5 phases (49–53), 5 plans
+**Timeline:** Single-session sprint, 2026-04-20
+
+**Key accomplishments:**
+
+1. **Phase 49 — metadata-accuracy:** ffprobe skipped on images; new `src/lib/image-metadata.ts` extracts dimensions server-side via `image-size` (pure-JS, no native binary). Client reads dimensions from original File via `createImageBitmap` (not downscaled canvas). New `src/lib/format-date.ts` with `coerceToDate` handles every Timestamp shape (`toDate`, `{seconds,nanoseconds}`, `{_seconds,_nanoseconds}`, ISO, epoch, Date) — kills "Invalid Date". FileInfoPanel renders image-appropriate section (no Container/Pixel format/Color space/Bitrate rows for images). 13 new unit tests.
+2. **Phase 50 — review-links-repair:** Root cause: `/api/review-links` did `.where(projectId).orderBy(createdAt)` which required an undeployed composite Firestore index → 500 → clients read "empty". Dropped `orderBy`, sort in memory (mirrors `/api/review-links/all`). Added `!res.ok` guards on 3 client callsites so empty state no longer masquerades as success on error. 9 new integration tests.
+3. **Phase 51 — file-type-expansion:** New `src/lib/file-types.ts` centralizes MIME/extension classification for 6 types: video, image, document (PDF/HTML), archive (ZIP), font (TTF/OTF/WOFF/WOFF2), design (AI/PSD/AEP/FIG). Server + client allow-lists unified. New viewer components: `DocumentViewer` (PDF iframe), `HtmlViewer` (sandboxed iframe), `FileTypeCard` (icon + metadata + Download). Grid + list cards render type-specific icons instead of broken thumbnails.
+4. **Phase 52 — trash-and-recovery:** Soft-delete for assets and folders (`deletedAt`, `deletedBy` fields). DELETE endpoints now soft-delete; hard-delete logic extracted to `src/lib/trash.ts` (`hardDeleteAsset`, `hardDeleteFolder`). New endpoints: GET `/api/projects/[id]/trash`, POST `/api/trash/restore`, POST `/api/trash/permanent-delete`, POST `/api/trash/empty`. New `/projects/[id]/trash` page with Restore + Permanent Delete + Empty Trash. Restore auto-reparents to project root when the original folder is also deleted.
+5. **Phase 53 — visual-polish:** 8 VIS bugs closed — Modal `overflow-hidden` clips the accent line; new `/api/folders/[id]/preview-assets` + tiled folder thumbnails; rename uses Check/X confirm buttons (blur no longer commits); `object-contain` preserves asset aspect ratio; single version count badge; ReviewStatusBadge wrapped in `bg-black/50 backdrop-blur-sm` for contrast on bright thumbs; CreateReviewLinkModal contents contained; Dashboard Quick Actions have distinct hrefs (`/projects`, `/projects?action=upload`, `/projects?action=invite`).
+
+**New files (high-value):** `src/lib/image-metadata.ts`, `src/lib/format-date.ts`, `src/lib/file-types.ts`, `src/lib/trash.ts`, `src/components/viewer/{DocumentViewer,HtmlViewer,FileTypeCard}.tsx`, 4 trash API routes, 1 folder preview-assets API route, 1 trash UI page.
+
+**Pending:** Human verification walkthroughs for phases 49, 51, 52, 53 (automated tests all green; live uploads required for end-to-end checks).
+
+---
+
 ## v1.7 Review UX & Access Rewrite (Shipped: 2026-04-20)
 
 **Phases completed:** 6 phases (43–48), 6 plans, 66 commits
