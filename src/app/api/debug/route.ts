@@ -1,27 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth-helpers';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const admin = await requireAdmin(request);
+  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const result: Record<string, string> = {};
 
-  // 1. Check env vars presence
-  result.hasServiceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON ? 'YES' : 'NO';
-  result.hasAdminKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY ? 'YES' : 'NO';
-  result.projectId = process.env.FIREBASE_ADMIN_PROJECT_ID ?? 'MISSING';
-
-  // 2. Try parsing the JSON
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    try {
-      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-      result.jsonParsed = 'OK';
-      result.jsonProjectId = sa.project_id ?? 'missing';
-      result.jsonClientEmail = sa.client_email ? sa.client_email.slice(0, 20) + '...' : 'missing';
-      result.jsonKeyStart = sa.private_key ? sa.private_key.slice(0, 30) : 'missing';
-    } catch (e) {
-      result.jsonParsed = 'FAILED: ' + (e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  // 3. Try initializing Firebase Admin
+  // Firebase Admin initialization healthcheck
   try {
     const { getAdminAuth } = await import('@/lib/firebase-admin');
     getAdminAuth();
@@ -30,10 +16,12 @@ export async function GET() {
     result.firebaseInit = 'FAILED: ' + (e instanceof Error ? e.message : String(e));
   }
 
-  // 4. Add build info
+  // Runtime identifiers (safe for admin eyes)
   result.gitCommit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? 'local';
   result.deploymentUrl = process.env.VERCEL_URL ?? 'local';
   result.nodeEnv = process.env.NODE_ENV ?? 'unknown';
+  result.nodeVersion = process.version;
+  result.admin = admin.email;
 
   return NextResponse.json(result);
 }
