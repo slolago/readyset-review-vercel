@@ -355,8 +355,11 @@ Plans:
   1. The list/grid toggle is available and functional in a folder that contains only folders (no assets) — switching to list view renders folders as rows matching the list view used for mixed contents
   2. Hovering an asset card in grid view reveals the three-dots overflow button, and moving the cursor onto the button keeps it visible and clickable — the real-time hover preview does not consume pointer events over the button's hit region
   3. The three-dots button on asset cards behaves identically to the three-dots button on folder cards — same opening behavior, same menu, same reachability
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans:
+- [ ] 71-01-PLAN.md — Folders-as-rows in list view + raise asset three-dots above hover preview (VIEW-01, VIEW-02)
 
 ### Phase 72: inline-edit-and-folder-duplicate
 **Goal**: Inline rename is safely cancellable and never double-mounted, and folder Duplicate actually persists a copy instead of firing a success toast on nothing
