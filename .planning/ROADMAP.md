@@ -340,8 +340,12 @@ See [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) for full phase deta
   2. Left-clicking anywhere outside an open context menu (empty space, another card, sidebar, header) closes it; pressing Escape closes it; right-clicking a different target replaces the menu instead of stacking a second one
   3. Right-clicking on a folder, or on an asset, or on a mixed selection of both opens one menu (not two different menus depending on which card the cursor landed on); the right-click menu is a superset of the floating bottom selection bar
   4. Right-clicking a folder opens the context menu (never the folder's double-click "open" behavior), and each item — Rename, Duplicate, Move, Copy, Delete, Share — runs its action when clicked; the same menu content that appears from the three-dots button appears from right-click
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 2 plans
+
+Plans:
+- [ ] 70-01-PLAN.md — ContextMenu viewport flip + singleton controller (CTX-02, CTX-03)
+- [ ] 70-02-PLAN.md — Unified action-list helper + FolderCard click-through hardening (CTX-04, CTX-05)
+
 
 ### Phase 71: grid-view-affordances
 **Goal**: Grid and list view work in all folder states, and the per-card three-dots button on assets is reliably clickable without the hover preview stealing the pointer
