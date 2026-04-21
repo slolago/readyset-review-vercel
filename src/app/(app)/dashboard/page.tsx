@@ -60,7 +60,7 @@ export default function DashboardPage() {
 
       <div className="p-8 max-w-6xl mx-auto">
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
           <StatCard
             icon={<FolderOpen className="w-5 h-5" />}
             label="Projects"
@@ -72,6 +72,12 @@ export default function DashboardPage() {
             label="Assets"
             value={statsLoading ? null : (stats?.assetCount.toString() ?? '—')}
             color="blue"
+          />
+          <StatCard
+            icon={<Users className="w-5 h-5" />}
+            label="Collaborators"
+            value={statsLoading ? null : ((stats?.collaboratorCount ?? 0).toString())}
+            color="pink"
           />
           <StatCard
             icon={<LinkIcon className="w-5 h-5" />}
@@ -187,6 +193,7 @@ function StatCard({
     blue: { icon: 'text-blue-400 bg-blue-400/10', glow: 'shadow-blue-400/10' },
     green: { icon: 'text-frame-green bg-frame-green/10', glow: 'shadow-frame-green/10' },
     orange: { icon: 'text-orange-400 bg-orange-400/10', glow: 'shadow-orange-400/10' },
+    pink: { icon: 'text-pink-400 bg-pink-400/10', glow: 'shadow-pink-400/10' },
   };
   const c = colorMap[color];
   const inner = (
