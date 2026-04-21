@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { generateReadSignedUrl } from '@/lib/gcs';
 import { canProbeAsset } from '@/lib/permissions';
+import { createJob, updateJob } from '@/lib/jobs';
 import type { Project } from '@/types';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
@@ -154,6 +156,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const user = await getAuthenticatedUser(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  let jobId: string | null = null;
   try {
     const db = getAdminDb();
     const snap = await db.collection('assets').doc(params.assetId).get();
@@ -167,22 +170,45 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Create observability job. Retry requests reuse the existing job id so
+    // the history + attempt counter are preserved.
+    const retryJobId = request.headers.get('x-retry-job-id');
+    jobId = retryJobId ?? await createJob({
+      type: 'probe',
+      assetId: params.assetId,
+      projectId: asset.projectId,
+      userId: user.id,
+    });
+    await updateJob(jobId, {
+      status: 'running',
+      startedAt: FieldValue.serverTimestamp() as any,
+      error: FieldValue.delete() as any,
+    });
+
     // Images (and any future non-video types) do not go through ffprobe.
     // Mark probed:true so the UI's "Probe" affordance in FileInfoPanel hides.
     if (asset.type !== 'video') {
       await db.collection('assets').doc(params.assetId).update({ probed: true });
+      await updateJob(jobId, { status: 'ready', completedAt: FieldValue.serverTimestamp() as any });
       return NextResponse.json({ success: true, skipped: 'non-video asset', updates: { probed: true } });
     }
 
-    if (!asset.gcsPath) return NextResponse.json({ error: 'Asset has no file' }, { status: 400 });
+    if (!asset.gcsPath) {
+      await updateJob(jobId, { status: 'failed', error: 'Asset has no file' });
+      return NextResponse.json({ error: 'Asset has no file' }, { status: 400 });
+    }
 
     const ffprobePath = await resolveFfprobe();
-    if (!ffprobePath) return NextResponse.json({ error: 'ffprobe not available' }, { status: 500 });
+    if (!ffprobePath) {
+      await updateJob(jobId, { status: 'failed', error: 'ffprobe not available' });
+      return NextResponse.json({ error: 'ffprobe not available' }, { status: 500 });
+    }
 
     const signedUrl = await generateReadSignedUrl(asset.gcsPath, 60);
     const { code, stdout, stderr } = await runFfprobe(ffprobePath, signedUrl);
     if (code !== 0) {
       console.error('ffprobe failed', { code, stderr });
+      await updateJob(jobId, { status: 'failed', error: `ffprobe failed: ${stderr.slice(0, 300)}` });
       return NextResponse.json({ error: 'ffprobe failed', stderr: stderr.slice(0, 500) }, { status: 500 });
     }
 
@@ -191,6 +217,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       data = JSON.parse(stdout);
     } catch (err) {
       console.error('[POST /api/assets/[assetId]/probe] parse ffprobe output failed', err);
+      await updateJob(jobId, { status: 'failed', error: 'Could not parse ffprobe output' });
       return NextResponse.json({ error: 'Could not parse ffprobe output' }, { status: 500 });
     }
 
@@ -257,9 +284,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     await db.collection('assets').doc(params.assetId).update(updates);
+    await updateJob(jobId, { status: 'ready', completedAt: FieldValue.serverTimestamp() as any });
     return NextResponse.json({ success: true, updates });
   } catch (err) {
     console.error('probe error:', err);
+    if (jobId) {
+      try {
+        await updateJob(jobId, { status: 'failed', error: (err as Error).message });
+      } catch (writeErr) {
+        console.error('[probe] failed to mark job failed', writeErr);
+      }
+    }
     return NextResponse.json({ error: 'Probe failed' }, { status: 500 });
   }
 }
