@@ -30,13 +30,16 @@ import {
 import type { Project, ExportFormat, ExportJob } from '@/types';
 
 export const runtime = 'nodejs';
-// Bumped from 60s — encoding a 30-60s clip on a cold container can comfortably
-// exceed 60s once you add source-download + ffmpeg startup. 300s is Vercel's
-// Pro-plan ceiling; on Hobby it silently clamps back to 60, which is fine —
-// the user just won't get the headroom.
-export const maxDuration = 300;
+// Capped at 60s to match the Hobby-plan limit (vercel.json pins this).
+// If you later upgrade to Pro, bump this (and vercel.json) to 300 to give
+// room for longer clips.
+export const maxDuration = 60;
 
-const MAX_DURATION_SECONDS = 120;
+// Keep the allowed clip length well under maxDuration — the function
+// needs to also download the source range, run ffmpeg twice for GIFs,
+// and upload the result back to GCS. 45s leaves ~15s of wall-clock
+// headroom on top of the ffmpeg encode on Hobby.
+const MAX_DURATION_SECONDS = 45;
 
 function sanitizeFilename(raw: string): string {
   const cleaned = raw.replace(/[^a-zA-Z0-9._ -]/g, '_').trim();

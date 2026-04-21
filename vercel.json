@@ -1,8 +1,8 @@
 {
   "functions": {
     "src/app/api/exports/route.ts": {
-      "maxDuration": 300,
-      "memory": 3008
+      "maxDuration": 60,
+      "memory": 2048
     },
     "src/app/api/assets/[assetId]/probe/route.ts": {
       "maxDuration": 60,

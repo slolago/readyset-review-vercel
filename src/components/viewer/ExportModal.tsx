@@ -17,7 +17,7 @@ interface ExportModalProps {
 
 type UiState = 'idle' | 'encoding' | 'ready' | 'failed';
 
-const MAX_CLIP = 120; // matches server cap
+const MAX_CLIP = 45; // matches server cap (Hobby plan)
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return '0:00.000';
@@ -265,7 +265,7 @@ export function ExportModal({
             <span>In: <span className="text-white font-mono">{formatTime(inPt)}</span></span>
             <span className={clipTooLong ? 'text-frame-red' : ''}>
               Length: <span className="font-mono">{formatTime(clipDur)}</span>
-              {clipTooLong && <span className="ml-1">(max 2:00.000)</span>}
+              {clipTooLong && <span className="ml-1">(max 0:45.000)</span>}
             </span>
             <span>Out: <span className="text-white font-mono">{formatTime(outPt)}</span></span>
           </div>
@@ -322,8 +322,8 @@ export function ExportModal({
           </div>
           <p className="mt-1.5 text-[11px] text-frame-textMuted">
             {format === 'mp4'
-              ? 'Re-encodes to H.264/AAC if the source can\u2019t be stream-copied. Max 2 minutes.'
-              : '720p, 15 fps, looping. Max 2 minutes.'}
+              ? 'Re-encodes to H.264/AAC if the source can\u2019t be stream-copied. Max 45 seconds.'
+              : '480p, 12 fps, looping. Max 45 seconds.'}
           </p>
         </div>
 
