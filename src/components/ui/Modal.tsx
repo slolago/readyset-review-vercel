@@ -61,7 +61,7 @@ export function Modal({
       {/* Modal */}
       <div
         className={cn(
-          'relative w-full bg-frame-card border border-frame-border rounded-2xl shadow-2xl shadow-black/50 animate-slide-up',
+          'relative w-full bg-frame-card border border-frame-border rounded-2xl shadow-2xl shadow-black/50 animate-slide-up overflow-hidden',
           sizes[size],
           className
         )}
