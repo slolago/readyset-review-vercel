@@ -9,10 +9,10 @@
 
 ### Context menu behavior
 
-- [ ] **CTX-02**: In grid view, a right-click context menu on an asset or folder stays inside the viewport regardless of position. When the natural anchor would push the menu off-screen (e.g. asset rows sitting below folder rows push the menu past the bottom edge), the menu flips up/left so every item remains clickable.
-- [ ] **CTX-03**: Left-clicking anywhere outside an open context menu (empty space, another card, the sidebar, the header) closes the menu. Right-clicking on a different object replaces the open menu instead of stacking — only one context menu can be open at a time. Escape also closes.
-- [ ] **CTX-04**: The right-click context menu exposes the full action set for the clicked target. The floating bottom selection bar may remain a curated shortcut of common actions, but the right-click menu is always the superset. When an asset + folder are both in the current selection, right-clicking either one opens the same menu (a consistent intersection, or the full set with target-appropriate actions disabled) — not two different menus depending on which card the cursor lands on.
-- [ ] **CTX-05**: Right-clicking a folder opens the context menu and each menu item runs its action (Rename, Duplicate, Move, Copy, Delete, Share, etc.). Clicking an item never falls through to the folder's default double-click "open" behavior. The same menu that works via the three-dots button works via right-click.
+- [x] **CTX-02**: In grid view, a right-click context menu on an asset or folder stays inside the viewport regardless of position. When the natural anchor would push the menu off-screen (e.g. asset rows sitting below folder rows push the menu past the bottom edge), the menu flips up/left so every item remains clickable.
+- [x] **CTX-03**: Left-clicking anywhere outside an open context menu (empty space, another card, the sidebar, the header) closes the menu. Right-clicking on a different object replaces the open menu instead of stacking — only one context menu can be open at a time. Escape also closes.
+- [x] **CTX-04**: The right-click context menu exposes the full action set for the clicked target. The floating bottom selection bar may remain a curated shortcut of common actions, but the right-click menu is always the superset. When an asset + folder are both in the current selection, right-clicking either one opens the same menu (a consistent intersection, or the full set with target-appropriate actions disabled) — not two different menus depending on which card the cursor lands on.
+- [x] **CTX-05**: Right-clicking a folder opens the context menu and each menu item runs its action (Rename, Duplicate, Move, Copy, Delete, Share, etc.). Clicking an item never falls through to the folder's default double-click "open" behavior. The same menu that works via the three-dots button works via right-click.
 
 ### Grid / list affordances
 
@@ -60,10 +60,10 @@ See `.planning/MILESTONES.md` — v1.7 through v2.1 shipped.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTX-02 | Phase 70 | Pending |
-| CTX-03 | Phase 70 | Pending |
-| CTX-04 | Phase 70 | Pending |
-| CTX-05 | Phase 70 | Pending |
+| CTX-02 | Phase 70 | Complete |
+| CTX-03 | Phase 70 | Complete |
+| CTX-04 | Phase 70 | Complete |
+| CTX-05 | Phase 70 | Complete |
 | VIEW-01 | Phase 71 | Complete |
 | VIEW-02 | Phase 71 | Complete |
 | EDIT-01 | Phase 72 | Complete |

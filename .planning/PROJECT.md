@@ -10,15 +10,9 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Current Milestone: v2.2 Dashboard & Annotation UX Fixes
+## Latest Milestone: v2.2 Dashboard & Annotation UX Fixes (Shipped 2026-04-21)
 
-**Goal:** Fix 9 concrete UI/UX bugs in the file browser context menus, grid/list view affordances, inline rename flow, folder duplication, and drawing-mode transformations — so day-to-day browsing and annotation feels predictable.
-
-**Target features (bug fixes):**
-- Context menu behavior — clip to viewport, close on click-away, unify actions across right-click / three-dots / floating bottom bar, make folder right-click options actually run (not just open the folder)
-- Grid/list affordances — allow list view when only folders are present, make asset three-dots reachable in grid view without the hover preview stealing the cursor
-- Inline edit + mutations — click-away cancels rename (and only one rename input active at a time), folder "Duplicate" actually duplicates instead of just toasting
-- Drawing mode transforms — Fabric.js bounding-box scale/rotate works on a single selected object, not only multi-select
+9 UI/UX bugs closed across 4 phases (70–73) — context menu behavior, grid/list affordances, inline rename lifecycle, folder duplicate, and drawing-mode transforms. See [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md).
 
 **Prior milestone (v2.1 Dashboard Performance):** Shipped 2026-04-21 — see [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md).
 
@@ -149,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-21 — v2.2 milestone started*
+*Last updated: 2026-04-21 — v2.2 shipped*

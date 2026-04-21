@@ -12,14 +12,9 @@
 - ✅ **v1.9 — Hardening & Consistency Audit** - Phases 54–59 (shipped 2026-04-20)
 - ✅ **v2.0 — Architecture Hardening** - Phases 60–66 (shipped 2026-04-20)
 - ✅ **v2.1 — Dashboard Performance** - Phases 67–69 (shipped 2026-04-21)
-- 🚧 **v2.2 — Dashboard & Annotation UX Fixes** - Phases 70–73 (active)
+- ✅ **v2.2 — Dashboard & Annotation UX Fixes** - Phases 70–73 (shipped 2026-04-21)
 
 ## Phases
-
-- [ ] **Phase 70: context-menu-behavior** — Right-click menus clip to viewport, close on click-away, unify across surfaces, and actually run every action on folders
-- [ ] **Phase 71: grid-view-affordances** — List view works in folders-only listings, and the three-dots button on asset cards is reachable past the hover preview
-- [ ] **Phase 72: inline-edit-and-folder-duplicate** — Click-away cancels rename (one active at a time) and folder Duplicate produces a real duplicate, not just a toast
-- [ ] **Phase 73: drawing-mode-transforms** — Single-object selections in drawing mode get scale + rotation handles that match multi-select
 
 <details>
 <summary>✅ v1.2 — Feature Expansion (Phases 1–22) - SHIPPED 2026-04-07</summary>
@@ -329,68 +324,14 @@ See [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) for full phase deta
 
 </details>
 
-## Phase Details
+<details>
+<summary>✅ v2.2 — Dashboard & Annotation UX Fixes (Phases 70–73) - SHIPPED 2026-04-21</summary>
 
-### Phase 70: context-menu-behavior
-**Goal**: Right-click context menus in the file browser behave predictably — they stay on-screen, close when they should, expose the full action set, and every action actually runs on folders
-**Depends on**: Nothing (isolated to context menu component + wiring)
-**Requirements**: CTX-02, CTX-03, CTX-04, CTX-05
-**Success Criteria** (what must be TRUE):
-  1. Right-clicking an asset or folder near the right or bottom edge of the viewport opens a menu that is fully visible — it flips left and/or up so every item is clickable, regardless of where in the grid the user clicked
-  2. Left-clicking anywhere outside an open context menu (empty space, another card, sidebar, header) closes it; pressing Escape closes it; right-clicking a different target replaces the menu instead of stacking a second one
-  3. Right-clicking on a folder, or on an asset, or on a mixed selection of both opens one menu (not two different menus depending on which card the cursor landed on); the right-click menu is a superset of the floating bottom selection bar
-  4. Right-clicking a folder opens the context menu (never the folder's double-click "open" behavior), and each item — Rename, Duplicate, Move, Copy, Delete, Share — runs its action when clicked; the same menu content that appears from the three-dots button appears from right-click
-**Plans**: 2 plans
+See [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md) for full phase details.
 
-Plans:
-- [ ] 70-01-PLAN.md — ContextMenu viewport flip + singleton controller (CTX-02, CTX-03)
-- [ ] 70-02-PLAN.md — Unified action-list helper + FolderCard click-through hardening (CTX-04, CTX-05)
+4 phases: context-menu-behavior, grid-view-affordances, inline-edit-and-folder-duplicate, drawing-mode-transforms. 9 UI/UX bug fixes from hands-on use reports.
 
-
-### Phase 71: grid-view-affordances
-**Goal**: Grid and list view work in all folder states, and the per-card three-dots button on assets is reliably clickable without the hover preview stealing the pointer
-**Depends on**: Nothing (isolated to view toggle + AssetCard layering)
-**Requirements**: VIEW-01, VIEW-02
-**Success Criteria** (what must be TRUE):
-  1. The list/grid toggle is available and functional in a folder that contains only folders (no assets) — switching to list view renders folders as rows matching the list view used for mixed contents
-  2. Hovering an asset card in grid view reveals the three-dots overflow button, and moving the cursor onto the button keeps it visible and clickable — the real-time hover preview does not consume pointer events over the button's hit region
-  3. The three-dots button on asset cards behaves identically to the three-dots button on folder cards — same opening behavior, same menu, same reachability
-**Plans**: 1 plan
-**UI hint**: yes
-
-Plans:
-- [x] 71-01-PLAN.md — Folders-as-rows in list view + raise asset three-dots above hover preview (VIEW-01, VIEW-02)
-
-### Phase 72: inline-edit-and-folder-duplicate
-**Goal**: Inline rename is safely cancellable and never double-mounted, and folder Duplicate actually persists a copy instead of firing a success toast on nothing
-**Depends on**: Nothing (inline rename primitive exists from v1.9; folder duplicate is a new API wiring)
-**Requirements**: EDIT-01, FS-01
-**Success Criteria** (what must be TRUE):
-  1. While renaming a folder or asset inline, clicking anywhere outside the input — another card, empty space, sidebar, header — cancels the rename and reverts to the original name; only the confirm button or Enter commits the new name
-  2. Only one rename input is active across the whole file browser at any time — starting a rename on object B while A is still editing cancels A first
-  3. Selecting "Duplicate" on a folder (via three-dots or right-click) creates a real duplicate with the same contents and a new id, using the same naming rule as asset duplicate, and the duplicate appears in the current folder listing
-  4. The folder-duplicate success toast only fires after the duplicate actually persists in Firestore — failures surface as an error toast, not a false success
-**Plans**: 2 plans
-**UI hint**: yes
-
-Plans:
-- [x] 72-01-PLAN.md — InlineRename click-away cancel + single-active-rename singleton across FolderBrowser (EDIT-01)
-- [x] 72-02-PLAN.md — deepCopyFolder writes deletedAt: null so duplicates appear in listings (FS-01)
-
-### Phase 73: drawing-mode-transforms
-**Goal**: Single-object selections in drawing mode expose Fabric.js scale and rotation handles, matching multi-select behavior
-**Depends on**: Nothing (isolated to the drawing-mode canvas component)
-**Requirements**: DRAW-01
-**Success Criteria** (what must be TRUE):
-  1. Selecting a single object (text, arrow, freehand vector) with the selection tool shows the Fabric.js bounding box with visible corner handles and a rotation handle
-  2. Dragging a corner handle scales the single selected object
-  3. Dragging the rotation handle rotates the single selected object
-  4. Single-object transforms are on par with multi-object transforms — the controls are not movement-only when the selection size is one
-**Plans**: 1 plan
-**UI hint**: yes
-
-Plans:
-- [x] 73-01-PLAN.md — Restore evented=true on objects when tool is select (DRAW-01)
+</details>
 
 ## Progress
 
@@ -443,7 +384,7 @@ Plans:
 | 67. dashboard-query-optimizations | v2.1 | 1/1 | Complete   | 2026-04-21 |
 | 68. client-init-waterfall | v2.1 | 1/1 | Human-verify | 2026-04-21 |
 | 69. ssr-and-micro-optimizations | v2.1 | 1/1 | Human-verify | 2026-04-21 |
-| 70. context-menu-behavior | v2.2 | 0/? | Not started | - |
-| 71. grid-view-affordances | v2.2 | 1/1 | Complete   | 2026-04-21 |
-| 72. inline-edit-and-folder-duplicate | v2.2 | 2/2 | Complete   | 2026-04-21 |
-| 73. drawing-mode-transforms | v2.2 | 1/1 | Complete   | 2026-04-21 |
+| 70. context-menu-behavior | v2.2 | 2/2 | Human-verify | 2026-04-21 |
+| 71. grid-view-affordances | v2.2 | 1/1 | Human-verify | 2026-04-21 |
+| 72. inline-edit-and-folder-duplicate | v2.2 | 2/2 | Human-verify | 2026-04-21 |
+| 73. drawing-mode-transforms | v2.2 | 1/1 | Human-verify | 2026-04-21 |

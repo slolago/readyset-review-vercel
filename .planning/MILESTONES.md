@@ -1,5 +1,43 @@
 # Milestones
 
+## v2.2 Dashboard & Annotation UX Fixes (Shipped: 2026-04-21)
+
+**Phases completed:** 4 phases (70–73), 6 plans
+**Tests:** 171/171 green throughout
+**Source:** 9 concrete UI/UX bugs reported from hands-on use of the dashboard file browser, inline rename flow, and drawing-mode canvas
+
+**The 9 bugs it closed:**
+
+1. Context menu overflows viewport in grid view (CTX-02)
+2. Click-away / Escape don't close context menu; menus stack (CTX-03)
+3. Right-click menu inconsistent with three-dots / floating bar; differs across asset vs folder in mixed selection (CTX-04)
+4. Folder right-click falls through to "open folder" instead of running the action (CTX-05)
+5. List view toggle broken when folder contains only folders (VIEW-01)
+6. Asset three-dots unreachable in grid view — hover preview steals cursor (VIEW-02)
+7. Click-away during rename doesn't cancel; multiple rename inputs stack (EDIT-01)
+8. Folder Duplicate shows success toast but doesn't persist (FS-01)
+9. Fabric.js single-object transforms only move — scale/rotate only work on multi-select (DRAW-01)
+
+**Key accomplishments:**
+
+1. **Phase 70 context-menu-behavior:** New `ContextMenuProvider` + `useContextMenuController` singleton holds one `{key, position, items} | null` state — two menus open at once is physically impossible. `useLayoutEffect` + `getBoundingClientRect` + 8px viewport clamp for flip math. New `src/components/files/fileBrowserActions.ts::buildFileBrowserActions('asset'|'folder'|'mixed', selection, ctx)` pure-data factory feeds three-dots Dropdown AND right-click menu at 5 call-sites — drift impossible. FolderCard click-through hardened with 3 layered defenses (role="menu" target guard + 300ms suppressNextClickRef + right-button onMouseDown preventDefault).
+2. **Phase 71 grid-view-affordances:** Folders block in `FolderBrowser.tsx` now branches on `viewMode` with new `FolderListView` + `FolderListRow` components; `AssetListView` toggle works in folders-only folders. `AssetCard` actions wrapper raised to `z-20` (consistent with job indicators); sprite overlay / scrub bar / loading spinner marked `pointer-events-none` so scrub still works via bubble but three-dots stays reachable.
+3. **Phase 72 inline-edit-and-folder-duplicate:** `<InlineRename>` gained a document-level `pointerdown` listener that cancels on click-away using a stable `onCancelRef`. New `RenameController` context + `RenameProvider` wrap `FolderBrowserInner`; all 4 rename-capable surfaces (FolderCard, FolderListRow, AssetCard, AssetListView) consume the controller — opening rename on B cancels A automatically. Hand-rolled inputs on FolderCard + FolderListRow migrated to the shared primitive. `src/lib/folders.ts::deepCopyFolder` now writes `deletedAt: null` on both `.set(...)` calls — root cause: the Phase 63 composite-indexed listing query filters `where('deletedAt', '==', null)` which excludes docs missing the field entirely. Same fix also repairs "Copy to folder" which was silently broken.
+4. **Phase 73 drawing-mode-transforms:** One-line fix in `src/components/viewer/AnnotationCanvas.tsx:163` — restoring `obj.evented = true` alongside `obj.selectable = true` in the `'select'` tool branch. Root cause: the tool-switch effect force-sets `evented = false` on every object before each tool change; the `'select'` case restored `selectable` but not `evented`. Fabric.js single-object control-handle hit-testing requires `evented = true` — with it missing, handles fell through to the canvas-level move handler. Multi-select worked because `ActiveSelection` wraps objects in a separate evented group.
+
+**New files (high-value):** `src/components/files/fileBrowserActions.ts`, `ContextMenuProvider` + `useContextMenuController` primitives in `src/components/ui/ContextMenu.tsx`, `RenameController` context + `FolderListView`/`FolderListRow` components in `src/components/files/FolderBrowser.tsx`.
+
+**Scope discipline (CLAUDE.md §3 — surgical):**
+- Phase 73 fix was one character. Planner scouted for `lockScalingX/Y/Rotation` / `setControlsVisibility` / `hasControls` — all zero matches, ruling out the obvious "intentional lock" hypothesis before proposing the minimal diff.
+- Phase 72-02 fix was 4 insertions. Planner scouted the route + handler + listing query and traced the bug back to the helper, not the user-hypothesized "missing API".
+- No features added beyond bug scope. No speculative abstractions. 828 / 289 LOC across 8 src files.
+
+**Expected impact:** The 9 reported bugs fixed at their structural root. Context menu UX moves from "unreliable, stacks, overflows, broken on folders" to "predictable, single menu, viewport-clipped, works everywhere." Folder duplicate moves from "silent no-op with false toast" to "real copy + listing update + failure toast on error." Drawing mode moves from "movement-only for single objects" to "full Fabric.js transforms regardless of selection size."
+
+**Pending human verification:** All 4 phases flagged `human_needed` — structural code is correct, but final success criteria require live browser testing of pointer events, viewport geometry, Firestore round-trips, and Fabric.js hit-testing. Concrete test items listed in each phase's `VERIFICATION.md`.
+
+---
+
 ## v2.1 Dashboard Performance (Shipped: 2026-04-21)
 
 **Phases completed:** 3 phases (67–69), 3 plans
