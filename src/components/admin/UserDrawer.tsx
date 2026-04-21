@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useId, useRef } from 'react';
 import { X, Shield, Ban, CheckCircle2, Folder, Plus, Search, Trash2, User as UserIcon, MessageSquare, Upload } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Spinner } from '@/components/ui/Spinner';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useModalOwner } from '@/hooks/useModalOwner';
 import { formatRelativeTime } from '@/lib/utils';
 import type { User } from '@/types';
 import toast from 'react-hot-toast';
@@ -45,6 +47,18 @@ export function UserDrawer({ userId, onClose, onChanged, getIdToken }: UserDrawe
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useFocusTrap(drawerRef, true);
+  useModalOwner(true);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,10 +125,16 @@ export function UserDrawer({ userId, onClose, onChanged, getIdToken }: UserDrawe
       <div className="absolute inset-0 bg-black/50 pointer-events-auto" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="absolute top-0 right-0 bottom-0 w-[440px] bg-frame-sidebar border-l border-frame-border shadow-2xl pointer-events-auto flex flex-col">
+      <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="absolute top-0 right-0 bottom-0 w-[440px] bg-frame-sidebar border-l border-frame-border shadow-2xl pointer-events-auto flex flex-col"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-frame-border flex-shrink-0">
-          <h2 className="text-sm font-semibold text-white">User details</h2>
+          <h2 id={titleId} className="text-sm font-semibold text-white">User details</h2>
           <button onClick={onClose} className="text-frame-textMuted hover:text-white transition-colors">
             <X className="w-4 h-4" />
           </button>
