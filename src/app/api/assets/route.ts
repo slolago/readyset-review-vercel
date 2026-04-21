@@ -26,24 +26,57 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = getAdminDb();
-    // Fetch all assets for project, filter folderId in memory to avoid composite index
-    const snap = await db.collection('assets').where('projectId', '==', projectId).get();
-    const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
 
-    // Load soft-deleted folder IDs for this project so we can hide assets whose parent is trashed.
-    const foldersSnap = await db.collection('folders')
-      .where('projectId', '==', projectId)
-      .get();
-    const deletedFolderIds = new Set(
-      foldersSnap.docs.filter((d) => (d.data() as any).deletedAt).map((d) => d.id)
-    );
+    // Phase 63 (IDX-01): composite index on assets(projectId, folderId, deletedAt)
+    // lets us fetch only the live assets for this folder without scanning the
+    // full project collection. If the index isn't deployed yet, Firestore throws
+    // FAILED_PRECONDITION — fall back to the legacy in-memory filter so the
+    // endpoint keeps working during the deploy window.
+    let filtered: any[];
+    try {
+      const snap = await db
+        .collection('assets')
+        .where('projectId', '==', projectId)
+        .where('folderId', '==', folderId)
+        .where('deletedAt', '==', null)
+        .get();
+      filtered = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
 
-    const liveAssets = all.filter((a: any) => {
-      if (a.deletedAt) return false;
-      if (a.folderId && deletedFolderIds.has(a.folderId)) return false;
-      return true;
-    });
-    const filtered = liveAssets.filter((a: any) => (a.folderId ?? null) === folderId);
+      // Still need to hide assets whose parent folder is soft-deleted (the
+      // asset itself is live but orphaned). One indexed lookup for the folder.
+      if (folderId) {
+        const folderDoc = await db.collection('folders').doc(folderId).get();
+        if (!folderDoc.exists || (folderDoc.data() as any)?.deletedAt) {
+          filtered = [];
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/index/i.test(msg) || /FAILED_PRECONDITION/i.test(msg)) {
+        console.warn(
+          '[GET /api/assets] Composite index not deployed yet — falling back to in-memory filter. Deploy firestore.indexes.json.'
+        );
+        const snap = await db.collection('assets').where('projectId', '==', projectId).get();
+        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+
+        const foldersSnap = await db
+          .collection('folders')
+          .where('projectId', '==', projectId)
+          .get();
+        const deletedFolderIds = new Set(
+          foldersSnap.docs.filter((d) => (d.data() as any).deletedAt).map((d) => d.id)
+        );
+
+        const liveAssets = all.filter((a: any) => {
+          if (a.deletedAt) return false;
+          if (a.folderId && deletedFolderIds.has(a.folderId)) return false;
+          return true;
+        });
+        filtered = liveAssets.filter((a: any) => (a.folderId ?? null) === folderId);
+      } else {
+        throw err;
+      }
+    }
 
     // Group by versionGroupId, show only the latest version per group
     const groups = new Map<string, any[]>();
