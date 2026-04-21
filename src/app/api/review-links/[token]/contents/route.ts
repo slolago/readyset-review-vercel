@@ -58,7 +58,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     for (let i = 0; i < folderDocs.length; i++) {
       const d = folderDocs[i];
       const id = effectiveFolderIds[i];
-      if (d.exists) folders.push({ id, ...d.data() });
+      // SDC-02: treat soft-deleted folders as deleted tombstones
+      if (d.exists && !(d.data() as any).deletedAt) folders.push({ id, ...d.data() });
       else folders.push({ id, _deleted: true });
     }
 
@@ -67,7 +68,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     await Promise.all(
       assetIds.map(async (id) => {
         const d = await db.collection('assets').doc(id).get();
-        if (!d.exists) { assets.push({ id, _deleted: true }); return; }
+        // SDC-02: treat soft-deleted as deleted tombstones
+        if (!d.exists || (d.data() as any).deletedAt) { assets.push({ id, _deleted: true }); return; }
         const a = { id: d.id, ...d.data() } as any;
         if (a.thumbnailGcsPath) {
           try { a.thumbnailSignedUrl = await generateReadSignedUrl(a.thumbnailGcsPath); } catch {}
