@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
+import { canAccessProject } from '@/lib/permissions';
 import { getAdminDb } from '@/lib/firebase-admin';
+import type { Project } from '@/types';
 
 export async function GET(
   request: NextRequest,
@@ -19,8 +21,12 @@ export async function GET(
     if (!linkDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const link = linkDoc.data() as any;
 
-    const hasAccess = await canAccessProject(user.id, link.projectId);
-    if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const projectDoc = await db.collection('projects').doc(link.projectId).get();
+    if (!projectDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
+    if (!canAccessProject(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Get all comments made via this review link
     const commentsSnap = await db.collection('comments')
@@ -64,8 +70,8 @@ export async function GET(
       viewers,
       totalComments: commentsSnap.size,
     });
-  } catch (error) {
-    console.error('viewers error:', error);
+  } catch (err) {
+    console.error('[GET /api/review-links/[token]/viewers]', err);
     return NextResponse.json({ error: 'Failed to fetch viewers' }, { status: 500 });
   }
 }

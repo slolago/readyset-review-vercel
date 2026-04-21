@@ -1,11 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getAdminAuth, getAdminDb } from './firebase-admin';
-import type { User, Project } from '@/types';
-import {
-  canAccessProject as canAccessProjectPure,
-  platformRoleAtLeast,
-  type PlatformRole,
-} from './permissions';
+import type { User } from '@/types';
+import { platformRoleAtLeast, type PlatformRole } from './permissions';
 
 export async function verifyAuthToken(
   request: NextRequest
@@ -51,26 +47,6 @@ export function getIdTokenFromRequest(request: NextRequest): string | null {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
   return authHeader.slice(7);
-}
-
-/**
- * @deprecated Use the pure `canAccessProject(user, project)` from '@/lib/permissions'
- * after loading the project doc yourself. This async wrapper is preserved for
- * legacy callers that pass (userId, projectId) and expect a DB round-trip.
- */
-export async function canAccessProject(
-  userId: string,
-  projectId: string
-): Promise<boolean> {
-  const db = getAdminDb();
-  const [projectDoc, userDoc] = await Promise.all([
-    db.collection('projects').doc(projectId).get(),
-    db.collection('users').doc(userId).get(),
-  ]);
-  if (!projectDoc.exists || !userDoc.exists) return false;
-  const user = { id: userDoc.id, ...userDoc.data() } as User;
-  const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
-  return canAccessProjectPure(user, project);
 }
 
 /**

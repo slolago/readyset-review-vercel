@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser, canAccessProject } from '@/lib/auth-helpers';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
+import { canAccessProject } from '@/lib/permissions';
 import { getAdminDb } from '@/lib/firebase-admin';
+import type { Project } from '@/types';
 
 function getDescendantFolderIds(rootId: string, folders: any[]): Set<string> {
   const result = new Set<string>([rootId]);
@@ -27,11 +29,15 @@ export async function GET(request: NextRequest) {
 
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
 
-  const hasAccess = await canAccessProject(user.id, projectId);
-  if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
   try {
     const db = getAdminDb();
+
+    const projectDoc = await db.collection('projects').doc(projectId).get();
+    if (!projectDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const project = { id: projectDoc.id, ...projectDoc.data() } as Project;
+    if (!canAccessProject(user, project)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Fetch all assets for the project
     const snap = await db.collection('assets').where('projectId', '==', projectId).get();
@@ -60,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ sizeBytes });
   } catch (err) {
-    console.error('GET assets/size error:', err);
+    console.error('[GET /api/assets/size]', err);
     return NextResponse.json({ error: 'Failed to calculate size' }, { status: 500 });
   }
 }
