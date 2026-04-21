@@ -1662,18 +1662,35 @@ const FolderCard = React.memo(function FolderCard({
         </div>
       </div>
       {isRenaming ? (
-        <input
-          ref={renameInputRef}
-          className="w-full bg-frame-bg border border-frame-accent rounded px-1.5 py-0.5 text-sm font-medium text-white outline-none focus:ring-1 focus:ring-frame-accent"
-          value={renameValue}
-          onChange={(e) => setRenameValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); commitFolderRename(); }
-            if (e.key === 'Escape') { setIsRenaming(false); }
-          }}
-          onBlur={commitFolderRename}
-          onClick={(e) => e.stopPropagation()}
-        />
+        <div className="flex items-center gap-1">
+          <input
+            ref={renameInputRef}
+            className="flex-1 bg-frame-bg border border-frame-accent rounded px-1.5 py-0.5 text-sm font-medium text-white outline-none focus:ring-1 focus:ring-frame-accent"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commitFolderRename(); }
+              if (e.key === 'Escape') { setIsRenaming(false); }
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            title="Confirm"
+            onClick={(e) => { e.stopPropagation(); commitFolderRename(); }}
+            className="p-1 rounded hover:bg-frame-accent/20 text-frame-accent"
+          >
+            <Check className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            title="Cancel"
+            onClick={(e) => { e.stopPropagation(); setIsRenaming(false); }}
+            className="p-1 rounded hover:bg-frame-border text-frame-textMuted"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       ) : (
         <p className="text-sm font-medium text-white truncate">{folder.name}</p>
       )}
