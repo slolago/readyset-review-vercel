@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { generateReadSignedUrl, generateDownloadSignedUrl } from '@/lib/gcs';
+import { generateDownloadSignedUrl } from '@/lib/gcs';
+import { getOrCreateSignedUrl } from '@/lib/signed-url-cache';
 import { canAccessProject } from '@/lib/permissions';
 import type { Project } from '@/types';
 
@@ -84,27 +85,95 @@ export async function GET(request: NextRequest) {
       asset._commentCount = commentCountMap.get(asset.id) ?? 0;
     }
 
-    // Generate signed read URLs for all ready assets — parallelized per asset and across assets
+    // Generate/reuse signed read URLs for all ready assets.
+    // Phase 62 (CACHE-01/03): pull from asset doc when cached URL has >30 min
+    // of life; otherwise regenerate. Fresh URLs are batch-written back so the
+    // next request reuses them.
+    const pendingWrites: Array<{ id: string; patch: Record<string, unknown> }> = [];
+
     const assets = await Promise.all(
       grouped.map(async (asset: any) => {
         if (asset.status !== 'ready') return asset;
-        const [signedUrl, thumbnailSignedUrl, downloadUrl, spriteSignedUrl] = await Promise.all([
-          asset.gcsPath ? generateReadSignedUrl(asset.gcsPath, 120) : Promise.resolve(undefined),
-          asset.thumbnailGcsPath ? generateReadSignedUrl(asset.thumbnailGcsPath, 120) : Promise.resolve(undefined),
+
+        const patch: Record<string, unknown> = {};
+
+        const [mainRes, thumbRes, spriteRes, downloadUrl] = await Promise.all([
+          asset.gcsPath
+            ? getOrCreateSignedUrl({
+                gcsPath: asset.gcsPath,
+                cached: asset.signedUrl,
+                cachedExpiresAt: asset.signedUrlExpiresAt,
+                ttlMinutes: 120,
+              })
+            : Promise.resolve(null),
+          asset.thumbnailGcsPath
+            ? getOrCreateSignedUrl({
+                gcsPath: asset.thumbnailGcsPath,
+                cached: asset.thumbnailSignedUrl,
+                cachedExpiresAt: asset.thumbnailSignedUrlExpiresAt,
+                ttlMinutes: 720,
+              })
+            : Promise.resolve(null),
+          asset.spriteStripGcsPath && asset.spriteStripGcsPath.includes('sprite-v2.jpg')
+            ? getOrCreateSignedUrl({
+                gcsPath: asset.spriteStripGcsPath,
+                cached: asset.spriteSignedUrl,
+                cachedExpiresAt: asset.spriteSignedUrlExpiresAt,
+                ttlMinutes: 720,
+              })
+            : Promise.resolve(null),
+          // Download URL stays per-request — it has a filename disposition
+          // that changes if the asset is renamed, and isn't a hot-path cost.
           asset.gcsPath
             ? generateDownloadSignedUrl(asset.gcsPath, asset.name).catch(() => undefined)
             : Promise.resolve(undefined),
-          asset.spriteStripGcsPath && asset.spriteStripGcsPath.includes('sprite-v2.jpg')
-            ? generateReadSignedUrl(asset.spriteStripGcsPath, 120)
-            : Promise.resolve(undefined),
         ]);
-        if (signedUrl !== undefined) asset.signedUrl = signedUrl;
-        if (thumbnailSignedUrl !== undefined) asset.thumbnailSignedUrl = thumbnailSignedUrl;
+
+        if (mainRes) {
+          asset.signedUrl = mainRes.url;
+          if (mainRes.fresh) {
+            patch.signedUrl = mainRes.url;
+            patch.signedUrlExpiresAt = mainRes.expiresAt;
+          }
+        }
+        if (thumbRes) {
+          asset.thumbnailSignedUrl = thumbRes.url;
+          if (thumbRes.fresh) {
+            patch.thumbnailSignedUrl = thumbRes.url;
+            patch.thumbnailSignedUrlExpiresAt = thumbRes.expiresAt;
+          }
+        }
+        if (spriteRes) {
+          asset.spriteSignedUrl = spriteRes.url;
+          if (spriteRes.fresh) {
+            patch.spriteSignedUrl = spriteRes.url;
+            patch.spriteSignedUrlExpiresAt = spriteRes.expiresAt;
+          }
+        }
         if (downloadUrl !== undefined) asset.downloadUrl = downloadUrl;
-        if (spriteSignedUrl !== undefined) asset.spriteSignedUrl = spriteSignedUrl;
+
+        if (Object.keys(patch).length > 0) {
+          pendingWrites.push({ id: asset.id, patch });
+        }
         return asset;
       })
     );
+
+    // Persist freshly-signed URLs so the next request hits the cache.
+    // Sync write (batched) before response — the latency cost is one round-trip
+    // and only on requests that regenerated something.
+    if (pendingWrites.length > 0) {
+      try {
+        const batch = db.batch();
+        for (const { id, patch } of pendingWrites) {
+          batch.update(db.collection('assets').doc(id), patch);
+        }
+        await batch.commit();
+      } catch (err) {
+        // Non-fatal: worst case we regenerate again next request.
+        console.error('[GET /api/assets] signed URL cache write-back failed', err);
+      }
+    }
 
     return NextResponse.json({ assets });
   } catch (err) {
