@@ -21,17 +21,48 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const [assetsSnap, foldersSnap] = await Promise.all([
-      db.collection('assets').where('projectId', '==', params.projectId).get(),
-      db.collection('folders').where('projectId', '==', params.projectId).get(),
-    ]);
-
-    const assets = assetsSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as any))
-      .filter((a) => !!a.deletedAt);
-    const folders = foldersSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as any))
-      .filter((f) => !!f.deletedAt);
+    // Phase 63 (IDX-04): composite index on (projectId, deletedAt) lets us
+    // fetch only trashed rows instead of walking every asset/folder in memory.
+    // `deletedAt != null` excludes both missing-field and explicit-null values,
+    // so the result set is exactly the trashed items. Falls back to the legacy
+    // scan if the index isn't deployed yet.
+    let assets: any[];
+    let folders: any[];
+    try {
+      const [assetsSnap, foldersSnap] = await Promise.all([
+        db
+          .collection('assets')
+          .where('projectId', '==', params.projectId)
+          .where('deletedAt', '!=', null)
+          .get(),
+        db
+          .collection('folders')
+          .where('projectId', '==', params.projectId)
+          .where('deletedAt', '!=', null)
+          .get(),
+      ]);
+      assets = assetsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+      folders = foldersSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/index/i.test(msg) || /FAILED_PRECONDITION/i.test(msg)) {
+        console.warn(
+          '[GET /api/projects/[id]/trash] Composite index not deployed yet — falling back to in-memory filter. Deploy firestore.indexes.json.'
+        );
+        const [assetsSnap, foldersSnap] = await Promise.all([
+          db.collection('assets').where('projectId', '==', params.projectId).get(),
+          db.collection('folders').where('projectId', '==', params.projectId).get(),
+        ]);
+        assets = assetsSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as any))
+          .filter((a) => !!a.deletedAt);
+        folders = foldersSnap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as any))
+          .filter((f) => !!f.deletedAt);
+      } else {
+        throw err;
+      }
+    }
 
     return NextResponse.json({ assets, folders });
   } catch (err) {
