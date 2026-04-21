@@ -129,8 +129,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       console.error('[POST /api/assets/[assetId]/generate-sprite] chmod ffmpeg failed', err);
     }
 
-    // Get signed URL for the video — ffmpeg will do HTTP range requests
-    // so we ONLY download the bytes needed for each frame's keyframe
+    // Download the source to /tmp before extracting.
+    //
+    // Why not ffmpeg over HTTP range: videos muxed by Premiere / After
+    // Effects (Mainconcept MP4 encoder, fragmented MP4, or unusual moov
+    // placement) routinely fail with `-ss` before `-i` over HTTP — ffmpeg
+    // seeks to a byte offset that doesn't contain enough metadata to
+    // decode. Pulling the file locally once is bulletproof and still fits
+    // comfortably within the 60s serverless budget for typical review
+    // clips (~<500 MB). For very large sources we cap at 2 GB.
     const videoUrl = await generateReadSignedUrl(asset.gcsPath, 60);
     step('video signed URL generated');
 
@@ -138,18 +145,70 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `sprite-${assetId}-`));
     const spritePath = path.join(tmpDir, 'sprite.jpg');
+    const localVideoPath = path.join(tmpDir, 'source');
 
     try {
+      // Early abort if the stored size is too big — the route has ~1 GB
+      // of memory on Hobby and we stream to /tmp, but we still want a
+      // hard ceiling to avoid runaway function time.
+      const MAX_BYTES = 1500 * 1024 * 1024; // 1.5 GB safety ceiling
+      if (typeof asset.size === 'number' && asset.size > MAX_BYTES) {
+        return NextResponse.json({
+          error: `source too large for sprite generation (${Math.round(asset.size / 1024 / 1024)} MB)`,
+          steps,
+        }, { status: 413 });
+      }
+
+      step('downloading source…');
+      const downloadStart = Date.now();
+      const srcRes = await fetch(videoUrl);
+      if (!srcRes.ok || !srcRes.body) {
+        return NextResponse.json({
+          error: `source fetch failed (${srcRes.status})`,
+          steps,
+        }, { status: 500 });
+      }
+      // Stream the body straight to /tmp so we don't hold the entire
+      // file in memory at once. Web ReadableStream → async iterator →
+      // fs.WriteStream. Tracks byte count to enforce the ceiling.
+      const fsNode = await import('fs');
+      const writer = fsNode.createWriteStream(localVideoPath);
+      let downloaded = 0;
+      const reader = srcRes.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        downloaded += value.byteLength;
+        if (downloaded > MAX_BYTES) {
+          writer.destroy();
+          return NextResponse.json({
+            error: `source too large for sprite generation (>${Math.round(MAX_BYTES / 1024 / 1024)} MB)`,
+            steps,
+          }, { status: 413 });
+        }
+        if (!writer.write(Buffer.from(value))) {
+          // Backpressure — wait for drain before reading more
+          await new Promise<void>((resolve) => writer.once('drain', () => resolve()));
+        }
+      }
+      await new Promise<void>((resolve, reject) => {
+        writer.once('error', reject);
+        writer.end(() => resolve());
+      });
+      step(`source downloaded: ${Math.round(downloaded / 1024 / 1024)} MB in ${Date.now() - downloadStart}ms`);
+
       // Compute the 20 timestamps spread across the video (skip first/last 2%)
       const timestamps = Array.from({ length: SPRITE_FRAMES }, (_, i) => {
         return duration * (0.02 + (i / (SPRITE_FRAMES - 1)) * 0.96);
       });
 
-      // Extract all 20 frames IN PARALLEL (each does HTTP range request to GCS)
-      step(`extracting ${SPRITE_FRAMES} frames in parallel`);
+      // Extract all 20 frames IN PARALLEL from the LOCAL file. `-ss` before
+      // `-i` on a local file does a reliable keyframe seek (no HTTP range
+      // quirks) and avoids the "Mainconcept MP4 can't decode" class of bug.
+      step(`extracting ${SPRITE_FRAMES} frames in parallel from local file`);
       const frameResults = await Promise.all(
         timestamps.map((t, i) =>
-          extractFrame(binPath, videoUrl, t, path.join(tmpDir, `frame-${i}.jpg`))
+          extractFrame(binPath, localVideoPath, t, path.join(tmpDir, `frame-${i}.jpg`))
         )
       );
 
