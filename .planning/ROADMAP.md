@@ -361,7 +361,7 @@ See [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) for full phase deta
 | 59. a11y-and-keyboard-coordination | v1.9 | 1/1 | Complete | 2026-04-20 |
 | 60. pipeline-observability | v2.0 | 1/1 | Complete | 2026-04-20 |
 | 61. transactional-mutations | v2.0 | 1/1 | Complete | 2026-04-20 |
-| 62. signed-url-caching | v2.0 | 0/? | Not started | - |
+| 62. signed-url-caching | v2.0 | 1/1 | Complete | 2026-04-20 |
 | 63. firestore-indexes-and-denorm | v2.0 | 0/? | Not started | - |
 | 64. format-edge-cases | v2.0 | 0/? | Not started | - |
 | 65. security-and-upload-validation | v2.0 | 0/? | Not started | - |
