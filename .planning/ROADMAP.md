@@ -412,5 +412,5 @@ Plans:
 | 65. security-and-upload-validation | v2.0 | 1/1 | Complete   | 2026-04-21 |
 | 66. dead-data-and-contracts | v2.0 | 1/1 | Complete   | 2026-04-21 |
 | 67. dashboard-query-optimizations | v2.1 | 1/1 | Complete   | 2026-04-21 |
-| 68. client-init-waterfall | v2.1 | 0/? | Not started | - |
+| 68. client-init-waterfall | v2.1 | 1/1 | Human-verify | 2026-04-21 |
 | 69. ssr-and-micro-optimizations | v2.1 | 0/? | Not started | - |
