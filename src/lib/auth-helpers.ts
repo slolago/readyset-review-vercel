@@ -32,7 +32,11 @@ export async function getAuthenticatedUser(
   const userDoc = await db.collection('users').doc(auth.uid).get();
   if (!userDoc.exists) return null;
 
-  return { id: userDoc.id, ...userDoc.data() } as User;
+  const data = userDoc.data();
+  if (!data) return null;
+  if (data.disabled === true) return null;
+
+  return { id: userDoc.id, ...data } as User;
 }
 
 export async function requireAdmin(

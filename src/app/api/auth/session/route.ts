@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       userData = userDoc.data()!;
+      // SEC-03: disabled check also enforced in getAuthenticatedUser for all other routes
       // Block suspended accounts from establishing a session
       if (userData.disabled === true) {
         return NextResponse.json({ error: 'Account suspended. Contact your administrator.' }, { status: 403 });
