@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
 
     let sizeBytes = 0;
     for (const asset of allAssets) {
+      if (asset.deletedAt) continue; // SDC-04: exclude soft-deleted from size total
       const inScope =
         scopedFolderIds === null
           ? true
