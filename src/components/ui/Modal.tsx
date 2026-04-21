@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useModalOwner } from '@/hooks/useModalOwner';
 
 interface ModalProps {
   isOpen: boolean;
@@ -28,6 +30,11 @@ export function Modal({
   className,
   hideTopAccent = false,
 }: ModalProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const titleId = React.useId();
+  useFocusTrap(cardRef, isOpen);
+  useModalOwner(isOpen);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -60,6 +67,10 @@ export function Modal({
 
       {/* Modal */}
       <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={cn(
           'relative w-full bg-frame-card border border-frame-border rounded-2xl shadow-2xl shadow-black/50 animate-slide-up overflow-hidden',
           sizes[size],
@@ -73,7 +84,7 @@ export function Modal({
 
         {title ? (
           <div className="flex items-center justify-between px-6 py-4 border-b border-frame-border">
-            <h2 className="text-base font-semibold text-white">{title}</h2>
+            <h2 id={titleId} className="text-base font-semibold text-white">{title}</h2>
             <button
               onClick={onClose}
               aria-label="Close"
