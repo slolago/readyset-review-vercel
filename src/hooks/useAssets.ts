@@ -174,7 +174,7 @@ export function useAssets(projectId?: string, folderId?: string | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAssets = useCallback(async () => {
+  const fetchAssets = useCallback(async (signal?: AbortSignal) => {
     if (!projectId) return;
     setLoading(true);
     setError(null);
@@ -186,19 +186,26 @@ export function useAssets(projectId?: string, folderId?: string | null) {
       }
       const res = await fetch(`/api/assets?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
+      if (signal?.aborted) return;
       if (!res.ok) throw new Error('Failed to fetch assets');
       const data = await res.json();
       setAssets(data.assets);
     } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [projectId, folderId, getIdToken]);
 
   useEffect(() => {
-    fetchAssets();
+    // Abort in-flight request on folder/project change so stale responses
+    // can't overwrite fresh ones when the user switches folders quickly.
+    const ctrl = new AbortController();
+    fetchAssets(ctrl.signal);
+    return () => ctrl.abort();
   }, [fetchAssets]);
 
   return { assets, loading, error, refetch: fetchAssets };
