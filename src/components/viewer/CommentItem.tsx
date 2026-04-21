@@ -69,7 +69,16 @@ export function CommentItem({
   };
 
   const createdAt = comment.createdAt?.toDate?.() || new Date();
-  const canDelete = !readOnly && (user?.id === comment.authorId || user?.role === 'admin' || user?.role === 'manager' || user?.role === 'editor');
+  // Guest path: no authed user AND comment has no authorId → treat as guest-
+  // deletable so the review page (which decides via onDelete presence + a
+  // name match server-side) can show the button. Authed path unchanged.
+  const canDelete =
+    !readOnly &&
+    (user?.id === comment.authorId ||
+      user?.role === 'admin' ||
+      user?.role === 'manager' ||
+      user?.role === 'editor' ||
+      (!user && !comment.authorId));
   const hasAnnotation = !!(comment.annotation?.shapes && comment.annotation.shapes !== '[]');
   const hasTimestamp = comment.timestamp !== undefined;
   const hasRange = comment.inPoint !== undefined && comment.outPoint !== undefined;

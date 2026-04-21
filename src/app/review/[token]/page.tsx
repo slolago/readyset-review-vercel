@@ -246,6 +246,30 @@ export default function ReviewPage() {
     setGuestInfo(info);
   };
 
+  const handleResolveComment = async (id: string, resolved: boolean) => {
+    if (!selectedAsset) return false;
+    const res = await fetch(`/api/comments/${id}?reviewToken=${token}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolved }),
+    });
+    if (res.ok) { await fetchComments(selectedAsset.id); return true; }
+    return false;
+  };
+
+  const handleDeleteComment = async (id: string) => {
+    if (!selectedAsset) return false;
+    const res = await fetch(`/api/comments/${id}?reviewToken=${token}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Guest-Name': guestInfo?.name ?? '',
+      },
+    });
+    if (res.ok) { await fetchComments(selectedAsset.id); return true; }
+    return false;
+  };
+
   // ── Loading / error / password / guest screens ──────────────────────────
 
   if (loading) {
@@ -400,8 +424,8 @@ export default function ReviewPage() {
               onShowAnnotation={handleShowAnnotation}
               onHideAnnotation={handleHideAnnotation}
               onAddComment={handleAddComment}
-              onResolveComment={async () => false}
-              onDeleteComment={async () => false}
+              onResolveComment={handleResolveComment}
+              onDeleteComment={handleDeleteComment}
               onSeek={handleSeek}
               onSelectComment={setSelectedCommentId}
               inPoint={rangeIn}
