@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { canInviteCollaborator, canRemoveCollaborator } from '@/lib/permissions';
 import type { Project } from '@/types';
 
@@ -45,9 +45,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const filtered = existing.filter((c: any) => c.userId !== invitedUser.id);
     filtered.push(collaborator);
 
-    await db.collection('projects').doc(params.projectId).update({
-      collaborators: filtered,
-      updatedAt: Timestamp.now(),
+    // Phase 67 (PERF-01): keep collaborators + collaboratorIds in sync atomically.
+    // arrayUnion is idempotent so re-adding an existing collaborator with a new
+    // role still leaves collaboratorIds correct.
+    const projectRef = db.collection('projects').doc(params.projectId);
+    await db.runTransaction(async (tx) => {
+      tx.update(projectRef, {
+        collaborators: filtered,
+        collaboratorIds: FieldValue.arrayUnion(invitedUser.id),
+        updatedAt: Timestamp.now(),
+      });
     });
 
     return NextResponse.json({ collaborator });
@@ -76,9 +83,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       (c: any) => c.userId !== userId
     );
 
-    await db.collection('projects').doc(params.projectId).update({
-      collaborators,
-      updatedAt: Timestamp.now(),
+    // Phase 67 (PERF-01): atomic removal from both fields.
+    const projectRef = db.collection('projects').doc(params.projectId);
+    await db.runTransaction(async (tx) => {
+      tx.update(projectRef, {
+        collaborators,
+        collaboratorIds: FieldValue.arrayRemove(userId),
+        updatedAt: Timestamp.now(),
+      });
     });
 
     return NextResponse.json({ success: true });
