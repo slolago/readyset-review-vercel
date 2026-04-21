@@ -102,6 +102,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         ownerName: user?.name ?? null,
         ownerEmail: user?.email ?? null,
         collaborators: filtered,
+        // Phase 67 (PERF-01): keep denormalized collaboratorIds in sync.
+        collaboratorIds: filtered.map((c: any) => c.userId).filter(Boolean),
       });
     });
 

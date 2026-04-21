@@ -44,7 +44,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       };
       if (idx >= 0) collaborators[idx] = { ...collaborators[idx], ...entry };
       else collaborators.push(entry);
-      tx.update(ref, { collaborators });
+      // Phase 67 (PERF-01): keep denormalized collaboratorIds in sync atomically.
+      tx.update(ref, {
+        collaborators,
+        collaboratorIds: collaborators.map((c: any) => c.userId).filter(Boolean),
+      });
     });
 
     return NextResponse.json({ success: true });
@@ -81,7 +85,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       if (p.ownerId === params.userId) throw new Error('IS_OWNER');
       const collaborators = (Array.isArray(p.collaborators) ? p.collaborators : [])
         .filter((c: any) => c.userId !== params.userId);
-      tx.update(ref, { collaborators });
+      // Phase 67 (PERF-01): keep denormalized collaboratorIds in sync atomically.
+      tx.update(ref, {
+        collaborators,
+        collaboratorIds: collaborators.map((c: any) => c.userId).filter(Boolean),
+      });
     });
 
     return NextResponse.json({ success: true });
