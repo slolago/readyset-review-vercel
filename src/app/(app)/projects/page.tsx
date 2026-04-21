@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { useProjects } from '@/hooks/useProject';
 import { ProjectGrid } from '@/components/projects/ProjectGrid';
 import { CreateProjectModal } from '@/components/projects/CreateProjectModal';
@@ -14,6 +15,7 @@ export default function ProjectsPage() {
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState('');
+  const actionHandledRef = useRef(false);
 
   // Open create modal from deep link (e.g., /projects?create=1)
   useEffect(() => {
@@ -22,6 +24,28 @@ export default function ProjectsPage() {
       router.replace('/projects', { scroll: false });
     }
   }, [searchParams, router]);
+
+  // Handle ?action=upload|invite — route into a real project context
+  // (or prompt to create one first if no projects exist).
+  useEffect(() => {
+    if (actionHandledRef.current) return;
+    const action = searchParams.get('action');
+    if (action !== 'upload' && action !== 'invite') return;
+    if (loading) return; // wait until we know whether projects exist
+    actionHandledRef.current = true;
+
+    if (projects.length === 0) {
+      setShowCreate(true);
+      toast(
+        `Create a project first, then you can ${
+          action === 'upload' ? 'upload assets' : 'invite collaborators'
+        }.`
+      );
+      router.replace('/projects', { scroll: false });
+    } else {
+      router.replace(`/projects/${projects[0].id}?action=${action}`, { scroll: false });
+    }
+  }, [searchParams, loading, projects, router]);
 
   const filtered = projects.filter(
     (p) =>
