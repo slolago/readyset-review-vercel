@@ -160,7 +160,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       switch (tool) {
         case 'select':
           canvas.selection = true;
-          canvas.forEachObject((obj: any) => { obj.selectable = true; });
+          canvas.forEachObject((obj: any) => { obj.selectable = true; obj.evented = true; });
           break;
 
         case 'freehand':
