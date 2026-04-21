@@ -27,7 +27,7 @@ import {
   updateExportJob,
   listUserExports,
 } from '@/lib/exports';
-import type { Project, ExportFormat, ExportJob } from '@/types';
+import type { Project, ExportFormat, Job } from '@/types';
 
 export const runtime = 'nodejs';
 // Capped at 60s to match the Hobby-plan limit (vercel.json pins this).
@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
     await updateExportJob(jobId, {
       status: 'ready',
       gcsPath: gcsOutPath,
-      completedAt: FieldValue.serverTimestamp() as unknown as ExportJob['completedAt'],
+      completedAt: FieldValue.serverTimestamp() as unknown as Job['completedAt'],
     });
 
     // Fresh download URL
