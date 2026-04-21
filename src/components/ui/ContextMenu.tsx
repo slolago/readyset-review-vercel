@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,8 @@ interface ContextMenuProps {
 
 export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number }>({ left: position.x, top: position.y });
+  const [measured, setMeasured] = useState(false);
 
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
@@ -49,16 +51,24 @@ export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
     };
   }, [onClose]);
 
-  // Viewport-edge flip
-  const MENU_W = 200;
-  const MENU_H = items.length * 36 + items.filter(i => i.dividerBefore).length * 8 + 16;
-  const x = position.x + MENU_W > window.innerWidth ? position.x - MENU_W : position.x;
-  const y = position.y + MENU_H > window.innerHeight ? position.y - MENU_H : position.y;
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const pad = 8;
+    let left = position.x;
+    let top = position.y;
+    if (left + rect.width + pad > window.innerWidth) left = position.x - rect.width;
+    if (top + rect.height + pad > window.innerHeight) top = position.y - rect.height;
+    left = Math.max(pad, Math.min(left, window.innerWidth - rect.width - pad));
+    top = Math.max(pad, Math.min(top, window.innerHeight - rect.height - pad));
+    setPos({ left, top });
+    setMeasured(true);
+  }, [position.x, position.y, items.length]);
 
   const menu = (
     <div
       ref={ref}
-      style={{ position: 'fixed', left: x, top: y, zIndex: 9999 }}
+      style={{ position: 'fixed', left: pos.left, top: pos.top, zIndex: 9999, visibility: measured ? 'visible' : 'hidden' }}
       className="bg-frame-card border border-frame-border rounded-xl shadow-2xl py-1 min-w-[160px] animate-fade-in"
     >
       {items.map((item, i) => (
@@ -86,4 +96,41 @@ export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
   );
 
   return ReactDOM.createPortal(menu, document.body);
+}
+
+interface ContextMenuController {
+  openKey: string | null;
+  open: (key: string, position: { x: number; y: number }, items: MenuItem[]) => void;
+  close: () => void;
+}
+
+const Ctx = createContext<ContextMenuController | null>(null);
+
+export function ContextMenuProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<{ key: string; position: { x: number; y: number }; items: MenuItem[] } | null>(null);
+
+  const open = useCallback((key: string, position: { x: number; y: number }, items: MenuItem[]) => {
+    setState({ key, position, items });
+  }, []);
+
+  const close = useCallback(() => setState(null), []);
+
+  const value: ContextMenuController = {
+    openKey: state?.key ?? null,
+    open,
+    close,
+  };
+
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      {state && <ContextMenu position={state.position} items={state.items} onClose={() => setState(null)} />}
+    </Ctx.Provider>
+  );
+}
+
+export function useContextMenuController(): ContextMenuController {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error('useContextMenuController must be used inside ContextMenuProvider');
+  return ctx;
 }

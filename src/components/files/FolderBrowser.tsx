@@ -46,8 +46,7 @@ import { getProjectColor, formatBytes, forceDownload } from '@/lib/utils';
 import { FILE_INPUT_ACCEPT } from '@/lib/file-types';
 import { selectionStyle } from '@/lib/selectionStyle';
 import { Dropdown } from '@/components/ui/Dropdown';
-import { ContextMenu } from '@/components/ui/ContextMenu';
-import type { MenuItem } from '@/components/ui/ContextMenu';
+import { ContextMenuProvider, useContextMenuController } from '@/components/ui/ContextMenu';
 import toast from 'react-hot-toast';
 import { CreateReviewLinkModal } from '@/components/review/CreateReviewLinkModal';
 import { AddToReviewLinkModal } from '@/components/review/AddToReviewLinkModal';
@@ -59,7 +58,15 @@ interface FolderBrowserProps {
   ancestorPath?: string; // comma-separated ancestor folder IDs from URL, used when Firestore parentId chain is missing
 }
 
-export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: FolderBrowserProps) {
+export function FolderBrowser(props: FolderBrowserProps) {
+  return (
+    <ContextMenuProvider>
+      <FolderBrowserInner {...props} />
+    </ContextMenuProvider>
+  );
+}
+
+function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBrowserProps) {
   const { user, getIdToken } = useAuth();
   const confirm = useConfirm();
   const router = useRouter();
@@ -194,8 +201,7 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
   // Drag-to-version-stack state (merge asset into another asset's version group)
   const [dragOverAssetId, setDragOverAssetId] = useState<string | null>(null);
 
-  // Canvas right-click context menu
-  const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenu = useContextMenuController();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -561,8 +567,6 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
     return () => window.removeEventListener('keydown', handleKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds.size, folders, assets]);
-
-  const closeCanvasMenu = useCallback(() => setCanvasMenu(null), []);
 
   const ensureAllFolders = async () => {
     if (allFolders.length > 0) return; // already loaded
@@ -1090,7 +1094,12 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
           const card = (e.target as HTMLElement).closest('[data-selectable]');
           if (card) return; // card's own handler fires via stopPropagation
           e.preventDefault();
-          setCanvasMenu({ x: e.clientX, y: e.clientY });
+          ctxMenu.open('canvas', { x: e.clientX, y: e.clientY }, [
+            { label: 'New Folder', icon: <Plus className="w-4 h-4" />, onClick: () => setShowCreateFolder(true) },
+            { label: 'Upload files', icon: <Upload className="w-4 h-4" />, onClick: () => fileInputRef.current?.click() },
+            { label: 'Upload folder', icon: <FolderOpen className="w-4 h-4" />, onClick: () => folderInputRef.current?.click() },
+            { label: 'Download all', icon: <Download className="w-4 h-4" />, onClick: handleDownloadAll, dividerBefore: true, disabled: assets.length === 0 },
+          ]);
         }}
       >
         {/* File drop overlay */}
@@ -1114,20 +1123,6 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
               width: Math.abs(rubberBand.x2 - rubberBand.x1),
               height: Math.abs(rubberBand.y2 - rubberBand.y1),
             }}
-          />
-        )}
-
-        {/* Canvas context menu */}
-        {canvasMenu && (
-          <ContextMenu
-            position={canvasMenu}
-            onClose={closeCanvasMenu}
-            items={[
-              { label: 'New Folder', icon: <Plus className="w-4 h-4" />, onClick: () => setShowCreateFolder(true) },
-              { label: 'Upload files', icon: <Upload className="w-4 h-4" />, onClick: () => fileInputRef.current?.click() },
-              { label: 'Upload folder', icon: <FolderOpen className="w-4 h-4" />, onClick: () => folderInputRef.current?.click() },
-              { label: 'Download all', icon: <Download className="w-4 h-4" />, onClick: handleDownloadAll, dividerBefore: true, disabled: assets.length === 0 },
-            ]}
           />
         )}
 
@@ -1554,11 +1549,11 @@ const FolderCard = React.memo(function FolderCard({
 }) {
   const router = useRouter();
   const { getIdToken } = useAuth();
+  const ctxMenu = useContextMenuController();
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [showFolderCopyModal, setShowFolderCopyModal] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [preview, setPreview] = useState<
     Array<{ id: string; type: string; name: string; thumbnailSignedUrl?: string; signedUrl?: string }>
   >([]);
@@ -1637,7 +1632,16 @@ const FolderCard = React.memo(function FolderCard({
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        setContextMenu({ x: e.clientX, y: e.clientY });
+        ctxMenu.open(`folder-${folder.id}`, { x: e.clientX, y: e.clientY }, [
+          { label: 'Open', icon: <FolderOpen className="w-4 h-4" />, onClick: () => router.push(`/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`) },
+          { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRenameFolder },
+          { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: onDuplicate ?? (() => {}) },
+          { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: handleOpenCopyModal },
+          { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.() },
+          { label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink ?? (() => {}) },
+          { label: 'Add to review link…', icon: <LinkIcon className="w-4 h-4" />, onClick: onAddToReviewLink ?? (() => {}) },
+          { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true, dividerBefore: true },
+        ]);
       }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -1783,22 +1787,6 @@ const FolderCard = React.memo(function FolderCard({
             setShowFolderCopyModal(false);
           }}
           onClose={() => setShowFolderCopyModal(false)}
-        />
-      )}
-      {contextMenu && (
-        <ContextMenu
-          position={contextMenu}
-          onClose={() => setContextMenu(null)}
-          items={[
-            { label: 'Open', icon: <FolderOpen className="w-4 h-4" />, onClick: () => router.push(`/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`) },
-            { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRenameFolder },
-            { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: onDuplicate ?? (() => {}) },
-            { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: handleOpenCopyModal },
-            { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.() },
-            { label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink ?? (() => {}) },
-            { label: 'Add to review link…', icon: <LinkIcon className="w-4 h-4" />, onClick: onAddToReviewLink ?? (() => {}) },
-            { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: onDelete, danger: true, dividerBefore: true },
-          ]}
         />
       )}
     </div>

@@ -25,7 +25,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { InlineRename } from '@/components/ui/InlineRename';
 import { useUpload } from '@/hooks/useAssets';
-import { ContextMenu } from '@/components/ui/ContextMenu';
+import { useContextMenuController } from '@/components/ui/ContextMenu';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { SmartCopyModal } from './SmartCopyModal';
 import { VersionStackModal } from './VersionStackModal';
@@ -238,7 +238,7 @@ function AssetListRow({
   const { getIdToken } = useAuth();
   const confirm = useConfirm();
   const { uploadFile } = useUpload();
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const ctxMenu = useContextMenuController();
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [showCopyToModal, setShowCopyToModal] = useState(false);
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
@@ -416,7 +416,22 @@ function AssetListRow({
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setContextMenu({ x: e.clientX, y: e.clientY });
+          ctxMenu.open(`row-${asset.id}`, { x: e.clientX, y: e.clientY }, [
+            { label: 'Open', icon: <ExternalLink className="w-4 h-4" />, onClick: () => router.push(`/projects/${projectId}/assets/${asset.id}`) },
+            { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: () => setIsRenaming(true) },
+            { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: handleDuplicate },
+            { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
+            { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.(asset.id) },
+            { label: 'Upload new version', icon: <Upload className="w-4 h-4" />, onClick: handleUploadVersion },
+            { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
+            { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
+            { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
+            { label: 'Approved', icon: <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
+            { label: 'In Review', icon: <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />, onClick: () => handleSetStatus('in_review') },
+            { label: 'Needs Revision', icon: <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />, onClick: () => handleSetStatus('needs_revision') },
+            { label: 'Clear status', icon: <span className="w-2 h-2 rounded-full bg-white/20 inline-block" />, onClick: () => handleSetStatus(null) },
+            { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
+          ]);
         }}
         className={`cursor-pointer hover:bg-frame-card/50 transition-colors border-b border-frame-border/40 ${
           isSelected ? 'bg-frame-accent/10' : ''
@@ -548,28 +563,6 @@ function AssetListRow({
           </span>
         </td>
       </tr>
-      {contextMenu && (
-        <ContextMenu
-          position={contextMenu}
-          onClose={() => setContextMenu(null)}
-          items={[
-            { label: 'Open', icon: <ExternalLink className="w-4 h-4" />, onClick: () => router.push(`/projects/${projectId}/assets/${asset.id}`) },
-            { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: () => setIsRenaming(true) },
-            { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: handleDuplicate },
-            { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
-            { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.(asset.id) },
-            { label: 'Upload new version', icon: <Upload className="w-4 h-4" />, onClick: handleUploadVersion },
-            { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
-            { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
-            { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
-            { label: 'Approved', icon: <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
-            { label: 'In Review', icon: <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />, onClick: () => handleSetStatus('in_review') },
-            { label: 'Needs Revision', icon: <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />, onClick: () => handleSetStatus('needs_revision') },
-            { label: 'Clear status', icon: <span className="w-2 h-2 rounded-full bg-white/20 inline-block" />, onClick: () => handleSetStatus(null) },
-            { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
-          ]}
-        />
-      )}
       {showCopyToModal && (
         <SmartCopyModal
           folders={allFolders}

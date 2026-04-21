@@ -18,8 +18,7 @@ const ICON_COMPONENTS: Record<IconName, React.ComponentType<{ className?: string
 import type { Asset, Folder } from '@/types';
 import type { ReviewStatus } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
-import { ContextMenu } from '@/components/ui/ContextMenu';
-import type { MenuItem } from '@/components/ui/ContextMenu';
+import { useContextMenuController } from '@/components/ui/ContextMenu';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { SmartCopyModal } from './SmartCopyModal';
 import { VersionStackModal } from './VersionStackModal';
@@ -62,6 +61,7 @@ export const AssetCard = memo(function AssetCard({
   const { getIdToken } = useAuth();
   const confirm = useConfirm();
   const { uploadFile } = useUpload();
+  const ctxMenu = useContextMenuController();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const versionCount = (asset as any)._versionCount || 1;
@@ -74,7 +74,6 @@ export const AssetCard = memo(function AssetCard({
   const signedUrl = (asset as any).signedUrl as string | undefined;
   const thumbnailUrl = (asset as any).thumbnailSignedUrl as string | undefined;
   const downloadUrl = (asset as any).downloadUrl as string | undefined;
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [scrubPct, setScrubPct] = useState(0);
   const [spriteLoaded, setSpriteLoaded] = useState(false);
@@ -368,7 +367,25 @@ export const AssetCard = memo(function AssetCard({
       onContextMenu={isUploading || hideActions ? undefined : (e) => {
         e.preventDefault();
         e.stopPropagation();
-        setContextMenu({ x: e.clientX, y: e.clientY });
+        ctxMenu.open(`asset-${asset.id}`, { x: e.clientX, y: e.clientY }, [
+          { label: 'Open', icon: <ExternalLink className="w-4 h-4" />, onClick: () => onClick?.() },
+          { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRename },
+          { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: handleDuplicate },
+          { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
+          { label: 'Move to', icon: <MoveIcon className="w-4 h-4" />, onClick: () => onRequestMove?.() },
+          { label: 'Upload new version', icon: <Upload className="w-4 h-4" />, onClick: handleUploadVersion },
+          { label: 'Stack onto\u2026', icon: <Layers className="w-4 h-4" />, onClick: () => setShowStackOntoModal(true) },
+          { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
+          { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
+          { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
+          ...(onCreateReviewLink ? [{ label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink }] : []),
+          ...(onAddToReviewLink ? [{ label: 'Add to review link\u2026', icon: <LinkIcon className="w-4 h-4" />, onClick: onAddToReviewLink }] : []),
+          { label: 'Approved', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
+          { label: 'Needs Revision', icon: <AlertCircle className="w-4 h-4 text-yellow-400" />, onClick: () => handleSetStatus('needs_revision') },
+          { label: 'In Review', icon: <Clock className="w-4 h-4 text-blue-400" />, onClick: () => handleSetStatus('in_review') },
+          { label: 'Clear status', icon: <X className="w-4 h-4 text-frame-textMuted" />, onClick: () => handleSetStatus(null) },
+          { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
+        ]);
       }}
       className={[
         'group bg-frame-card rounded-xl overflow-hidden transition-all',
@@ -707,31 +724,6 @@ export const AssetCard = memo(function AssetCard({
           candidates={folderSiblings ?? []}
           onPick={handleStackOnto}
           onClose={() => setShowStackOntoModal(false)}
-        />
-      )}
-      {contextMenu && !hideActions && (
-        <ContextMenu
-          position={contextMenu}
-          onClose={() => setContextMenu(null)}
-          items={[
-            { label: 'Open', icon: <ExternalLink className="w-4 h-4" />, onClick: () => onClick?.() },
-            { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRename },
-            { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: handleDuplicate },
-            { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
-            { label: 'Move to', icon: <MoveIcon className="w-4 h-4" />, onClick: () => onRequestMove?.() },
-            { label: 'Upload new version', icon: <Upload className="w-4 h-4" />, onClick: handleUploadVersion },
-            { label: 'Stack onto\u2026', icon: <Layers className="w-4 h-4" />, onClick: () => setShowStackOntoModal(true) },
-            { label: 'Manage version stack', icon: <Layers className="w-4 h-4" />, onClick: () => setShowVersionModal(true) },
-            { label: 'Download', icon: <Download className="w-4 h-4" />, onClick: handleDownload },
-            { label: 'Get link', icon: <LinkIcon className="w-4 h-4" />, onClick: handleGetLink },
-            ...(onCreateReviewLink ? [{ label: 'Create review link', icon: <LinkIcon className="w-4 h-4" />, onClick: onCreateReviewLink }] : []),
-            ...(onAddToReviewLink ? [{ label: 'Add to review link\u2026', icon: <LinkIcon className="w-4 h-4" />, onClick: onAddToReviewLink }] : []),
-            { label: 'Approved', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, onClick: () => handleSetStatus('approved'), dividerBefore: true },
-            { label: 'Needs Revision', icon: <AlertCircle className="w-4 h-4 text-yellow-400" />, onClick: () => handleSetStatus('needs_revision') },
-            { label: 'In Review', icon: <Clock className="w-4 h-4 text-blue-400" />, onClick: () => handleSetStatus('in_review') },
-            { label: 'Clear status', icon: <X className="w-4 h-4 text-frame-textMuted" />, onClick: () => handleSetStatus(null) },
-            { label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: handleDelete, danger: true, dividerBefore: true },
-          ]}
         />
       )}
     </>
