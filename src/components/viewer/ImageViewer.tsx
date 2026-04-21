@@ -134,7 +134,7 @@ export const ImageViewer = forwardRef<ImageViewerHandle, ImageViewerProps>(funct
         }}
       >
         <img
-          src={(asset as any).signedUrl || asset.url}
+          src={(asset as any).signedUrl ?? ''}
           alt={asset.name}
           draggable={false}
           className="max-w-full max-h-[calc(100vh-120px)] object-contain block"

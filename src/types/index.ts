@@ -55,7 +55,6 @@ export interface Asset {
   /** Extension hint (e.g. 'pdf', 'html', 'zip', 'ttf', 'psd'). Optional — absent on pre-Phase-51 assets. */
   subtype?: string;
   mimeType: string;
-  url: string;
   gcsPath: string;
   thumbnailUrl: string;
   /** GCS path to the generated thumbnail. Set by upload/complete + upload/thumbnail. Absent until first thumbnail is produced. */

@@ -119,8 +119,8 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   const isVideo = typesMatch && assetA?.type === 'video';
   const isImage = typesMatch && assetA?.type === 'image';
 
-  const urlA = assetA ? ((assetA as any).signedUrl || assetA.url) : '';
-  const urlB = assetB ? ((assetB as any).signedUrl || assetB.url) : '';
+  const urlA = assetA ? ((assetA as any).signedUrl ?? '') : '';
+  const urlB = assetB ? ((assetB as any).signedUrl ?? '') : '';
 
   // ── Playback state ─────────────────────────────────────────────────────────
   const wrapperRef = useRef<HTMLDivElement>(null);

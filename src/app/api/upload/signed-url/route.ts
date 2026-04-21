@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { canUpload } from '@/lib/permissions';
 import type { Project } from '@/types';
-import { generateUploadSignedUrl, buildGcsPath, getPublicUrl } from '@/lib/gcs';
+import { generateUploadSignedUrl, buildGcsPath } from '@/lib/gcs';
 import { classify, extFromName } from '@/lib/file-types';
 import { Timestamp } from 'firebase-admin/firestore';
 import { randomUUID } from 'crypto';
@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
     const assetId = randomUUID();
     const gcsPath = buildGcsPath(projectId, assetId, filename);
     const signedUrl = await generateUploadSignedUrl(gcsPath, contentType);
-    const publicUrl = getPublicUrl(gcsPath);
     const folderMatch = folderId || null;
 
     // Transaction scoped to (projectId, folderId, filename):
@@ -114,7 +113,6 @@ export async function POST(request: NextRequest) {
           type: meta.type,
           subtype: meta.subtype,
           mimeType: contentType,
-          url: publicUrl,
           gcsPath,
           thumbnailUrl: '',
           size: size || 0,
