@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { listJobsForAsset } from '@/lib/jobs';
+import { listJobsForAsset, sweepStaleJobs } from '@/lib/jobs';
 import { canProbeAsset } from '@/lib/permissions';
 import type { Project } from '@/types';
 
@@ -30,6 +30,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const project = { id: projDoc.id, ...projDoc.data() } as Project;
   if (!canProbeAsset(user, project)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // FMT-02: lazy sweep of stuck jobs on every read — SIGKILL'd functions
+  // can't mark themselves failed, so we do it here. Fire-and-await is fine;
+  // the query is indexed on (status, startedAt) and usually returns zero.
+  try {
+    const swept = await sweepStaleJobs();
+    if (swept > 0) console.log('[jobs GET] swept stale jobs:', swept);
+  } catch (err) {
+    console.error('[jobs GET] sweep failed (non-fatal)', err);
   }
 
   const jobs = await listJobsForAsset(params.assetId, 20);

@@ -59,6 +59,37 @@ export async function getJob(jobId: string): Promise<Job | null> {
   return { id: snap.id, ...snap.data() } as Job;
 }
 
+/**
+ * FMT-02: mark running jobs stuck past a watermark as failed.
+ *
+ * A serverless function that gets SIGKILL'd (OOM, timeout, redeploy) can't
+ * write its own `failed` status, leaving a job `running` forever. This sweep
+ * flips anything older than `olderThanMs` (default 2 minutes) to failed with
+ * a clear error so the UI doesn't show a permanent "encoding…" spinner.
+ *
+ * Called lazily from the jobs GET endpoint — no cron needed for now.
+ * Returns the number of jobs swept.
+ */
+export async function sweepStaleJobs(olderThanMs = 120000): Promise<number> {
+  const db = getAdminDb();
+  const cutoff = new Date(Date.now() - olderThanMs);
+  const snap = await db.collection(COLLECTION)
+    .where('status', '==', 'running')
+    .where('startedAt', '<', cutoff)
+    .get();
+  if (snap.empty) return 0;
+  const batch = db.batch();
+  snap.docs.forEach((d) => {
+    batch.update(d.ref, {
+      status: 'failed',
+      error: 'function likely SIGKILL\'d or crashed',
+      completedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+  return snap.size;
+}
+
 export async function listJobsForAsset(assetId: string, max = 20): Promise<Job[]> {
   const db = getAdminDb();
   const snap = await db.collection(COLLECTION)
