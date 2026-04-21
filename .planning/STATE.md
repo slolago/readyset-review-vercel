@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Architecture Hardening
 status: active
-stopped_at: Roadmap created — Phase 60 (pipeline-observability) ready
+stopped_at: Phase 64 complete — Phase 65 (security-and-upload-validation) ready
 last_updated: "2026-04-20T00:00:00.000Z"
 last_activity: 2026-04-20
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 5
+  total_plans: 5
+  completed_plans: 5
+  percent: 71
 ---
 
 # State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 ## Current Position
 
-Phase: Phase 60 (pipeline-observability) — Not started
-Status: Roadmap created from deep lifecycle + unhappy-path audit
-Last activity: 2026-04-20 — v2.0 scaffolded (7 phases, 31 reqs)
+Phase: Phase 65 (security-and-upload-validation) — Not started
+Status: Phase 64 complete — FMT-01..04 shipped (mov+h264 remux, stale sweep, HEIC ffprobe, adaptive sprite)
+Last activity: 2026-04-20 — Phase 64 shipped
 
-Progress: [░░░░░░░░░░] 0% (0/7 phases)
+Progress: [███████░░░] 71% (5/7 phases)
 
 ## Accumulated Context
 
@@ -67,5 +67,5 @@ None — ready for /gsd:plan-phase 60.
 ## Session Continuity
 
 Last session: 2026-04-20
-Stopped at: v2.0 scaffolded, ready for /gsd:plan-phase 60
+Stopped at: Phase 64 complete — ready for /gsd:plan-phase 65
 Resume file: None

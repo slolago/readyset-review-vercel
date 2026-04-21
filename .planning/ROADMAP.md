@@ -314,7 +314,7 @@ See [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) for full phase deta
 - [ ] **Phase 61: transactional-mutations** — merge/unstack/reorder + auto-versioning under runTransaction, folder-delete-during-upload guard
 - [ ] **Phase 62: signed-url-caching** — cache signedUrl + expiresAt; stop regenerating per-request
 - [ ] **Phase 63: firestore-indexes-and-denorm** — composite indexes, denormalize commentCount, kill full-collection scans
-- [ ] **Phase 64: format-edge-cases** — HEVC/AV1/VP9/ProRes export, stale-job sweeper, HEIC/AVIF fallback, adaptive sprite spacing
+- [x] **Phase 64: format-edge-cases** — HEVC/AV1/VP9/ProRes export, stale-job sweeper, HEIC/AVIF fallback, adaptive sprite spacing
 - [ ] **Phase 65: security-and-upload-validation** — bcrypt review-link passwords, POST body not query, GCS.exists() verify, MIME validation
 - [ ] **Phase 66: dead-data-and-contracts** — remove url phantom, unify sprite naming, UploadCompleteRequest, AbortController, folder.path ancestry, provisional-metadata pattern
 
@@ -363,6 +363,6 @@ See [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) for full phase deta
 | 61. transactional-mutations | v2.0 | 1/1 | Complete | 2026-04-20 |
 | 62. signed-url-caching | v2.0 | 1/1 | Complete | 2026-04-20 |
 | 63. firestore-indexes-and-denorm | v2.0 | 1/1 | Complete | 2026-04-20 |
-| 64. format-edge-cases | v2.0 | 0/? | Not started | - |
+| 64. format-edge-cases | v2.0 | 1/1 | Complete | 2026-04-20 |
 | 65. security-and-upload-validation | v2.0 | 0/? | Not started | - |
 | 66. dead-data-and-contracts | v2.0 | 0/? | Not started | - |

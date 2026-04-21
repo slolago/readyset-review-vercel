@@ -37,10 +37,10 @@ Synthesized from a deep pipeline-lifecycle + unhappy-path audit (2026-04-20). 5 
 
 ### Format Edge Cases (Phase 64)
 
-- [ ] **FMT-01**: Export route handles HEVC / AV1 / VP9 / ProRes source correctly — copy path's container check stops rejecting `.mov` with H.264, and the re-encode path works for any input codec
-- [ ] **FMT-02**: Export jobs have a `startedAt` timestamp and a server-side sweeper that marks jobs stuck in `encoding` past a watermark as `failed` so SIGKILL'd functions don't leave permanent ghost jobs
-- [ ] **FMT-03**: `src/lib/image-metadata.ts` falls back to ffprobe (already resolved server-side) when `image-size` returns null for HEIC / AVIF / HDR image inputs
-- [ ] **FMT-04**: Sprite frame spacing adapts to very short (<3s) and very long (>1h) videos — no frame-timestamp clustering at boundaries; limits to 20 frames always but distributes intelligently
+- [x] **FMT-01**: Export route handles HEVC / AV1 / VP9 / ProRes source correctly — copy path's container check stops rejecting `.mov` with H.264, and the re-encode path works for any input codec
+- [x] **FMT-02**: Export jobs have a `startedAt` timestamp and a server-side sweeper that marks jobs stuck in `encoding` past a watermark as `failed` so SIGKILL'd functions don't leave permanent ghost jobs
+- [x] **FMT-03**: `src/lib/image-metadata.ts` falls back to ffprobe (already resolved server-side) when `image-size` returns null for HEIC / AVIF / HDR image inputs
+- [x] **FMT-04**: Sprite frame spacing adapts to very short (<3s) and very long (>1h) videos — no frame-timestamp clustering at boundaries; limits to 20 frames always but distributes intelligently
 
 ### Security & Upload Validation (Phase 65)
 
@@ -105,10 +105,10 @@ All 37 REQs trace to concrete audit findings — 18 specific (C-1 to L-4) + 5 sy
 | IDX-02 | Phase 63 | Pending |
 | IDX-03 | Phase 63 | Pending |
 | IDX-04 | Phase 63 | Pending |
-| FMT-01 | Phase 64 | Pending |
-| FMT-02 | Phase 64 | Pending |
-| FMT-03 | Phase 64 | Pending |
-| FMT-04 | Phase 64 | Pending |
+| FMT-01 | Phase 64 | Complete |
+| FMT-02 | Phase 64 | Complete |
+| FMT-03 | Phase 64 | Complete |
+| FMT-04 | Phase 64 | Complete |
 | SEC-20 | Phase 65 | Pending |
 | SEC-21 | Phase 65 | Pending |
 | SEC-22 | Phase 65 | Pending |
