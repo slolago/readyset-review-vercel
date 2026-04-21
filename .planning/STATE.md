@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Dashboard Performance
-status: shipped
-stopped_at: All 3 phases shipped; live Lighthouse verification pending
-last_updated: "2026-04-21T20:00:00.000Z"
+milestone: v2.2
+milestone_name: Dashboard & Annotation UX Fixes
+status: defining_requirements
+stopped_at: Defining requirements for v2.2
+last_updated: "2026-04-21T21:00:00.000Z"
 last_activity: 2026-04-21
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
@@ -21,19 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-21)
 
 **Core value:** Fast, accurate video review
-**Current focus:** v2.1 shipped; awaiting next milestone
+**Current focus:** v2.2 Dashboard & Annotation UX Fixes — 9 UI/UX bugs
 
 ## Current Position
 
-Phase: All v2.1 phases shipped
-Status: Milestone complete (3/3 phases, 9 REQs)
-Last activity: 2026-04-21 — Phase 69 executed; commits 194d8f66..09ce4cd2 pushed
-
-Progress: [██████████] 100% (3/3 phases)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-21 — Milestone v2.2 started
 
 ## Accumulated Context
 
-### Key decisions
+### Key decisions (carried from v2.1)
 
 - Denormalized `Project.collaboratorIds` (maintained atomically everywhere `collaborators` is written — 5 writers total)
 - `src/lib/projects-access.ts::fetchAccessibleProjects` and `src/lib/dashboard-stats.ts::fetchDashboardStats` are the single entry points for those queries (route + SSR both consume)
@@ -45,6 +44,8 @@ Progress: [██████████] 100% (3/3 phases)
 ### Recently shipped
 
 - v2.1 Dashboard Performance (3 phases, shipped 2026-04-21)
+- v2.0 Architecture Hardening (7 phases, shipped 2026-04-20)
+- v1.9 Hardening & Consistency Audit (6 phases, shipped 2026-04-20)
 
 ### Operational state
 
@@ -57,15 +58,14 @@ Progress: [██████████] 100% (3/3 phases)
 
 ### Pending Todos
 
-None — v2.1 shipped end-to-end. Awaiting next feature/fix input from user.
+None — starting v2.2 requirements work.
 
 ### Blockers/Concerns
 
-- Server Component SSR prefetch doesn't activate until middleware-based session cookie infra exists. Today the Server Component falls back to client-side fetch — same perf as before, but the structural split is done so v3 can turn on SSR cleanly.
-- Hobby-plan 60s function limit is now the bottleneck for sprite generation on very large videos (3 of 74 timing out). Upgrading to Pro (300s) or a different processing path are separate decisions.
+- None blocking v2.2 specifically. All bugs are scoped to frontend behavior (context menus, grid/list UI, inline rename, Fabric.js canvas) plus one API-backed fix for folder duplicate.
 
 ## Session Continuity
 
 Last session: 2026-04-21
-Stopped at: v2.1 shipped — 5 milestones total shipped this sprint (v1.7, v1.8, v1.9, v2.0, v2.1)
+Stopped at: v2.2 milestone started — requirements being defined
 Resume file: None
