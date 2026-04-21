@@ -633,9 +633,6 @@ export const AssetCard = memo(function AssetCard({
                 {commentCount > 99 ? '99+' : commentCount}
               </span>
             )}
-            {versionCount > 1 && (
-              <p className="text-xs text-frame-accent font-medium">{versionCount} versions</p>
-            )}
           </div>
         </div>
         {uploadDateLabel && (
