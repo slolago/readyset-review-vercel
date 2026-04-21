@@ -52,12 +52,12 @@ export default function LoginPage() {
 
         <div className="relative z-10 text-center">
           <Image
-            src="https://readyset.co/wp-content/uploads/2025/09/01.logo-horizontal.png"
+            src="/logo-horizontal.png"
             alt="Ready Set"
             width={200}
             height={56}
             className="object-contain mx-auto mb-12"
-            unoptimized
+            priority
           />
           <h2 className="text-3xl font-bold text-white mb-4 leading-tight">
             Review. Collaborate.<br />
@@ -87,12 +87,12 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="lg:hidden flex justify-center mb-10">
             <Image
-              src="https://readyset.co/wp-content/uploads/2025/09/01.logo-horizontal.png"
+              src="/logo-horizontal.png"
               alt="Ready Set"
               width={160}
               height={44}
               className="object-contain"
-              unoptimized
+              priority
             />
           </div>
 

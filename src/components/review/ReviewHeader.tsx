@@ -32,12 +32,11 @@ export function ReviewHeader({ reviewLink, projectName }: ReviewHeaderProps) {
       <header className="bg-frame-sidebar border-b border-frame-border px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
           <Image
-            src="https://readyset.co/wp-content/uploads/2025/09/01.logo-horizontal.png"
+            src="/logo-horizontal.png"
             alt="Ready Set"
             width={100}
             height={28}
             className="object-contain"
-            unoptimized
           />
           <div className="w-px h-5 bg-frame-border" />
           <div>

@@ -38,12 +38,12 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-4 flex items-center border-b border-frame-border h-16">
         <Image
-          src="https://readyset.co/wp-content/uploads/2025/09/01.logo-horizontal.png"
+          src="/logo-horizontal.png"
           alt="Ready Set"
           width={130}
           height={36}
           className="object-contain"
-          unoptimized
+          priority
         />
       </div>
 
