@@ -963,6 +963,13 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
       if (res.ok) {
         const targetName = targetAsset?.name ?? 'version stack';
         toast.success(`Added to ${targetName}'s version stack`);
+        // BLK-04: drop merged source from selection before refetch swaps it out
+        setSelectedIds((prev) => {
+          if (!prev.has(sourceId)) return prev;
+          const next = new Set(prev);
+          next.delete(sourceId);
+          return next;
+        });
         refetchAssets();
       } else {
         const data = await res.json().catch(() => ({}));
