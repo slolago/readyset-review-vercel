@@ -102,6 +102,16 @@ export interface Asset {
   profile?: string;                // e.g. 'High', 'Main 10'
   level?: number;                  // H.264 level (40 = 4.0)
   rotation?: number;               // display rotation in degrees (0/90/180/270)
+
+  // Phase 62: signed URL cache (CACHE-01..03). Stored so list endpoints can
+  // return cached values when expiry is >30 min away and avoid per-request
+  // GCS signing (a 200-asset review link was firing 600 sign calls per load).
+  signedUrl?: string;
+  signedUrlExpiresAt?: Timestamp;
+  thumbnailSignedUrl?: string;
+  thumbnailSignedUrlExpiresAt?: Timestamp;
+  spriteSignedUrl?: string;
+  spriteSignedUrlExpiresAt?: Timestamp;
 }
 
 export interface AnnotationData {
