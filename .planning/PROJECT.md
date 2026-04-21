@@ -10,18 +10,19 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Current Milestone: v1.8 Asset Pipeline & Visual Polish
+## Current Milestone: v1.9 Hardening & Consistency Audit
 
-**Goal:** Make asset metadata trustworthy for both images and video, restore broken review-link flows, widen the supported file-type surface (PDFs, archives, design files, fonts, HTML), add a Trash/restore safety net, and close visible UI-polish bugs reported during v1.7 QA.
+**Goal:** Close the highest-severity gaps surfaced by a full-app audit across security, data consistency, viewer, file management, and UX. Fix the systemic patterns (soft-delete filter gaps, `Promise.all` silent partial failures, two permission helper styles, modal a11y, phantom type fields) so the platform reads as one coherent product rather than accumulated features.
 
 **Target features:**
-- Metadata accuracy — stop running ffprobe on images; show image-appropriate info (real resolution, file size, EXIF); fix "Invalid Date" upload timestamp
-- Review-link repairs — "Add to review link" modal loads without error; project-scoped review-link views list the project's links
-- File-type expansion — accept PDFs, archives (.zip), fonts, .html, and editable design formats (.ai/.psd/.aep/.fig); sensible previews/icons for non-playable types
-- Trash & restore — soft-delete assets/folders, list in a Trash view, restore to original location, permanent delete from Trash
-- Visual polish — New Folder modal accent clipped, folder content thumbnails, inline-rename confirm, aspect-preserving asset cards, de-duplicate version count, legible tags on busy backgrounds, Review Link modal containment, Quick Actions route correctly
+- Security hardening — plug unauthenticated leaks (`/api/debug`, `/api/safe-zones GET`), enforce `disabled` user check on every route, extend `PATCH /api/review-links` to cover all editable flags, strip password field in all serialization paths, save `approvalStatus` properly
+- Bulk mutation correctness — version-stack-aware DELETE, deep folder copy, replace bare `Promise.all` with `Promise.allSettled` + per-item feedback in bulk move/status, clear selection after merge
+- Viewer alignment — wire Export trim bar to player loop in/out, route review-link page to DocumentViewer/HtmlViewer/FileTypeCard, unify loop range with range-comment range, fix AudioContext lifecycle, fix VersionComparison duration effects
+- UX polish — implement Dashboard Quick Actions targets, wire review-link guest resolve/delete, migrate AssetListView rename to inline, unify admin-table confirm with `useConfirm`, exclude trashed from stats, add Collaborators stat, expiry warning on review pages
+- Data consistency — sweep soft-delete filters everywhere (stats, copy, review-link contents + drill-down), consolidate permission helpers onto the pure `src/lib/permissions.ts` path, add missing fields to `Asset` type (`thumbnailGcsPath`, `spriteStripGcsPath`), name-collision check on asset/folder rename, log every bare `catch`
+- A11y & keyboard — focus trap on Modal + UserDrawer, `role="dialog"` everywhere, Dropdown keyboard navigation + ARIA, coordinate `window keydown` listeners across VideoPlayer / VersionComparison / ExportModal / CommentSidebar
 
-**Prior milestone (v1.7 Review UX & Access Rewrite):** Shipped 2026-04-20 — see [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md).
+**Prior milestones:** v1.7 Review UX & Access Rewrite (shipped 2026-04-20), v1.8 Asset Pipeline & Visual Polish (shipped 2026-04-20). See [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) and [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md).
 
 ## Current State (v1.4 — shipped 2026-04-14)
 
