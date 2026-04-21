@@ -23,6 +23,7 @@ const ICON_COMPONENTS: Record<IconName, React.ComponentType<{ className?: string
 import { useUserNames } from '@/hooks/useUserNames';
 import { useAuth } from '@/hooks/useAuth';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { InlineRename } from '@/components/ui/InlineRename';
 import { useUpload } from '@/hooks/useAssets';
 import { ContextMenu } from '@/components/ui/ContextMenu';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
@@ -242,6 +243,7 @@ function AssetListRow({
   const [showCopyToModal, setShowCopyToModal] = useState(false);
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const [showVersionModal, setShowVersionModal] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isSelected = selectedIds?.has(asset.id) ?? false;
@@ -283,19 +285,18 @@ function AssetListRow({
     }
   };
 
-  const handleRename = async () => {
-    const name = window.prompt('Rename asset:', asset.name);
-    if (!name || name.trim() === asset.name) return;
+  const commitRename = async (next: string) => {
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/assets/${asset.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: next }),
       });
       if (res.ok) { toast.success('Renamed'); onAssetDeleted?.(); }
       else toast.error('Rename failed');
     } catch { toast.error('Rename failed'); }
+    finally { setIsRenaming(false); }
   };
 
   const openCopyTo = async () => {
@@ -452,8 +453,19 @@ function AssetListRow({
         </td>
 
         {/* Name */}
-        <td className="px-3 py-2">
-          <span className="font-medium text-white truncate block max-w-[240px]" title={asset.name}>{asset.name}</span>
+        <td
+          className="px-3 py-2"
+          onClick={(e) => { if (isRenaming) e.stopPropagation(); }}
+        >
+          {isRenaming ? (
+            <InlineRename
+              value={asset.name}
+              onCommit={commitRename}
+              onCancel={() => setIsRenaming(false)}
+            />
+          ) : (
+            <span className="font-medium text-white truncate block max-w-[240px]" title={asset.name}>{asset.name}</span>
+          )}
         </td>
 
         {/* Review status — clickable dropdown */}
@@ -542,7 +554,7 @@ function AssetListRow({
           onClose={() => setContextMenu(null)}
           items={[
             { label: 'Open', icon: <ExternalLink className="w-4 h-4" />, onClick: () => router.push(`/projects/${projectId}/assets/${asset.id}`) },
-            { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: handleRename },
+            { label: 'Rename', icon: <Pencil className="w-4 h-4" />, onClick: () => setIsRenaming(true) },
             { label: 'Duplicate', icon: <CopyPlus className="w-4 h-4" />, onClick: handleDuplicate },
             { label: 'Copy to', icon: <Copy className="w-4 h-4" />, onClick: openCopyTo },
             { label: 'Move to', icon: <Move className="w-4 h-4" />, onClick: () => onRequestMove?.(asset.id) },

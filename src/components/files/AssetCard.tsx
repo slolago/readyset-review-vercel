@@ -26,6 +26,7 @@ import { VersionStackModal } from './VersionStackModal';
 import { StackOntoModal } from './StackOntoModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { InlineRename } from '@/components/ui/InlineRename';
 import { useUpload } from '@/hooks/useAssets';
 import { selectionStyle, type SelectionState } from '@/lib/selectionStyle';
 import toast from 'react-hot-toast';
@@ -65,8 +66,6 @@ export const AssetCard = memo(function AssetCard({
   const versionCount = (asset as any)._versionCount || 1;
   const commentCount = ((asset as any)._commentCount as number | undefined) ?? 0;
   const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState('');
-  const renameInputRef = useRef<HTMLInputElement>(null);
   const [showCopyToModal, setShowCopyToModal] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [showStackOntoModal, setShowStackOntoModal] = useState(false);
@@ -127,17 +126,10 @@ export const AssetCard = memo(function AssetCard({
   }, [spriteUrl, generatingSprite, spriteFailed, asset.type, asset.id, getIdToken]);
 
   const handleRename = () => {
-    setRenameValue(asset.name);
     setIsRenaming(true);
-    setTimeout(() => renameInputRef.current?.select(), 0);
   };
 
-  const commitRename = async () => {
-    const trimmed = renameValue.trim();
-    if (!trimmed || trimmed === asset.name) {
-      setIsRenaming(false);
-      return;
-    }
+  const commitRename = async (trimmed: string) => {
     try {
       const token = await getIdToken();
       const res = await fetch(`/api/assets/${asset.id}`, {
@@ -595,35 +587,11 @@ export const AssetCard = memo(function AssetCard({
       {/* Info */}
       <div className="p-3">
         {isRenaming ? (
-          <div className="flex items-center gap-1">
-            <input
-              ref={renameInputRef}
-              className="flex-1 bg-frame-bg border border-frame-accent rounded px-1.5 py-0.5 text-sm font-medium text-white outline-none focus:ring-1 focus:ring-frame-accent"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
-                if (e.key === 'Escape') { setIsRenaming(false); }
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              type="button"
-              title="Confirm"
-              onClick={(e) => { e.stopPropagation(); commitRename(); }}
-              className="p-1 rounded hover:bg-frame-accent/20 text-frame-accent"
-            >
-              <Check className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Cancel"
-              onClick={(e) => { e.stopPropagation(); setIsRenaming(false); }}
-              className="p-1 rounded hover:bg-frame-border text-frame-textMuted"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <InlineRename
+            value={asset.name}
+            onCommit={commitRename}
+            onCancel={() => setIsRenaming(false)}
+          />
         ) : (
           <p className="text-sm font-medium text-white truncate" title={asset.name}>
             {asset.name}
