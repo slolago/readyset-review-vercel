@@ -390,7 +390,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 73-01-PLAN.md — Restore evented=true on objects when tool is select (DRAW-01)
+- [x] 73-01-PLAN.md — Restore evented=true on objects when tool is select (DRAW-01)
 
 ## Progress
 
@@ -446,4 +446,4 @@ Plans:
 | 70. context-menu-behavior | v2.2 | 0/? | Not started | - |
 | 71. grid-view-affordances | v2.2 | 1/1 | Complete   | 2026-04-21 |
 | 72. inline-edit-and-folder-duplicate | v2.2 | 2/2 | Complete   | 2026-04-21 |
-| 73. drawing-mode-transforms | v2.2 | 0/? | Not started | - |
+| 73. drawing-mode-transforms | v2.2 | 1/1 | Complete   | 2026-04-21 |

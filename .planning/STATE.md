@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: — Dashboard & Annotation UX Fixes
-status: "Phase 72 complete (EDIT-01, FS-01). Awaiting Phase 73."
-stopped_at: Completed 72-01-PLAN.md
-last_updated: "2026-04-21T21:17:50Z"
-last_activity: "2026-04-21 — Phase 72 plan 01 shipped: InlineRename click-away cancel + single-active rename invariant (EDIT-01)"
+status: completed
+stopped_at: Completed 73-01-PLAN.md
+last_updated: "2026-04-21T18:30:00.000Z"
+last_activity: "2026-04-21 — Phase 73 plan 01 shipped: drawing-mode single-object transforms — obj.evented=true on select tool (DRAW-01)"
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
 ---
 
 # State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-21)
 
 ## Current Position
 
-Phase: 72 (inline-edit-and-folder-duplicate) — complete
-Plan: 72-01-PLAN.md + 72-02-PLAN.md — both shipped
-Status: Phase 72 complete (EDIT-01 + FS-01). Awaiting Phase 73.
-Last activity: 2026-04-21 — Phase 72 plan 01 shipped: InlineRename click-away cancel + single-active rename invariant (EDIT-01)
+Phase: 73 (drawing-mode-transforms) — complete
+Plan: 73-01-PLAN.md — shipped
+Status: Phase 73 complete (DRAW-01). v2.2 milestone complete — all 9 requirements across 4 phases shipped.
+Last activity: 2026-04-21 — Phase 73 plan 01 shipped: drawing-mode single-object transforms — obj.evented=true on select tool (DRAW-01)
 
 ## v2.2 Phase Structure
 
@@ -75,7 +75,7 @@ Last activity: 2026-04-21 — Phase 72 plan 01 shipped: InlineRename click-away 
 
 ### Pending Todos
 
-None — ready to plan Phase 70.
+None — v2.2 milestone complete. Ready to ship or plan next milestone.
 
 ### Blockers/Concerns
 
@@ -83,6 +83,6 @@ None — ready to plan Phase 70.
 
 ## Session Continuity
 
-Last session: 2026-04-21T21:19:15.463Z
-Stopped at: Completed 72-01-PLAN.md
+Last session: 2026-04-21T18:30:00.000Z
+Stopped at: Completed 73-01-PLAN.md
 Resume file: None

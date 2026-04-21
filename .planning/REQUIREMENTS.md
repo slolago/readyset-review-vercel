@@ -26,7 +26,7 @@
 
 ### Drawing mode
 
-- [ ] **DRAW-01**: In drawing mode over an asset, selecting a single object (text, arrow, freehand vector) with the selection tool shows the Fabric.js bounding box with working scale + rotation handles. Dragging a corner handle scales the object; dragging the rotation handle rotates it. Single-object transforms match multi-object transforms — the controls are not movement-only.
+- [x] **DRAW-01**: In drawing mode over an asset, selecting a single object (text, arrow, freehand vector) with the selection tool shows the Fabric.js bounding box with working scale + rotation handles. Dragging a corner handle scales the object; dragging the rotation handle rotates it. Single-object transforms match multi-object transforms — the controls are not movement-only.
 
 ## Absorbed from prior milestones
 
@@ -68,7 +68,7 @@ See `.planning/MILESTONES.md` — v1.7 through v2.1 shipped.
 | VIEW-02 | Phase 71 | Complete |
 | EDIT-01 | Phase 72 | Complete |
 | FS-01 | Phase 72 | Complete |
-| DRAW-01 | Phase 73 | Pending |
+| DRAW-01 | Phase 73 | Complete |
 
 **Coverage:**
 - v2.2 requirements: 9 total
