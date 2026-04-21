@@ -421,6 +421,6 @@ See [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) for full phase deta
 | 54. security-hardening | v1.9 | 1/1 | Complete | 2026-04-20 |
 | 55. bulk-mutations-and-soft-delete | v1.9 | 1/1 | Complete | 2026-04-20 |
 | 56. viewer-alignment | v1.9 | 1/1 | Human-verify | 2026-04-20 |
-| 57. ux-and-dashboard | v1.9 | 0/? | Not started | - |
+| 57. ux-and-dashboard | v1.9 | 1/1 | Complete | 2026-04-20 |
 | 58. data-consistency | v1.9 | 0/? | Not started | - |
 | 59. a11y-and-keyboard-coordination | v1.9 | 0/? | Not started | - |
