@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { uploadBuffer, generateReadSignedUrl } from '@/lib/gcs';
 import { canGenerateSprite } from '@/lib/permissions';
+import { createJob, updateJob } from '@/lib/jobs';
 import type { Project } from '@/types';
 import path from 'path';
 import os from 'os';
@@ -92,6 +94,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const step = (msg: string) => { steps.push(msg); console.log('[generate-sprite]', msg); };
   const startedAt = Date.now();
 
+  let jobId: string | null = null;
   try {
     const user = await getAuthenticatedUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -113,15 +116,38 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Not a video asset' }, { status: 400 });
     }
 
+    // Observability job. Retries reuse id via x-retry-job-id header.
+    const retryJobId = request.headers.get('x-retry-job-id');
+    jobId = retryJobId ?? await createJob({
+      type: 'sprite',
+      assetId,
+      projectId: asset.projectId,
+      userId: user.id,
+    });
+    await updateJob(jobId, {
+      status: 'running',
+      startedAt: FieldValue.serverTimestamp() as any,
+      error: FieldValue.delete() as any,
+    });
+
     // Cached?
     if (asset.spriteStripGcsPath && asset.spriteStripGcsPath.includes('sprite-v2.jpg')) {
       const signedUrl = await generateReadSignedUrl(asset.spriteStripGcsPath, 720);
+      await updateJob(jobId, { status: 'ready', completedAt: FieldValue.serverTimestamp() as any });
       return NextResponse.json({ spriteStripUrl: signedUrl, cached: true });
     }
     step(`duration: ${asset.duration}`);
 
+    // OBS-05: re-read asset from Firestore so we pick up any probe-set
+    // duration that landed between upload/complete and this handler.
+    const fresh = await db.collection('assets').doc(assetId).get();
+    const freshAsset = fresh.data() as any;
+    const duration = freshAsset?.duration && freshAsset.duration > 0 ? freshAsset.duration : 60;
+    step(`fresh duration: ${duration}`);
+
     const { binPath, source, diag } = await resolveFfmpeg();
     if (!binPath) {
+      await updateJob(jobId, { status: 'failed', error: 'ffmpeg not found' });
       return NextResponse.json({ error: 'ffmpeg not found', diagnostic: diag, steps }, { status: 500 });
     }
     step(`ffmpeg via ${source}`);
@@ -141,8 +167,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const videoUrl = await generateReadSignedUrl(asset.gcsPath, 60);
     step('video signed URL generated');
 
-    const duration = asset.duration && asset.duration > 0 ? asset.duration : 60;
-
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `sprite-${assetId}-`));
     const spritePath = path.join(tmpDir, 'sprite.jpg');
     const localVideoPath = path.join(tmpDir, 'source');
@@ -153,6 +177,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // hard ceiling to avoid runaway function time.
       const MAX_BYTES = 1500 * 1024 * 1024; // 1.5 GB safety ceiling
       if (typeof asset.size === 'number' && asset.size > MAX_BYTES) {
+        await updateJob(jobId, { status: 'failed', error: `source too large (${Math.round(asset.size / 1024 / 1024)} MB)` });
         return NextResponse.json({
           error: `source too large for sprite generation (${Math.round(asset.size / 1024 / 1024)} MB)`,
           steps,
@@ -163,6 +188,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const downloadStart = Date.now();
       const srcRes = await fetch(videoUrl);
       if (!srcRes.ok || !srcRes.body) {
+        await updateJob(jobId, { status: 'failed', error: `source fetch failed (${srcRes.status})` });
         return NextResponse.json({
           error: `source fetch failed (${srcRes.status})`,
           steps,
@@ -181,6 +207,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         downloaded += value.byteLength;
         if (downloaded > MAX_BYTES) {
           writer.destroy();
+          await updateJob(jobId, { status: 'failed', error: `source too large (>${Math.round(MAX_BYTES / 1024 / 1024)} MB)` });
           return NextResponse.json({
             error: `source too large for sprite generation (>${Math.round(MAX_BYTES / 1024 / 1024)} MB)`,
             steps,
@@ -214,6 +241,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       const failed = frameResults.filter((r) => !r.ok);
       if (failed.length > 0) {
+        await updateJob(jobId, { status: 'failed', error: `${failed.length}/${SPRITE_FRAMES} frames failed` });
         return NextResponse.json({
           error: `${failed.length}/${SPRITE_FRAMES} frames failed`,
           stderr: failed[0]?.stderr.slice(-500),
@@ -233,6 +261,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ];
       const tile = await runFfmpeg(binPath, tileArgs);
       if (tile.code !== 0 || !existsSync(spritePath)) {
+        await updateJob(jobId, { status: 'failed', error: `tile step failed: ${tile.stderr.slice(-300)}` });
         return NextResponse.json({
           error: 'tile step failed',
           stderr: tile.stderr.slice(-500),
@@ -252,6 +281,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       await db.collection('assets').doc(assetId).update({
         spriteStripGcsPath: spriteGcsPath,
       });
+      await updateJob(jobId, { status: 'ready', completedAt: FieldValue.serverTimestamp() as any });
 
       const signedSpriteUrl = await generateReadSignedUrl(spriteGcsPath, 720);
       step(`total: ${Date.now() - startedAt}ms`);
@@ -267,6 +297,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   } catch (err) {
     console.error('[generate-sprite] unhandled error:', err);
+    if (jobId) {
+      try {
+        await updateJob(jobId, { status: 'failed', error: (err as Error).message });
+      } catch (writeErr) {
+        console.error('[generate-sprite] failed to mark job failed', writeErr);
+      }
+    }
     return NextResponse.json({
       error: (err as Error).message,
       stack: (err as Error).stack?.split('\n').slice(0, 5),
