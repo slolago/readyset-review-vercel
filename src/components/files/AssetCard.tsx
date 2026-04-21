@@ -483,7 +483,9 @@ export const AssetCard = memo(function AssetCard({
         {/* Review status badge — bottom-left of thumbnail */}
         {asset.reviewStatus && (
           <div className="absolute bottom-2 left-2">
-            <ReviewStatusBadge status={asset.reviewStatus} />
+            <div className="bg-black/50 backdrop-blur-sm rounded px-1.5 py-0.5">
+              <ReviewStatusBadge status={asset.reviewStatus} />
+            </div>
           </div>
         )}
 
