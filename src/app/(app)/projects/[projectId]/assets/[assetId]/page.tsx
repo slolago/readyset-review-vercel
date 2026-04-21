@@ -141,6 +141,15 @@ export default function AssetViewerPage() {
       setDisplayShapes(null);
     }
     setSelectedCommentId(comment.id);
+
+    // VWR-04: range-comment clicks hydrate the shared loop range so loop,
+    // Export trim, and composer range all reflect the clicked range via a
+    // single source of truth. Non-range comments leave rangeIn/rangeOut
+    // untouched — the user probably still wants their loop preserved.
+    if (typeof comment.inPoint === 'number' && typeof comment.outPoint === 'number') {
+      setRangeIn(comment.inPoint);
+      setRangeOut(comment.outPoint);
+    }
   }, []);
 
   const handleSeek = useCallback((time: number) => {
