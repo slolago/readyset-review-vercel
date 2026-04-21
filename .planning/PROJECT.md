@@ -10,19 +10,20 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Current Milestone: v1.9 Hardening & Consistency Audit
+## Current Milestone: v2.0 Architecture Hardening
 
-**Goal:** Close the highest-severity gaps surfaced by a full-app audit across security, data consistency, viewer, file management, and UX. Fix the systemic patterns (soft-delete filter gaps, `Promise.all` silent partial failures, two permission helper styles, modal a11y, phantom type fields) so the platform reads as one coherent product rather than accumulated features.
+**Goal:** Attack the 5 systemic architectural patterns surfaced by a deep pipeline-lifecycle + unhappy-path audit. Move the platform from "stack of features that work in happy cases" to "production-grade system that degrades gracefully under format weirdness, concurrent mutations, stale metadata, and unbounded asset counts". No new user-facing features — this milestone rebuilds foundations.
 
 **Target features:**
-- Security hardening — plug unauthenticated leaks (`/api/debug`, `/api/safe-zones GET`), enforce `disabled` user check on every route, extend `PATCH /api/review-links` to cover all editable flags, strip password field in all serialization paths, save `approvalStatus` properly
-- Bulk mutation correctness — version-stack-aware DELETE, deep folder copy, replace bare `Promise.all` with `Promise.allSettled` + per-item feedback in bulk move/status, clear selection after merge
-- Viewer alignment — wire Export trim bar to player loop in/out, route review-link page to DocumentViewer/HtmlViewer/FileTypeCard, unify loop range with range-comment range, fix AudioContext lifecycle, fix VersionComparison duration effects
-- UX polish — implement Dashboard Quick Actions targets, wire review-link guest resolve/delete, migrate AssetListView rename to inline, unify admin-table confirm with `useConfirm`, exclude trashed from stats, add Collaborators stat, expiry warning on review pages
-- Data consistency — sweep soft-delete filters everywhere (stats, copy, review-link contents + drill-down), consolidate permission helpers onto the pure `src/lib/permissions.ts` path, add missing fields to `Asset` type (`thumbnailGcsPath`, `spriteStripGcsPath`), name-collision check on asset/folder rename, log every bare `catch`
-- A11y & keyboard — focus trap on Modal + UserDrawer, `role="dialog"` everywhere, Dropdown keyboard navigation + ARIA, coordinate `window keydown` listeners across VideoPlayer / VersionComparison / ExportModal / CommentSidebar
+- Pipeline observability — job status tracking + retry for probe/sprite/export/thumbnail; UI surfaces in-flight + failed jobs instead of silent `.catch(console.warn)`; GCS-object verification before marking upload `ready`; dedupe duplicate sprite triggers
+- Transactional mutations — merge-version / unstack-version / reorder-versions / auto-versioning under `db.runTransaction()` so concurrent users never corrupt stacks; folder-delete-during-upload guard
+- Signed URL caching — stop regenerating GCS signed URLs per-request; cache with expiry on asset doc; review-link loads stop triggering 200+ signing calls per guest
+- Firestore composite indexes — eliminate full-collection scans in list/upload/trash paths; denormalize `commentCount` onto asset docs; query by `(projectId, folderId, deletedAt)` instead of fetch-then-filter
+- Format edge cases — export handles HEVC/AV1/VP9/ProRes cleanly with TTL + stale-job sweeper; image-metadata falls back to ffprobe for HEIC/AVIF; sprite frame spacing adapts to real duration
+- Security + upload validation — bcrypt review-link passwords, POST body (not query string), GCS.exists() verify before `ready`, reject zero-byte uploads, MIME validation
+- Dead data + contract cleanup — remove `url` phantom field, unify sprite URL naming, complete `UploadCompleteRequest` type, useAssets AbortController, folder-ancestry uses `path[]`, provisional-metadata pattern (client dims marked as "pending probe")
 
-**Prior milestones:** v1.7 Review UX & Access Rewrite (shipped 2026-04-20), v1.8 Asset Pipeline & Visual Polish (shipped 2026-04-20). See [milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) and [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md).
+**Prior milestones:** v1.7 Review UX & Access Rewrite (shipped 2026-04-20), v1.8 Asset Pipeline & Visual Polish (shipped 2026-04-20), v1.9 Hardening & Consistency Audit (shipped 2026-04-20). See [milestones/](milestones/).
 
 ## Current State (v1.4 — shipped 2026-04-14)
 

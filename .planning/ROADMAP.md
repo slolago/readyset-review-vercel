@@ -10,6 +10,7 @@
 - ✅ **v1.7 — Review UX & Access Rewrite** - Phases 43–48 (shipped 2026-04-20)
 - ✅ **v1.8 — Asset Pipeline & Visual Polish** - Phases 49–53 (shipped 2026-04-20)
 - ✅ **v1.9 — Hardening & Consistency Audit** - Phases 54–59 (shipped 2026-04-20)
+- 🚧 **v2.0 — Architecture Hardening** - Phases 60–66 (in progress)
 
 ## Phases
 
@@ -303,6 +304,20 @@ See [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) for full phase deta
 
 </details>
 
+### 🚧 v2.0 — Architecture Hardening (In Progress)
+
+**Milestone goal:** Fix the 5 systemic architectural patterns surfaced by a deep pipeline-lifecycle + unhappy-path audit. Production-grade foundations for the platform.
+
+**Phases (7):**
+
+- [ ] **Phase 60: pipeline-observability** — Job status tracking, retry UI, dedupe sprite triggers, GCS verify, wait-for-probe
+- [ ] **Phase 61: transactional-mutations** — merge/unstack/reorder + auto-versioning under runTransaction, folder-delete-during-upload guard
+- [ ] **Phase 62: signed-url-caching** — cache signedUrl + expiresAt; stop regenerating per-request
+- [ ] **Phase 63: firestore-indexes-and-denorm** — composite indexes, denormalize commentCount, kill full-collection scans
+- [ ] **Phase 64: format-edge-cases** — HEVC/AV1/VP9/ProRes export, stale-job sweeper, HEIC/AVIF fallback, adaptive sprite spacing
+- [ ] **Phase 65: security-and-upload-validation** — bcrypt review-link passwords, POST body not query, GCS.exists() verify, MIME validation
+- [ ] **Phase 66: dead-data-and-contracts** — remove url phantom, unify sprite naming, UploadCompleteRequest, AbortController, folder.path ancestry, provisional-metadata pattern
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -344,3 +359,10 @@ See [milestones/v1.9-ROADMAP.md](milestones/v1.9-ROADMAP.md) for full phase deta
 | 57. ux-and-dashboard | v1.9 | 1/1 | Complete | 2026-04-20 |
 | 58. data-consistency | v1.9 | 1/1 | Complete | 2026-04-20 |
 | 59. a11y-and-keyboard-coordination | v1.9 | 1/1 | Complete | 2026-04-20 |
+| 60. pipeline-observability | v2.0 | 0/? | Not started | - |
+| 61. transactional-mutations | v2.0 | 0/? | Not started | - |
+| 62. signed-url-caching | v2.0 | 0/? | Not started | - |
+| 63. firestore-indexes-and-denorm | v2.0 | 0/? | Not started | - |
+| 64. format-edge-cases | v2.0 | 0/? | Not started | - |
+| 65. security-and-upload-validation | v2.0 | 0/? | Not started | - |
+| 66. dead-data-and-contracts | v2.0 | 0/? | Not started | - |

@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.9
-milestone_name: Hardening & Consistency Audit
-status: shipped
-stopped_at: All 6 phases shipped — awaiting human verification walkthroughs on 56+57
+milestone: v2.0
+milestone_name: Architecture Hardening
+status: active
+stopped_at: Roadmap created — Phase 60 (pipeline-observability) ready
 last_updated: "2026-04-20T00:00:00.000Z"
 last_activity: 2026-04-20
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # State
@@ -20,65 +20,52 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-04-20)
 
-**Core value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management
-**Current focus:** v1.9 shipped; awaiting next milestone definition
+**Core value:** Fast, accurate video review
+**Current focus:** v2.0 Architecture Hardening — Phase 60 next
 
 ## Current Position
 
-Phase: All v1.9 phases shipped
-Plan: —
-Status: Milestone v1.9 complete (6/6 phases, 37 reqs)
-Last activity: 2026-04-20 — Phase 59 executed; commits 7672f304..acacbba9 pushed
+Phase: Phase 60 (pipeline-observability) — Not started
+Status: Roadmap created from deep lifecycle + unhappy-path audit
+Last activity: 2026-04-20 — v2.0 scaffolded (7 phases, 31 reqs)
 
-Progress: [██████████] 100% (6/6 phases)
-
-## Performance Metrics
-
-- v1.3: 9 plans / 6 phases
-- v1.4: 7 plans / 5 phases
-- v1.5: 9 plans / 8 phases
-- v1.6: archived, never executed
-- v1.7: 6 plans / 6 phases (shipped 2026-04-20)
-- v1.8: 5 plans / 5 phases (shipped 2026-04-20)
-- v1.9: 6 plans / 6 phases (shipped 2026-04-20)
+Progress: [░░░░░░░░░░] 0% (0/7 phases)
 
 ## Accumulated Context
+
+### v2.0 audit source
+
+Single deep audit (2026-04-20), max thoroughness, found 5 critical + 8 medium + 4 low issues. Systemic patterns:
+
+1. Fire-and-forget jobs with no observability/retry
+2. Signed URLs regenerated per-request (no cache)
+3. Full-collection scans where composite indexes would suffice
+4. `batch()` where `runTransaction()` is required (corruption race)
+5. Client metadata → Firestore → probe corrects later (stale window visible to others)
 
 ### Decisions
 
 - Push to both origin + vercel after each phase
-- Atomic Firestore batch for version group merge
-- Permissions module (src/lib/permissions.ts) is the single source of truth for role matrices
-- version-groups helper (src/lib/version-groups.ts) handles legacy-root resolution
-- ffmpeg export: Hobby caps at 60s / 2048 MB; clip cap 45s
-- Confirm dialogs go through ConfirmProvider/useConfirm (no window.confirm)
-- file-types.ts is the single source of truth for MIME/extension classification
-- Soft-delete via deletedAt + deletedBy; list endpoints filter in-memory
-- Firestore list queries avoid .where().orderBy() combinations — sort in memory
-- Modal accent line requires parent overflow-hidden
-- v1.9: review-link serialization goes through serializeReviewLink (strips password, returns hasPassword)
-- v1.9: disabled-user check lives in getAuthenticatedUser, applies to every route
-- v1.9: Asset + Comment types declare every field the server writes (no more phantom fields)
-- v1.9: rename collision validation via src/lib/names.ts (asset + folder)
-- v1.9: modal-layer keyboard ownership via document.body.dataset.modalOpen — viewer handlers early-return
-- v1.9: useFocusTrap + useModalOwner are the a11y primitives every overlay should consume
-
-### Recently Shipped
-
-- v1.9 Hardening & Consistency Audit (6 phases, shipped 2026-04-20)
+- Permissions: src/lib/permissions.ts is single source of truth
+- Soft-delete via deletedAt + deletedBy, filtered in-memory
+- ffmpeg Hobby caps: 60s / 2048 MB; clip cap 45s
+- v2.0: jobs get a Firestore `jobs` collection with status tracking
+- v2.0: signed URLs cached on asset doc with expiresAt; regen within 30 min of expiry
+- v2.0: merge/unstack/reorder + auto-versioning all under runTransaction
+- v2.0: composite index on `assets(projectId, folderId, deletedAt)` replaces fetch-then-filter
 
 ### Pending Todos
 
-- Human-verify walkthroughs on phases 49, 51, 52, 53 (v1.8), 56, 57 (v1.9)
-- 21 lower-severity audit items documented under "v2 / Future" in REQUIREMENTS.md
+None — ready for /gsd:plan-phase 60.
 
 ### Blockers/Concerns
 
-- Firestore composite index `comments(assetId, reviewLinkId, createdAt)` — SEC-07 has an in-memory fallback but the index should be deployed for perf at scale
-- Vercel Hobby plan caps: export maxDuration=60s / memory=2048 MB; if upgrading to Pro, bump vercel.json + route const
+- IDX-02 commentCount denormalization: existing assets will have no commentCount until a migration backfills. Plan includes a backfill script.
+- SEC-20 bcrypt migration: existing plaintext passwords need migration on first-read (hash-then-replace). Plan handles this transparently.
+- Firestore composite indexes require deployment; the GSD plan will generate the `firestore.indexes.json` deltas.
 
 ## Session Continuity
 
 Last session: 2026-04-20
-Stopped at: v1.9 milestone shipped end-to-end (6 phases, 37 reqs); 21 lower-severity items deferred
+Stopped at: v2.0 scaffolded, ready for /gsd:plan-phase 60
 Resume file: None

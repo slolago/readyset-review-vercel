@@ -1,147 +1,129 @@
 # Requirements: readyset-review
 
-**Defined:** 2026-04-20 (v1.9 — hardening & consistency audit)
+**Defined:** 2026-04-20 (v2.0 — architecture hardening)
 **Core Value:** Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## v1.9 Requirements
+## v2.0 Requirements
 
-Synthesized from a 4-stream full-app audit (UX, backend/security, file-management flows, viewer/player). Every REQ below traces to at least one concrete audit finding.
+Synthesized from a deep pipeline-lifecycle + unhappy-path audit (2026-04-20). 5 critical + 8 medium + 4 low findings; grouped by systemic pattern, not by individual bug.
 
-### Security Hardening
+### Pipeline Observability (Phase 60)
 
-- [ ] **SEC-01**: `GET /api/debug` is gated behind `requireAdmin` and stops returning any private-key prefix, Firebase service-account email, or git-level identifiers in the response body
-- [ ] **SEC-02**: `GET /api/safe-zones` requires `getAuthenticatedUser` (read path was unauthenticated; seed transaction stays on the server side unchanged)
-- [ ] **SEC-03**: `getAuthenticatedUser` in `src/lib/auth-helpers.ts` returns `null` when the user's Firestore doc has `disabled === true`, so a suspended user's still-valid Firebase ID token cannot authenticate any API route (not just `/auth/session`)
-- [ ] **SEC-04**: `PATCH /api/review-links/[token]` accepts updates to every editable field — `name`, `password`, `expiresAt`, `allowComments`, `allowDownloads`, `allowApprovals`, `showAllVersions` — gated by `canEditReviewLink`; removing a password or shortening an expiry is possible in-app
-- [ ] **SEC-05**: `password` field is stripped from every review-link API response shape — `/api/review-links`, `/api/review-links/all`, `/api/review-links/[token]/contents` — via a shared `serializeReviewLink` helper
-- [ ] **SEC-06**: `POST /api/comments` persists `approvalStatus` onto the comment doc when provided; the value is returned on subsequent GETs
-- [ ] **SEC-07**: Review-link guest comment GET uses a composite Firestore query (`assetId` + `reviewLinkId`) rather than an in-memory filter after a collection scan
+- [ ] **OBS-01**: Processing jobs (probe, sprite, thumbnail, export) write a status doc to Firestore (`queued | running | ready | failed`, with `startedAt`, `completedAt`, `error?`) consumed by a minimal UI indicator on the asset card / viewer — no more silent `.catch(console.warn)`
+- [ ] **OBS-02**: Failed jobs can be retried from the UI; retry re-uses the same job doc id so history is preserved; 3-strike auto-abandon with a visible error state
+- [ ] **OBS-03**: Duplicate sprite triggers are eliminated — the client-side fire-and-forget in `useUpload` is removed; the server-side fire from `upload/complete` is the only trigger
+- [ ] **OBS-04**: `upload/complete` verifies the GCS object exists AND is non-zero before marking `status: 'ready'`; cancelled / zero-byte / MIME-spoofed uploads never land as ready assets
+- [ ] **OBS-05**: Sprite generation waits for probe to complete (or reads fresh `asset.duration` from Firestore at sprite time) so the frame-spacing uses the authoritative duration rather than the client-provided fallback
 
-### Soft-Delete Filter Sweep
+### Transactional Mutations (Phase 61)
 
-- [ ] **SDC-01**: `GET /api/stats` excludes soft-deleted assets from `assetCount` and `storageBytes`
-- [ ] **SDC-02**: Review-link resolution endpoints — `GET /api/review-links/[token]`, drill-down folder queries, and `GET /api/review-links/[token]/contents` — filter out soft-deleted assets and folders before returning to guests
-- [ ] **SDC-03**: `POST /api/assets/copy` skips soft-deleted versions when expanding the source group; the destination never contains resurrected trash entries
-- [ ] **SDC-04**: `GET /api/assets/size` excludes soft-deleted assets from folder-size totals
+- [ ] **TXN-01**: `POST /api/assets/merge-version` wraps fetchGroupMembers + batch.commit in `db.runTransaction()` so two concurrent merges cannot produce duplicate `version` values in the same stack
+- [ ] **TXN-02**: `POST /api/assets/unstack-version` uses the same transaction guarantee — no partial unstacks under concurrent access
+- [ ] **TXN-03**: `POST /api/upload/signed-url` auto-versioning (name-collision → next version) runs under a transaction scoped to (projectId, folderId, filename); concurrent uploads of the same filename produce a correct stack, not two V1s
+- [ ] **TXN-04**: `POST /api/upload/signed-url` validates that the target `folderId` (if set) is live — if it's been soft-deleted, reject with 404 so the asset is never orphaned
 
-### Bulk Mutation Correctness
+### Signed URL Caching (Phase 62)
 
-- [ ] **BLK-01**: `DELETE /api/assets/[id]` on a version stack soft-deletes every member of the group atomically (not just the representative card) when the caller's intent is delete-all-versions; an explicit single-version delete is still available via the version-stack modal's per-row delete
-- [ ] **BLK-02**: Bulk move (`handleMoveSelected` in FolderBrowser) uses `Promise.allSettled`; per-item failures are surfaced via distinct toasts and the grid reflects partial success state accurately
-- [ ] **BLK-03**: Bulk review-status update uses `Promise.allSettled`; the toast reports "N updated, M failed" rather than collapsing to a single failure
-- [ ] **BLK-04**: Drag-to-stack merge clears the source asset's id from `selectedIds` after the merge succeeds so the selection toolbar reflects reality
-- [ ] **BLK-05**: `POST /api/folders/copy` deep-copies the folder tree — subfolders + their assets — not just the top-level folder doc; behavior is documented in the API response
+- [ ] **CACHE-01**: Assets store `signedUrl` + `signedUrlExpiresAt` alongside `gcsPath`; list endpoints return the cached value when expiry is >30 min away, regenerate otherwise
+- [ ] **CACHE-02**: Review-link resolution (`GET /api/review-links/[token]`) uses the same cache — a 200-asset review link no longer fires 200 GCS signing calls per guest page load
+- [ ] **CACHE-03**: Thumbnail signed URLs + sprite signed URLs use the same caching strategy (same fields, longer TTL since they're less sensitive)
 
-### Viewer Alignment
+### Firestore Indexes & Denormalization (Phase 63)
 
-- [ ] **VWR-01**: `ExportModal` receives `initialIn` and `initialOut` from the viewer parent and pre-fills the trim bar with the player's current loop/range markers; opening Export on a marked range always starts on that range
-- [ ] **VWR-02**: When `asset.duration` is 0 (still processing), the Export modal renders a "Duration not yet available" state instead of showing a permanently-disabled submit button with no explanation
-- [ ] **VWR-03**: Review-link asset viewer routes documents (PDF/HTML) to `DocumentViewer`/`HtmlViewer` and other non-playable types to `FileTypeCard`, matching the internal viewer's branching
-- [ ] **VWR-04**: Clicking a range-comment timeline marker in VideoPlayer writes that comment's `inPoint`/`outPoint` into the shared loop range (`rangeIn`/`rangeOut`); loop honors the clicked range, unifying the three "range" concepts (loop range, range-comment range, export trim range)
-- [ ] **VWR-05**: `VUMeter`'s `sharedCtx` singleton closes when the last consumer unmounts (ref-counted), so navigating away from the viewer does not leak an AudioContext; the analyser graph is torn down on `activeSide` change in compare
-- [ ] **VWR-06**: `VersionComparison` duration/readiness `useEffect`s include `selectedIdA`/`selectedIdB` in their deps so version swaps re-subscribe to the new video element and `durationA`/`durationB` stay accurate
+- [ ] **IDX-01**: Composite Firestore index on `assets(projectId, folderId, deletedAt)` deployed; `GET /api/assets` queries directly on (projectId, folderId) and excludes deleted assets in the same query — no more post-fetch in-memory filter
+- [ ] **IDX-02**: Comment count denormalized onto asset doc as `commentCount: number`; incremented on create, decremented on delete (via Firestore transaction); `GET /api/assets` no longer scans the `comments` collection per list request
+- [ ] **IDX-03**: Composite index on `folders(projectId, parentId)`; folder tree fetches use a single indexed query per level
+- [ ] **IDX-04**: Trash page + permanent-delete use a dedicated index on `(projectId, deletedAt)` and no longer walk every collection in memory
 
-### UX & Dashboard
+### Format Edge Cases (Phase 64)
 
-- [ ] **UX-01**: Dashboard Quick Actions route correctly — "Upload Assets" opens the upload flow (either via a modal or by navigating to a project with the upload sheet open), "Invite Team" opens the Collaborators panel; no more dead links
-- [ ] **UX-02**: Review-link guest comment actions — resolve and delete — either fire a real API call (when the guest has permission) or are hidden entirely (when they don't); no more silent-no-op buttons
-- [ ] **UX-03**: `AssetListView` inline rename uses the shared inline-rename pattern (checkmark + X buttons, Enter commits, Escape cancels) — matches AssetCard, no more `window.prompt`
-- [ ] **UX-04**: Admin `UserTable` delete flow goes through `useConfirm({ destructive: true })` instead of the ad-hoc inline confirmation
-- [ ] **UX-05**: Dashboard stats show a "Collaborators" card — the value returned by `/api/stats.collaboratorCount` is surfaced (currently fetched and discarded)
-- [ ] **UX-06**: Review page surfaces expiry state — links within 24 h of `expiresAt` show a banner; expired links show a dedicated message ("This link has expired") instead of the generic "Link not available"
-- [ ] **UX-07**: Review page guest-info is restored in full on reload — both name and email come from a single JSON `frame_guest_info` key in localStorage (current key only stores name)
+- [ ] **FMT-01**: Export route handles HEVC / AV1 / VP9 / ProRes source correctly — copy path's container check stops rejecting `.mov` with H.264, and the re-encode path works for any input codec
+- [ ] **FMT-02**: Export jobs have a `startedAt` timestamp and a server-side sweeper that marks jobs stuck in `encoding` past a watermark as `failed` so SIGKILL'd functions don't leave permanent ghost jobs
+- [ ] **FMT-03**: `src/lib/image-metadata.ts` falls back to ffprobe (already resolved server-side) when `image-size` returns null for HEIC / AVIF / HDR image inputs
+- [ ] **FMT-04**: Sprite frame spacing adapts to very short (<3s) and very long (>1h) videos — no frame-timestamp clustering at boundaries; limits to 20 frames always but distributes intelligently
 
-### Data Consistency & Types
+### Security & Upload Validation (Phase 65)
 
-- [ ] **DC-01**: Permission helpers are consolidated onto the pure `src/lib/permissions.ts` style — the deprecated async `canAccessProject(userId, projectId)` in `auth-helpers` is removed or reduced to a thin wrapper with a deprecation comment; all call sites use load-then-pure-check
-- [ ] **DC-02**: `Asset` interface in `src/types/index.ts` declares every field actually written by the server — `thumbnailGcsPath`, `spriteStripGcsPath`, any other phantom fields surfaced by the audit
-- [ ] **DC-03**: Asset and folder rename APIs validate name-collisions within the parent scope (same folder for assets, same project+parent for folders) — matches project rename's behavior; duplicate names are rejected with a clear error
-- [ ] **DC-04**: Every `catch` block in API routes logs the error via `console.error` with a contextual prefix before returning the 500 response — no more silent swallows
+- [ ] **SEC-20**: Review-link passwords are hashed with bcrypt (cost ≥10) at write; verification uses `bcrypt.compare`; existing plaintext passwords are migrated on first read (hash-then-replace)
+- [ ] **SEC-21**: Guests submit the password in the POST body (not the `?password=` query string) so CDN and Vercel access logs stop capturing passwords; legacy query-param path removed after a migration window
+- [ ] **SEC-22**: `POST /api/upload/complete` calls `bucket.file(gcsPath).getMetadata()` and rejects if the object is missing or size is 0 — zero-byte, cancelled, and MIME-spoofed uploads never become `ready` assets
+- [ ] **SEC-23**: Server-side MIME validation on upload/complete — the Content-Type GCS reports must be on the accepted-MIME allow-list (from `src/lib/file-types.ts`); mismatch rejects with a clear error
 
-### A11y & Keyboard Coordination
+### Dead Data & Contract Cleanup (Phase 66)
 
-- [ ] **A11Y-01**: `Modal` renders with `role="dialog"`, `aria-modal="true"`, and traps Tab focus within the modal card; Escape continues to close
-- [ ] **A11Y-02**: `UserDrawer` matches Modal a11y — `role="dialog"`, `aria-modal="true"`, Escape closes, focus trap active
-- [ ] **A11Y-03**: `Dropdown` supports keyboard navigation — ArrowUp/Down moves selection, Enter activates, Escape closes; `role="menu"` and `role="menuitem"` set
-- [ ] **A11Y-04**: `window.keydown` listener coordination — when a modal (`Modal`/`UserDrawer`/`ExportModal`) is open, underlying viewer shortcuts (Space/arrows/M/F/I/O etc.) are suppressed; driven by a shared "keyboard-owner" context or data attribute checked by each listener
+- [ ] **CLN-01**: `Asset.url` (the stored public GCS URL) is removed from the type and stops being written by `signed-url`; the bucket is private and the field was never consumed
+- [ ] **CLN-02**: Sprite URL naming unified — `spriteSignedUrl` is used consistently in both the list endpoint and the on-demand generate-sprite response; AssetCard reads one field name
+- [ ] **CLN-03**: `UploadCompleteRequest` type in `src/types/index.ts` is expanded to include `frameRate?`, `thumbnailGcsPath?`, any other field the server actually reads
+- [ ] **CLN-04**: `useAssets.fetchAssets` uses `AbortController` — folder switches no longer race stale responses over fresh ones
+- [ ] **CLN-05**: `folderIsAccessible` in review-link resolution uses the `Folder.path[]` array (already stored) for O(1) ancestry check instead of walking `parentId` with N sequential Firestore reads
+- [ ] **CLN-06**: Sprite generation cleanup: `writer.destroy()` + `reader.cancel()` awaited before the finally block tries `fs.rm`; no EBUSY on /tmp cleanup under size-exceeded path
+- [ ] **CLN-07**: Client-side pre-upload dimensions are tagged `probed: false` until probe completes; features that read dims (export, sprite, viewer aspect) can surface "pending probe" UX in the 10-30s window where client values might be stale
 
 ## Absorbed from audits
 
-Every REQ above traces to an audit finding. The audits also surfaced lower-severity items (Modal `size="full"` variant for AssetCompareModal, Dropdown divider API unification, `useAssets` AbortController, ReviewHeader download/approval pills, SafeZonesOverlay videoRect cleanup) — these are captured in the "v2 / Future" section and can be promoted into a follow-up milestone if the core v1.9 set ships clean.
+All 37 REQs trace to concrete audit findings — 18 specific (C-1 to L-4) + 5 systemic patterns synthesized into architectural phases.
 
-## v2 / Future Requirements
+## v3 / Future Requirements
 
-- Modal `size="full"` variant; migrate `AssetCompareModal` to the primitive
-- Unified `divider` / `dividerBefore` API between `Dropdown` and `ContextMenu`
-- `useAssets` request deduplication via AbortController
-- Review-link header: visual indicators for allowDownloads / allowApprovals flags
-- Hash-based folder sort; lowercased shadow fields on users for case-insensitive search
-- N+1 query fixes in `hardDeleteFolder` (Promise.all per BFS level)
-- Trash retention policy / cron auto-purge after N days
-- Inline design-file preview (AI/PSD/Figma)
+- Server-side cron: Trash auto-purge, stale job sweeper, orphan GCS object cleanup
+- Presence indicators (who is reviewing a link right now)
+- Notifications (email + in-app) for new comments / approval changes
+- Per-asset watermarks for client-facing review links
+- AI auto-tagging + semantic search
+- Bulk export (folder → zip of N trims)
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
+| Real-time collaborative cursors | Async workflow |
+| Offline mode | Real-time collaboration is core |
 | Mobile app | Web-first |
-| Real-time collaborative cursors | Async review workflow |
-| Video transcoding library | ffmpeg trim/convert is enough |
-| SSO / SAML / OIDC beyond Google | Google OAuth is the single entry |
-| Role customization | Fixed role set is sufficient |
-| Audit log with full event sourcing | Structured logging is enough |
-| In-browser Photoshop/AE editing | Out of scope for review platform |
-| Archive (zip) content extraction/preview | Download to inspect |
-| Server-side HTML sandboxing beyond iframe sandbox | `sandbox` attr is the boundary |
-| Auto-purge Trash after N days (cron) | Manual cleanup only |
+| SSO beyond Google | Single entry point |
+| Custom role matrices | Fixed role set |
+| In-browser AE/Photoshop | Review platform, not editor |
+| Zip preview | Download to inspect |
+| Full event-sourced audit log | Structured logging + Firestore history sufficient |
 
 ## Traceability
 
-Which phases cover which requirements. Populated at roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | Phase 54 | Pending |
-| SEC-02 | Phase 54 | Pending |
-| SEC-03 | Phase 54 | Pending |
-| SEC-04 | Phase 54 | Pending |
-| SEC-05 | Phase 54 | Pending |
-| SEC-06 | Phase 54 | Pending |
-| SEC-07 | Phase 54 | Pending |
-| SDC-01 | Phase 55 | Pending |
-| SDC-02 | Phase 55 | Pending |
-| SDC-03 | Phase 55 | Pending |
-| SDC-04 | Phase 55 | Pending |
-| BLK-01 | Phase 55 | Pending |
-| BLK-02 | Phase 55 | Pending |
-| BLK-03 | Phase 55 | Pending |
-| BLK-04 | Phase 55 | Pending |
-| BLK-05 | Phase 55 | Pending |
-| VWR-01 | Phase 56 | Pending |
-| VWR-02 | Phase 56 | Pending |
-| VWR-03 | Phase 56 | Pending |
-| VWR-04 | Phase 56 | Pending |
-| VWR-05 | Phase 56 | Pending |
-| VWR-06 | Phase 56 | Pending |
-| UX-01 | Phase 57 | Pending |
-| UX-02 | Phase 57 | Pending |
-| UX-03 | Phase 57 | Pending |
-| UX-04 | Phase 57 | Pending |
-| UX-05 | Phase 57 | Pending |
-| UX-06 | Phase 57 | Pending |
-| UX-07 | Phase 57 | Pending |
-| DC-01 | Phase 58 | Pending |
-| DC-02 | Phase 58 | Pending |
-| DC-03 | Phase 58 | Pending |
-| DC-04 | Phase 58 | Pending |
-| A11Y-01 | Phase 59 | Pending |
-| A11Y-02 | Phase 59 | Pending |
-| A11Y-03 | Phase 59 | Pending |
-| A11Y-04 | Phase 59 | Pending |
+| OBS-01 | Phase 60 | Pending |
+| OBS-02 | Phase 60 | Pending |
+| OBS-03 | Phase 60 | Pending |
+| OBS-04 | Phase 60 | Pending |
+| OBS-05 | Phase 60 | Pending |
+| TXN-01 | Phase 61 | Pending |
+| TXN-02 | Phase 61 | Pending |
+| TXN-03 | Phase 61 | Pending |
+| TXN-04 | Phase 61 | Pending |
+| CACHE-01 | Phase 62 | Pending |
+| CACHE-02 | Phase 62 | Pending |
+| CACHE-03 | Phase 62 | Pending |
+| IDX-01 | Phase 63 | Pending |
+| IDX-02 | Phase 63 | Pending |
+| IDX-03 | Phase 63 | Pending |
+| IDX-04 | Phase 63 | Pending |
+| FMT-01 | Phase 64 | Pending |
+| FMT-02 | Phase 64 | Pending |
+| FMT-03 | Phase 64 | Pending |
+| FMT-04 | Phase 64 | Pending |
+| SEC-20 | Phase 65 | Pending |
+| SEC-21 | Phase 65 | Pending |
+| SEC-22 | Phase 65 | Pending |
+| SEC-23 | Phase 65 | Pending |
+| CLN-01 | Phase 66 | Pending |
+| CLN-02 | Phase 66 | Pending |
+| CLN-03 | Phase 66 | Pending |
+| CLN-04 | Phase 66 | Pending |
+| CLN-05 | Phase 66 | Pending |
+| CLN-06 | Phase 66 | Pending |
+| CLN-07 | Phase 66 | Pending |
 
 **Coverage:**
-- v1.9 requirements: 37 total
-- Mapped to phases: 37 (100%)
+- v2.0 requirements: 31 total
+- Mapped to phases: 31 (100%)
 - Unmapped: 0
 
 ---
