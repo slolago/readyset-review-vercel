@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { canAccessProject } from '@/lib/permissions';
 import type { Project } from '@/types';
+import { serializeReviewLink } from '@/lib/review-links';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -48,11 +49,11 @@ export async function GET(request: NextRequest) {
       } catch { /* non-fatal */ }
     }
 
-    const links = allLinks.map(l => ({
-      ...l,
+    const links = allLinks.map((l) => ({
+      ...serializeReviewLink(l as Record<string, unknown>),
       projectName: projectMap[l.projectId] ?? 'Unknown',
       _commentCount: commentCounts[l.token || l.id] ?? 0,
-    }));
+    })) as any[];
 
     // Sort by createdAt desc
     links.sort((a, b) => {

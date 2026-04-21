@@ -5,6 +5,7 @@ import { generateReadSignedUrl } from '@/lib/gcs';
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { canEditReviewLink, canAccessProject } from '@/lib/permissions';
 import type { Project, ReviewLink } from '@/types';
+import { serializeReviewLink } from '@/lib/review-links';
 
 interface RouteParams { params: { token: string } }
 
@@ -83,6 +84,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       folders,
       projectId: link.projectId,
       canEdit,
+      reviewLink: serializeReviewLink({ id: params.token, ...link }),
     });
   } catch (err) {
     console.error('review-link contents GET error:', err);

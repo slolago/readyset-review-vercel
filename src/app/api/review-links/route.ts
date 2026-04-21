@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { canAccessProject, canCreateReviewLink } from '@/lib/permissions';
 import type { Project } from '@/types';
+import { serializeReviewLink } from '@/lib/review-links';
 import { Timestamp } from 'firebase-admin/firestore';
 import { customAlphabet } from 'nanoid';
 
@@ -35,11 +36,9 @@ export async function GET(request: NextRequest) {
       .get();
 
     // Strip password field — only indicate whether one is set
-    const links = snap.docs.map((d) => {
-      const data = d.data() as Record<string, unknown>;
-      const { password, ...safe } = data;
-      return { id: d.id, ...safe, hasPassword: !!password };
-    });
+    const links = snap.docs.map((d) =>
+      serializeReviewLink({ id: d.id, ...(d.data() as Record<string, unknown>) })
+    );
 
     // Sort by createdAt desc in memory (supports both _seconds and seconds shapes)
     links.sort((a, b) => {
@@ -104,9 +103,8 @@ export async function POST(request: NextRequest) {
     await db.collection('reviewLinks').doc(token).set(data);
     const doc = await db.collection('reviewLinks').doc(token).get();
     const docData = doc.data() as Record<string, unknown>;
-    const { password: _pw, ...safeData } = docData;
 
-    return NextResponse.json({ link: { id: token, ...safeData, hasPassword: !!_pw } }, { status: 201 });
+    return NextResponse.json({ link: serializeReviewLink({ id: token, ...docData }) }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Failed to create review link' }, { status: 500 });
   }

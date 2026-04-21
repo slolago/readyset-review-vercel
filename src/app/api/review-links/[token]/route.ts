@@ -10,6 +10,7 @@ import {
 } from '@/lib/permissions';
 import type { Project, ReviewLink } from '@/types';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { serializeReviewLink } from '@/lib/review-links';
 
 interface RouteParams {
   params: { token: string };
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .get();
       const folders = subfoldersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      const { password: _pw, ...safeLink } = link;
+      const safeLink = serializeReviewLink(link);
       return NextResponse.json({ reviewLink: safeLink, assets, folders, projectName, currentFolderId: effectiveFolderRequest });
     }
 
@@ -215,7 +216,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Remove password from response
-    const { password: _pw, ...safeLink } = link;
+    const safeLink = serializeReviewLink(link);
 
     return NextResponse.json({
       reviewLink: safeLink,
@@ -321,9 +322,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     await doc.ref.update(update);
     const updated = await doc.ref.get();
     const updatedData = updated.data() as Record<string, unknown>;
-    const { password: _pw, ...safe } = updatedData;
     return NextResponse.json({
-      link: { id: params.token, ...safe, hasPassword: !!_pw },
+      link: serializeReviewLink({ id: params.token, ...updatedData }),
     });
   } catch {
     return NextResponse.json({ error: 'Failed to update review link' }, { status: 500 });
