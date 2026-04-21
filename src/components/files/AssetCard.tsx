@@ -97,6 +97,27 @@ export const AssetCard = memo(function AssetCard({
     ? `${runningJob.type} ${runningJob.status}…`
     : '';
 
+  const handleRetryFailedJob = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!failedJob) return;
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/jobs/${failedJob.id}/retry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast.success(`Retrying ${failedJob.type}…`);
+        refetchJobs();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ? `Retry failed: ${data.error}` : 'Retry failed');
+      }
+    } catch (err) {
+      toast.error(`Retry failed: ${(err as Error).message || 'network error'}`);
+    }
+  }, [failedJob, getIdToken, refetchJobs]);
+
   // When a video element loads its metadata, seek to a non-black frame
   const handleVideoMetadata = useCallback(() => {
     const vid = videoRef.current;
@@ -369,14 +390,23 @@ export const AssetCard = memo(function AssetCard({
       >
         {/* Phase 60 job indicator — top-left, above existing badges */}
         {indicatorState && (
-          <div
-            data-testid={`job-indicator-${indicatorState}`}
-            title={indicatorTooltip}
-            className="absolute top-1 left-1 z-20 w-2.5 h-2.5 rounded-full shadow-md ring-1 ring-black/40"
-            style={{
-              backgroundColor: indicatorState === 'failed' ? '#ef4444' : '#f59e0b',
-            }}
-          />
+          indicatorState === 'failed' ? (
+            <button
+              type="button"
+              data-testid="job-indicator-failed"
+              title={indicatorTooltip}
+              onClick={handleRetryFailedJob}
+              className="absolute top-1 left-1 z-20 w-2.5 h-2.5 rounded-full shadow-md ring-1 ring-black/40 hover:scale-125 transition-transform"
+              style={{ backgroundColor: '#ef4444' }}
+            />
+          ) : (
+            <div
+              data-testid="job-indicator-running"
+              title={indicatorTooltip}
+              className="absolute top-1 left-1 z-20 w-2.5 h-2.5 rounded-full shadow-md ring-1 ring-black/40 animate-pulse"
+              style={{ backgroundColor: '#f59e0b' }}
+            />
+          )
         )}
         {asset.type === 'image' && signedUrl ? (
           <Image
