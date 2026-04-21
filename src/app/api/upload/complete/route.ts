@@ -82,6 +82,14 @@ export async function POST(request: NextRequest) {
       }
       // Images do not go through ffprobe — mark probed:true so UI hides Probe button.
       updates.probed = true;
+    } else if (asset.type === 'video') {
+      // CLN-07: any client-provided width/height/duration/frameRate here are
+      // provisional — the authoritative values come from the async ffprobe
+      // fired below. Explicitly mark probed:false so consumers (export, sprite,
+      // viewer aspect) can differentiate "no probe yet" from "probe complete
+      // but no dims" and surface a pending-probe UX in the ~10-30s window.
+      // The probe endpoint flips this to true on success.
+      updates.probed = false;
     }
 
     await db.collection('assets').doc(assetId).update(updates);
