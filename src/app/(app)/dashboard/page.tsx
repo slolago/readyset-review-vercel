@@ -146,15 +146,17 @@ export default function DashboardPage() {
               description="View and manage all your projects"
               gradient="from-violet-500/20 to-purple-500/10"
             />
+            {/* TODO(VIS-08): wire ?action=upload and ?action=invite handlers
+                on the projects list page in a follow-up plan. */}
             <QuickAction
-              href="/projects"
+              href="/projects?action=upload"
               icon={<Upload className="w-5 h-5" />}
               label="Upload Assets"
               description="Upload videos and images for review"
               gradient="from-blue-500/20 to-cyan-500/10"
             />
             <QuickAction
-              href="/projects"
+              href="/projects?action=invite"
               icon={<Users className="w-5 h-5" />}
               label="Invite Team"
               description="Collaborate with your team members"
