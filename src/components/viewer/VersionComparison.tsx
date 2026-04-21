@@ -18,7 +18,7 @@ interface VersionComparisonProps {
 // ── Extracted components (not inlined so they don't remount on every parent render) ──
 
 const VersionLabel = memo(function VersionLabel({
-  side, asset, versions, isOpen, onTogglePicker, onPick,
+  side, asset, versions, isOpen, onTogglePicker, onPick, expectedType,
 }: {
   side: Side;
   asset: Asset;
@@ -26,6 +26,12 @@ const VersionLabel = memo(function VersionLabel({
   isOpen: boolean;
   onTogglePicker: (side: Side) => void;
   onPick: (side: Side, id: string) => void;
+  /**
+   * Type the other side is currently showing. Versions of a different type
+   * would trigger the mixed-type error screen, so they render disabled with
+   * a tooltip explaining why — a cleaner UX than error-then-fix.
+   */
+  expectedType: Asset['type'];
 }) {
   return (
     <div className="relative" data-picker>
@@ -48,18 +54,32 @@ const VersionLabel = memo(function VersionLabel({
             side === 'B' ? 'right-0' : 'left-0'
           }`}
         >
-          {versions.map((v) => (
-            <button
-              key={v.id}
-              data-picker
-              onClick={() => onPick(side, v.id)}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-frame-cardHover transition-colors truncate ${
-                v.id === asset.id ? 'text-frame-accent font-semibold' : 'text-white'
-              }`}
-            >
-              V{v.version} — {v.name}
-            </button>
-          ))}
+          {versions.map((v) => {
+            const incompatible = v.type !== expectedType;
+            return (
+              <button
+                key={v.id}
+                data-picker
+                onClick={() => { if (!incompatible) onPick(side, v.id); }}
+                disabled={incompatible}
+                title={incompatible ? `Can't compare ${v.type} with ${expectedType}` : undefined}
+                className={`w-full text-left px-3 py-2 text-xs truncate transition-colors ${
+                  incompatible
+                    ? 'text-white/25 cursor-not-allowed'
+                    : v.id === asset.id
+                    ? 'text-frame-accent font-semibold hover:bg-frame-cardHover'
+                    : 'text-white hover:bg-frame-cardHover'
+                }`}
+              >
+                V{v.version} — {v.name}
+                {incompatible && (
+                  <span className="ml-1 text-[10px] uppercase tracking-wide opacity-70">
+                    · {v.type}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -475,7 +495,16 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
   // ── Slider drag (robust against lost mouseup) ─────────────────────────────
   const [sliderPos, setSliderPos] = useState(0.5);
   const [isDragging, setIsDragging] = useState(false);
-  const handleMouseDown = useCallback((e: React.MouseEvent) => { e.preventDefault(); setIsDragging(true); }, []);
+  // Grabbing the slider handle while zoomed misaligns the split boundary
+  // from the transformed media content (clip-path is in media-local space,
+  // handle is in frame-space). The simplest correct fix is to reset zoom
+  // the moment the user grabs the handle — they were inspecting detail,
+  // now they want the split authoritative again.
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resetZoom();
+    setIsDragging(true);
+  }, [resetZoom]);
   useEffect(() => {
     if (!isDragging) return;
     const frame = frameRef.current;
@@ -499,11 +528,12 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
+    resetZoom();
     setIsDragging(true);
     const r = frameRef.current?.getBoundingClientRect();
     if (!r) return;
     setSliderPos(Math.max(0.02, Math.min(0.98, (e.touches[0].clientX - r.left) / r.width)));
-  }, []);
+  }, [resetZoom]);
   useEffect(() => {
     if (!isDragging) return;
     const frame = frameRef.current;
@@ -608,19 +638,66 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      // F and digit-based view mode toggle work for both videos + images.
-      // Playback/audio shortcuts are video-only — skip them for images so
-      // the key isn't silently swallowed.
+      // ── Shortcuts that apply to BOTH videos + images ─────────────
       if (e.code === 'KeyF') {
         e.preventDefault();
         toggleFullscreen();
         return;
       }
+      // W — swap A ↔ B in whatever pair is active.
+      if (e.code === 'KeyW') {
+        e.preventDefault();
+        setUserTouchedSelection(true);
+        setSelectedIdA(selectedIdB);
+        setSelectedIdB(selectedIdA);
+        return;
+      }
+      // +/= (zoom in) and - / _ (zoom out). Mimics the toolbar buttons.
+      if (e.code === 'Equal' || e.code === 'NumpadAdd') {
+        e.preventDefault();
+        const r = frameRef.current?.getBoundingClientRect();
+        if (r) handleWheel({
+          preventDefault: () => {}, deltaY: -150,
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+        } as unknown as React.WheelEvent);
+        return;
+      }
+      if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
+        e.preventDefault();
+        const r = frameRef.current?.getBoundingClientRect();
+        if (r) handleWheel({
+          preventDefault: () => {}, deltaY: 150,
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+        } as unknown as React.WheelEvent);
+        return;
+      }
+      // 0 — center the slider (slider mode only). Shift+0 additionally
+      // resets zoom/pan, acting like a full "view reset".
+      if (e.code === 'Digit0') {
+        e.preventDefault();
+        if (viewMode === 'slider') setSliderPos(0.5);
+        if (e.shiftKey) resetZoom();
+        return;
+      }
+
+      // ── Image-only shortcuts ──────────────────────────────────────
       if (isImage) {
-        // For images, only the viewMode toggles need keyboard support.
         if (e.code === 'KeyS') {
           e.preventDefault();
           setViewMode((m) => (m === 'slider' ? 'side-by-side' : 'slider'));
+          return;
+        }
+        // Arrow keys nudge the slider handle in slider mode. ±1% per
+        // press; Shift makes it ±10% for quick jumps.
+        if (
+          viewMode === 'slider' &&
+          (e.code === 'ArrowLeft' || e.code === 'ArrowRight')
+        ) {
+          e.preventDefault();
+          const delta = (e.code === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 0.1 : 0.01);
+          setSliderPos((p) => Math.max(0.02, Math.min(0.98, p + delta)));
           return;
         }
         return;
@@ -661,7 +738,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePlay, masterRef, duration, toggleFullscreen, isImage]);
+  }, [togglePlay, masterRef, duration, toggleFullscreen, isImage, viewMode, selectedIdA, selectedIdB, handleWheel, resetZoom]);
 
   // ── Render: gate on mismatched types ──────────────────────────────────────
   if (!assetA || !assetB) {
@@ -867,6 +944,9 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
                 isOpen={pickerSide === 'A'}
                 onTogglePicker={(s) => setPickerSide((p) => (p === s ? null : s))}
                 onPick={handlePickerPick}
+                // Incompatible = different type from the OTHER side. Both
+                // sides use assetB/assetA as the anchor respectively.
+                expectedType={assetB.type}
               />
             </div>
             <div className="absolute top-3 right-3 z-10 pointer-events-auto">
@@ -877,6 +957,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
                 isOpen={pickerSide === 'B'}
                 onTogglePicker={(s) => setPickerSide((p) => (p === s ? null : s))}
                 onPick={handlePickerPick}
+                expectedType={assetA.type}
               />
             </div>
           </div>
