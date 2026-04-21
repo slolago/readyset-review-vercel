@@ -564,7 +564,8 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
       const assetIds = ids.filter((id) => assets.some((a) => a.id === id));
       const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
 
-      await Promise.all([
+      // BLK-02: use allSettled so one failure doesn't abort the rest
+      const results = await Promise.allSettled([
         ...assetIds.map((id) =>
           fetch(`/api/assets/${id}`, {
             method: 'PUT',
@@ -581,7 +582,25 @@ export function FolderBrowser({ projectId, folderId, ancestorPath = '' }: Folder
         ),
       ]);
 
-      toast.success(`Moved ${selectedIds.size} item(s)`);
+      let ok = 0;
+      let fail = 0;
+      results.forEach((r, i) => {
+        const id = i < assetIds.length ? assetIds[i] : folderIds[i - assetIds.length];
+        const name =
+          i < assetIds.length
+            ? assets.find((a) => a.id === id)?.name ?? id
+            : folders.find((f) => f.id === id)?.name ?? id;
+        if (r.status === 'fulfilled' && r.value.ok) {
+          ok++;
+        } else {
+          fail++;
+          console.error('Move failed for', name, id, r.status === 'rejected' ? r.reason : r.value.status);
+        }
+      });
+
+      if (fail === 0) toast.success(`Moved ${ok} item(s)`);
+      else toast.error(`${ok} moved, ${fail} failed`);
+
       setSelectedIds(new Set());
       setShowMoveModal(false);
       refetchAssets();
