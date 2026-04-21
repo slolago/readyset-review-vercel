@@ -22,13 +22,37 @@ interface DropdownProps {
 export function Dropdown({ trigger, items, align = 'right', className }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const wasOpenRef = useRef(false);
 
-  // Compute trigger position when opening
+  // Compute trigger position when opening + reset active index
   useEffect(() => {
     if (open && triggerRef.current) {
       setRect(triggerRef.current.getBoundingClientRect());
+      setActiveIndex(0);
+    } else if (!open) {
+      setActiveIndex(-1);
+    }
+  }, [open]);
+
+  // Focus active item when it changes (roving tabindex)
+  useEffect(() => {
+    if (open && activeIndex >= 0) {
+      itemRefs.current[activeIndex]?.focus();
+    }
+  }, [open, activeIndex]);
+
+  // Return focus to trigger when closing (but not on initial mount)
+  useEffect(() => {
+    if (open) {
+      wasOpenRef.current = true;
+      return;
+    }
+    if (wasOpenRef.current) {
+      triggerRef.current?.focus();
     }
   }, [open]);
 
@@ -43,8 +67,6 @@ export function Dropdown({ trigger, items, align = 'right', className }: Dropdow
       }
     };
     const handleClose = () => setOpen(false);
-    // Only close on scroll if it's happening OUTSIDE the dropdown itself.
-    // Scrolling inside a long dropdown menu should not dismiss it.
     const handleScroll = (e: Event) => {
       const target = e.target as Node;
       const insidePanel = panelRef.current?.contains(target) ?? false;
@@ -62,11 +84,55 @@ export function Dropdown({ trigger, items, align = 'right', className }: Dropdow
     };
   }, []);
 
+  const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setOpen(true);
+    }
+  };
+
+  const handlePanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (items.length === 0) return;
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex((i) => (i + 1) % items.length);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex((i) => (i - 1 + items.length) % items.length);
+        break;
+      case 'Home':
+        e.preventDefault();
+        setActiveIndex(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        setActiveIndex(items.length - 1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (activeIndex >= 0 && activeIndex < items.length) {
+          items[activeIndex].onClick();
+          setOpen(false);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setOpen(false);
+        break;
+      default:
+        break;
+    }
+  };
+
   const panel =
     open && rect && typeof document !== 'undefined'
       ? createPortal(
           <div
             ref={panelRef}
+            role="menu"
+            onKeyDown={handlePanelKeyDown}
             style={{
               position: 'fixed',
               top: rect.bottom + 6,
@@ -83,15 +149,21 @@ export function Dropdown({ trigger, items, align = 'right', className }: Dropdow
                   <div className="my-1 border-t border-frame-border" />
                 )}
                 <button
+                  ref={(el) => {
+                    itemRefs.current[i] = el;
+                  }}
+                  role="menuitem"
+                  tabIndex={-1}
                   onClick={() => {
                     item.onClick();
                     setOpen(false);
                   }}
+                  onMouseEnter={() => setActiveIndex(i)}
                   className={cn(
-                    'w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors text-left',
+                    'w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors text-left outline-none',
                     item.danger
-                      ? 'text-red-400 hover:bg-red-500/10'
-                      : 'text-frame-textSecondary hover:text-white hover:bg-frame-cardHover'
+                      ? 'text-red-400 hover:bg-red-500/10 focus:bg-red-500/10'
+                      : 'text-frame-textSecondary hover:text-white hover:bg-frame-cardHover focus:text-white focus:bg-frame-cardHover'
                   )}
                 >
                   {item.icon && <span className="flex-shrink-0">{item.icon}</span>}
@@ -106,13 +178,17 @@ export function Dropdown({ trigger, items, align = 'right', className }: Dropdow
 
   return (
     <>
-      <div
+      <button
+        type="button"
         ref={triggerRef}
+        aria-haspopup="menu"
+        aria-expanded={open}
         className={cn('relative inline-block', className)}
         onClick={() => setOpen((v) => !v)}
+        onKeyDown={handleTriggerKeyDown}
       >
         {trigger}
-      </div>
+      </button>
       {panel}
     </>
   );
