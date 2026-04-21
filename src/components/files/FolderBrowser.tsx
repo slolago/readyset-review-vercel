@@ -60,10 +60,38 @@ interface FolderBrowserProps {
   ancestorPath?: string; // comma-separated ancestor folder IDs from URL, used when Firestore parentId chain is missing
 }
 
+// Phase 72 (EDIT-01): single-active-rename invariant. Every rename-capable
+// card (FolderCard / FolderListRow / AssetCard / AssetListView row) keys
+// itself by `${kind}-${id}` and derives its isRenaming flag from
+// activeId === myRenameKey. Starting rename B flips activeId, any other
+// card that was editing unmounts its InlineRename on the next render —
+// the previous draft is discarded, original name preserved, no PUT fires.
+interface RenameController {
+  activeId: string | null;
+  setActiveId: (id: string | null) => void;
+}
+
+const RenameControllerContext = React.createContext<RenameController>({
+  activeId: null,
+  setActiveId: () => {},
+});
+
+function RenameProvider({ children }: { children: React.ReactNode }) {
+  const [activeId, setActiveId] = React.useState<string | null>(null);
+  const value = React.useMemo(() => ({ activeId, setActiveId }), [activeId]);
+  return <RenameControllerContext.Provider value={value}>{children}</RenameControllerContext.Provider>;
+}
+
+export function useRenameController(): RenameController {
+  return React.useContext(RenameControllerContext);
+}
+
 export function FolderBrowser(props: FolderBrowserProps) {
   return (
     <ContextMenuProvider>
-      <FolderBrowserInner {...props} />
+      <RenameProvider>
+        <FolderBrowserInner {...props} />
+      </RenameProvider>
     </ContextMenuProvider>
   );
 }
@@ -1582,7 +1610,12 @@ const FolderCard = React.memo(function FolderCard({
   const router = useRouter();
   const { getIdToken } = useAuth();
   const ctxMenu = useContextMenuController();
-  const [isRenaming, setIsRenaming] = useState(false);
+  const { activeId, setActiveId } = useRenameController();
+  const myRenameKey = `folder-${folder.id}`;
+  const isRenaming = activeId === myRenameKey;
+  // Guard against stale-cancel races: if another card has already taken
+  // the active slot, our onCancel must not clobber theirs.
+  const closeRename = () => { if (activeId === myRenameKey) setActiveId(null); };
   const [showFolderCopyModal, setShowFolderCopyModal] = useState(false);
   // CTX-05 defense: suppress the synthetic click some platforms fire
   // immediately after contextmenu+mouseup (Linux Chromium is the usual
@@ -1617,13 +1650,13 @@ const FolderCard = React.memo(function FolderCard({
   };
 
   const handleRenameFolder = () => {
-    setIsRenaming(true);
+    setActiveId(myRenameKey);
   };
 
   const commitFolderRename = async (next: string) => {
     const trimmed = next.trim();
     if (!trimmed || trimmed === folder.name) {
-      setIsRenaming(false);
+      closeRename();
       return;
     }
     try {
@@ -1642,7 +1675,7 @@ const FolderCard = React.memo(function FolderCard({
     } catch {
       toast.error('Rename failed');
     } finally {
-      setIsRenaming(false);
+      closeRename();
     }
   };
 
@@ -1808,7 +1841,7 @@ const FolderCard = React.memo(function FolderCard({
         <InlineRename
           value={folder.name}
           onCommit={commitFolderRename}
-          onCancel={() => setIsRenaming(false)}
+          onCancel={closeRename}
         />
       ) : (
         <p className="text-sm font-medium text-white truncate">{folder.name}</p>
@@ -1966,7 +1999,10 @@ function FolderListRow({
   const router = useRouter();
   const { getIdToken } = useAuth();
   const ctxMenu = useContextMenuController();
-  const [isRenaming, setIsRenaming] = useState(false);
+  const { activeId, setActiveId } = useRenameController();
+  const myRenameKey = `folder-${folder.id}`;
+  const isRenaming = activeId === myRenameKey;
+  const closeRename = () => { if (activeId === myRenameKey) setActiveId(null); };
   const [showFolderCopyModal, setShowFolderCopyModal] = useState(false);
   // CTX-05 defense: suppress the synthetic click some platforms fire
   // immediately after contextmenu+mouseup. Set in onContextMenu, checked +
@@ -1981,7 +2017,7 @@ function FolderListRow({
   const commitFolderRename = async (next: string) => {
     const trimmed = next.trim();
     if (!trimmed || trimmed === folder.name) {
-      setIsRenaming(false);
+      closeRename();
       return;
     }
     try {
@@ -2000,13 +2036,13 @@ function FolderListRow({
     } catch {
       toast.error('Rename failed');
     } finally {
-      setIsRenaming(false);
+      closeRename();
     }
   };
 
   const folderActions = buildFileBrowserActions('folder', {
     onOpen: () => router.push(`/projects/${projectId}/folders/${folder.id}${ancestorPath ? `?path=${ancestorPath}` : ''}`),
-    onRename: () => setIsRenaming(true),
+    onRename: () => setActiveId(myRenameKey),
     onDuplicate,
     onCopyTo: handleOpenCopyModal,
     onMoveTo: onRequestMove,
@@ -2095,7 +2131,7 @@ function FolderListRow({
             <InlineRename
               value={folder.name}
               onCommit={commitFolderRename}
-              onCancel={() => setIsRenaming(false)}
+              onCancel={closeRename}
             />
           ) : (
             <span className="font-medium text-white truncate block max-w-[240px]" title={folder.name}>{folder.name}</span>

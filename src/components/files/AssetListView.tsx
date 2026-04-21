@@ -26,6 +26,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { InlineRename } from '@/components/ui/InlineRename';
 import { useUpload } from '@/hooks/useAssets';
 import { useContextMenuController } from '@/components/ui/ContextMenu';
+import { useRenameController } from './FolderBrowser';
 import { buildFileBrowserActions } from './fileBrowserActions';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { SmartCopyModal } from './SmartCopyModal';
@@ -244,7 +245,10 @@ function AssetListRow({
   const [showCopyToModal, setShowCopyToModal] = useState(false);
   const [allFolders, setAllFolders] = useState<Folder[]>([]);
   const [showVersionModal, setShowVersionModal] = useState(false);
-  const [isRenaming, setIsRenaming] = useState(false);
+  const { activeId, setActiveId } = useRenameController();
+  const myRenameKey = `asset-${asset.id}`;
+  const isRenaming = activeId === myRenameKey;
+  const closeRename = () => { if (activeId === myRenameKey) setActiveId(null); };
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isSelected = selectedIds?.has(asset.id) ?? false;
@@ -297,7 +301,7 @@ function AssetListRow({
       if (res.ok) { toast.success('Renamed'); onAssetDeleted?.(); }
       else toast.error('Rename failed');
     } catch { toast.error('Rename failed'); }
-    finally { setIsRenaming(false); }
+    finally { closeRename(); }
   };
 
   const openCopyTo = async () => {
@@ -412,7 +416,7 @@ function AssetListRow({
   // behavior.
   const assetActions = buildFileBrowserActions('asset', {
     onOpen: () => router.push(`/projects/${projectId}/assets/${asset.id}`),
-    onRename: () => setIsRenaming(true),
+    onRename: () => setActiveId(myRenameKey),
     onDuplicate: handleDuplicate,
     onCopyTo: openCopyTo,
     onMoveTo: () => onRequestMove?.(asset.id),
@@ -496,7 +500,7 @@ function AssetListRow({
             <InlineRename
               value={asset.name}
               onCommit={commitRename}
-              onCancel={() => setIsRenaming(false)}
+              onCancel={closeRename}
             />
           ) : (
             <span className="font-medium text-white truncate block max-w-[240px]" title={asset.name}>{asset.name}</span>

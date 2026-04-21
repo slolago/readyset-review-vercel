@@ -19,6 +19,7 @@ import type { Asset, Folder } from '@/types';
 import type { ReviewStatus } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { useContextMenuController } from '@/components/ui/ContextMenu';
+import { useRenameController } from './FolderBrowser';
 import { buildFileBrowserActions } from './fileBrowserActions';
 import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import { SmartCopyModal } from './SmartCopyModal';
@@ -63,11 +64,14 @@ export const AssetCard = memo(function AssetCard({
   const confirm = useConfirm();
   const { uploadFile } = useUpload();
   const ctxMenu = useContextMenuController();
+  const { activeId, setActiveId } = useRenameController();
+  const myRenameKey = `asset-${asset.id}`;
+  const isRenaming = activeId === myRenameKey;
+  const closeRename = () => { if (activeId === myRenameKey) setActiveId(null); };
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const versionCount = (asset as any)._versionCount || 1;
   const commentCount = ((asset as any)._commentCount as number | undefined) ?? 0;
-  const [isRenaming, setIsRenaming] = useState(false);
   const [showCopyToModal, setShowCopyToModal] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [showStackOntoModal, setShowStackOntoModal] = useState(false);
@@ -164,7 +168,7 @@ export const AssetCard = memo(function AssetCard({
   }, [spriteUrl, generatingSprite, spriteFailed, asset.type, asset.id, getIdToken]);
 
   const handleRename = () => {
-    setIsRenaming(true);
+    setActiveId(myRenameKey);
   };
 
   const commitRename = async (trimmed: string) => {
@@ -185,7 +189,7 @@ export const AssetCard = memo(function AssetCard({
     } catch (err) {
       toast.error(`Rename failed: ${(err as Error).message || 'network error'}`);
     } finally {
-      setIsRenaming(false);
+      closeRename();
     }
   };
 
@@ -642,7 +646,7 @@ export const AssetCard = memo(function AssetCard({
           <InlineRename
             value={asset.name}
             onCommit={commitRename}
-            onCancel={() => setIsRenaming(false)}
+            onCancel={closeRename}
           />
         ) : (
           <p className="text-sm font-medium text-white truncate" title={asset.name}>
