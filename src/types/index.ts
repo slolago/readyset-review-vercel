@@ -24,6 +24,12 @@ export interface Project {
   description: string;
   ownerId: string;
   collaborators: Collaborator[];
+  /**
+   * Phase 67 (PERF-01) — denormalized UIDs for array-contains queries.
+   * Maintained by project create + collaborator add/remove endpoints.
+   * Backfilled by scripts/backfill-collaborator-ids.mjs.
+   */
+  collaboratorIds?: string[];
   color: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
