@@ -128,14 +128,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .where('status', '==', 'ready')
         .where('folderId', '==', effectiveFolderRequest)
         .get();
-      const decoratedAssets = await Promise.all(assetsSnap.docs.map((d) => decorate({ id: d.id, ...d.data() })));
+      // SDC-02: filter soft-deleted before decorating
+      const liveAssetDocs = assetsSnap.docs.filter((d) => !(d.data() as any).deletedAt);
+      const decoratedAssets = await Promise.all(liveAssetDocs.map((d) => decorate({ id: d.id, ...d.data() })));
       const assets = groupByVersion(decoratedAssets, !!link.showAllVersions);
 
       const subfoldersSnap = await db.collection('folders')
         .where('projectId', '==', link.projectId)
         .where('parentId', '==', effectiveFolderRequest)
         .get();
-      const folders = subfoldersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // SDC-02: filter soft-deleted folders
+      const folders = subfoldersSnap.docs
+        .filter((d) => !(d.data() as any).deletedAt)
+        .map((d) => ({ id: d.id, ...d.data() }));
 
       const safeLink = serializeReviewLink(link);
       return NextResponse.json({ reviewLink: safeLink, assets, folders, projectName, currentFolderId: effectiveFolderRequest });
@@ -158,6 +163,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         for (const d of docs) {
           if (!d.exists) { missingAssetIds.push(d.id); continue; }
           const a = { id: d.id, ...d.data() } as any;
+          // SDC-02: treat soft-deleted as missing for guests
+          if (a.deletedAt) { missingAssetIds.push(d.id); continue; }
           if (a.status === 'ready') assetMap.set(a.id, a);
         }
       }
@@ -170,6 +177,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         for (const d of folderDocs) {
           if (!d.exists) continue;
           const f = d.data() as any;
+          // SDC-02: skip soft-deleted folders (guests shouldn't see them)
+          if (f?.deletedAt) continue;
           if (f?.projectId === link.projectId) folders.push({ id: d.id, ...f });
         }
       }
@@ -202,7 +211,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         assetsQuery = assetsQuery.where('folderId', '==', link.folderId) as any;
       }
       const assetsSnap = await assetsQuery.get();
-      const decorated = await Promise.all(assetsSnap.docs.map((d) => decorate({ id: d.id, ...d.data() })));
+      // SDC-02: filter soft-deleted before decoration
+      const liveAssetDocs = assetsSnap.docs.filter((d) => !(d.data() as any).deletedAt);
+      const decorated = await Promise.all(liveAssetDocs.map((d) => decorate({ id: d.id, ...d.data() })));
       assets = groupByVersion(decorated, !!link.showAllVersions);
 
       let foldersQuery = db.collection('folders').where('projectId', '==', link.projectId);
@@ -212,7 +223,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         foldersQuery = foldersQuery.where('parentId', '==', null) as any;
       }
       const foldersSnap = await foldersQuery.get();
-      folders = foldersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // SDC-02: filter soft-deleted folders
+      folders = foldersSnap.docs
+        .filter((d) => !(d.data() as any).deletedAt)
+        .map((d) => ({ id: d.id, ...d.data() }));
     }
 
     // Remove password from response
