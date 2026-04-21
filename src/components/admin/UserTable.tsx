@@ -8,6 +8,7 @@ import type { User } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Shield, Trash2, ChevronDown } from 'lucide-react';
 import { UserSessionActions } from './UserSessionActions';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface UserTableProps {
   users: User[];
@@ -54,7 +55,7 @@ function UserRow({
 }) {
   const [roleLoading, setRoleLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const confirm = useConfirm();
   const createdAtRaw = u.createdAt as any;
   const createdAt: Date | null =
     typeof createdAtRaw?.toDate === 'function'
@@ -70,11 +71,14 @@ function UserRow({
   };
 
   const handleDelete = async () => {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
+    const ok = await confirm({
+      title: `Delete user "${u.name}"?`,
+      message: `${u.email}\n\nThis removes their access and cannot be undone.`,
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleteLoading(true);
-    await onDelete(u.id);
-    setDeleteLoading(false);
-    setConfirmDelete(false);
+    try { await onDelete(u.id); } finally { setDeleteLoading(false); }
   };
 
   return (
@@ -154,32 +158,14 @@ function UserRow({
                 onRevoke={onRevoke}
               />
             )}
-            {confirmDelete ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-frame-textSecondary">Sure?</span>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleteLoading}
-                  className="text-xs text-red-400 hover:text-red-300 font-medium transition-colors disabled:opacity-50"
-                >
-                  {deleteLoading ? 'Deleting…' : 'Yes, delete'}
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="text-xs text-frame-textMuted hover:text-white transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleDelete}
-                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs text-frame-textMuted hover:text-red-400 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete
-              </button>
-            )}
+            <button
+              onClick={handleDelete}
+              disabled={deleteLoading}
+              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs text-frame-textMuted hover:text-red-400 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {deleteLoading ? 'Deleting…' : 'Delete'}
+            </button>
           </div>
         )}
       </td>
