@@ -320,7 +320,7 @@ See [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) for full phase deta
 
 **Phases (3):**
 
-- [ ] **Phase 67: dashboard-query-optimizations** — `collaboratorIds` array-contains queries, Promise.all on stats loops, stale-while-revalidate cache headers
+- [x] **Phase 67: dashboard-query-optimizations** — `collaboratorIds` array-contains queries, Promise.all on stats loops, stale-while-revalidate cache headers (completed 2026-04-21)
 - [ ] **Phase 68: client-init-waterfall** — AuthContext session short-circuit, ProjectsContext to unify dashboard + sidebar project fetches
 - [ ] **Phase 69: ssr-and-micro-optimizations** — Server Component dashboard with pre-fetched stats, in-process user cache in auth-helpers, local logo asset
 
@@ -337,6 +337,11 @@ See [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) for full phase deta
   4. `/api/stats` response includes `Cache-Control: private, max-age=0, s-maxage=60, stale-while-revalidate=300`; back-to-back dashboard loads within 60s don't re-query Firestore
   5. One-off backfill script has populated `collaboratorIds` on every existing project doc that has a non-empty `collaborators` array
   6. A new Firestore composite index on `projects(collaboratorIds ARRAY, <something deterministic>)` is committed to `firestore.indexes.json`
+
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 67-01-PLAN.md — collaboratorIds denorm + shared access helper + /api/stats parallelization + cache header + backfill + index
 
 ### Phase 68: client-init-waterfall
 **Goal**: Remove the ~700ms-1s blank-spinner gate on every page load, and eliminate the duplicate project-list fetch between the dashboard and the sidebar.
@@ -406,6 +411,6 @@ See [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) for full phase deta
 | 64. format-edge-cases | v2.0 | 1/1 | Complete | 2026-04-20 |
 | 65. security-and-upload-validation | v2.0 | 1/1 | Complete   | 2026-04-21 |
 | 66. dead-data-and-contracts | v2.0 | 1/1 | Complete   | 2026-04-21 |
-| 67. dashboard-query-optimizations | v2.1 | 0/? | Not started | - |
+| 67. dashboard-query-optimizations | v2.1 | 1/1 | Complete   | 2026-04-21 |
 | 68. client-init-waterfall | v2.1 | 0/? | Not started | - |
 | 69. ssr-and-micro-optimizations | v2.1 | 0/? | Not started | - |

@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.1
-milestone_name: Dashboard Performance
-status: active
-stopped_at: Roadmap created — Phase 67 (dashboard-query-optimizations) ready
-last_updated: "2026-04-21T16:00:00.000Z"
-last_activity: 2026-04-21
+milestone_name: — Dashboard Performance
+status: Roadmap created from focused dashboard perf audit
+stopped_at: Completed 67-01-PLAN.md
+last_updated: "2026-04-21T18:13:41.343Z"
+last_activity: 2026-04-21 — v2.1 scaffolded (3 phases, 9 reqs)
 progress:
   total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
   percent: 0
 ---
 
@@ -38,6 +38,7 @@ Progress: [░░░░░░░░░░] 0% (0/3 phases)
 Single focused perf audit (2026-04-21), dashboard load path only. 3 critical + 3 medium + 3 low findings, cleanly split into 3 phases per auditor's recommendation.
 
 **Top 3 criticals:**
+
 1. `/api/stats` and `/api/projects` both do full `projects` collection scans to find collaborator access (Firestore read cost proportional to total project count in the system, not user's own)
 2. `/api/stats` asset-count loop is sequential `await` inside `for` — 15 projects = 15 serial Firestore RPCs = 750ms-2.5s
 3. `AuthContext` blocks all rendering with `/api/auth/session` POST on every page load — 700ms-1s blank spinner gate
@@ -49,6 +50,7 @@ Single focused perf audit (2026-04-21), dashboard load path only. 3 critical + 3
 - Phase 68 uses `sessionStorage` for cached user object (not localStorage — tab-scoped, auto-clears on close)
 - Phase 69 Server Component wrapper shares the stats-fetch helper with `/api/stats` (no logic duplication)
 - Firebase Admin SDK composite index on `projects(collaboratorIds ARRAY, name ASC)` or similar — define during Phase 67 planning
+- [Phase 67]: Denormalized Project.collaboratorIds for indexed array-contains queries; shared helper + Promise.all fan-out + SWR cache header on /api/stats.
 
 ### Recently shipped
 
@@ -67,6 +69,6 @@ None — ready for /gsd:plan-phase 67.
 
 ## Session Continuity
 
-Last session: 2026-04-21
-Stopped at: v2.1 scaffolded, ready for /gsd:plan-phase 67 or /gsd:autonomous
+Last session: 2026-04-21T18:13:34.151Z
+Stopped at: Completed 67-01-PLAN.md
 Resume file: None

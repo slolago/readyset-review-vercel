@@ -9,10 +9,10 @@ Synthesized from a focused dashboard perf audit (2026-04-21). 3 critical + 3 med
 
 ### Query Optimizations (Phase 67)
 
-- [ ] **PERF-01**: `/api/stats` and `/api/projects` no longer do full `projects` collection scans. Denormalize collaborator UIDs to `Project.collaboratorIds: string[]`, add a Firestore composite index, and query with `where('collaboratorIds', 'array-contains', user.id)` in parallel with the existing `where('ownerId', '==', user.id)`. Includes a one-off backfill script that populates `collaboratorIds` on existing project docs from the existing `collaborators` array.
-- [ ] **PERF-02**: `/api/stats` asset-count loop runs in parallel via `Promise.all(projectIds.map(...))` instead of sequential `await` inside a `for`. Expected impact: cuts the dominant latency component from O(N projects × 100ms) to O(1 round trip).
-- [ ] **PERF-03**: `/api/stats` review-link chunked-`in` queries run in parallel. Same fix pattern as PERF-02, applied to the `where('projectId', 'in', chunk)` loop.
-- [ ] **PERF-04**: `/api/stats` response includes `Cache-Control: private, max-age=0, s-maxage=60, stale-while-revalidate=300`. Dashboard remounts within 60s serve the cached stats instantly; stale revalidation happens asynchronously.
+- [x] **PERF-01**: `/api/stats` and `/api/projects` no longer do full `projects` collection scans. Denormalize collaborator UIDs to `Project.collaboratorIds: string[]`, add a Firestore composite index, and query with `where('collaboratorIds', 'array-contains', user.id)` in parallel with the existing `where('ownerId', '==', user.id)`. Includes a one-off backfill script that populates `collaboratorIds` on existing project docs from the existing `collaborators` array.
+- [x] **PERF-02**: `/api/stats` asset-count loop runs in parallel via `Promise.all(projectIds.map(...))` instead of sequential `await` inside a `for`. Expected impact: cuts the dominant latency component from O(N projects × 100ms) to O(1 round trip).
+- [x] **PERF-03**: `/api/stats` review-link chunked-`in` queries run in parallel. Same fix pattern as PERF-02, applied to the `where('projectId', 'in', chunk)` loop.
+- [x] **PERF-04**: `/api/stats` response includes `Cache-Control: private, max-age=0, s-maxage=60, stale-while-revalidate=300`. Dashboard remounts within 60s serve the cached stats instantly; stale revalidation happens asynchronously.
 
 ### Client Init Waterfall (Phase 68)
 
@@ -56,10 +56,10 @@ See `.planning/MILESTONES.md` — v1.7 through v2.0 shipped.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PERF-01 | Phase 67 | Pending |
-| PERF-02 | Phase 67 | Pending |
-| PERF-03 | Phase 67 | Pending |
-| PERF-04 | Phase 67 | Pending |
+| PERF-01 | Phase 67 | Complete |
+| PERF-02 | Phase 67 | Complete |
+| PERF-03 | Phase 67 | Complete |
+| PERF-04 | Phase 67 | Complete |
 | PERF-05 | Phase 68 | Pending |
 | PERF-06 | Phase 68 | Pending |
 | PERF-07 | Phase 69 | Pending |
