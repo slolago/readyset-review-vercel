@@ -235,9 +235,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ assets }, {
-      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
-    });
+    // No Cache-Control: this list mutates on delete / upload / rename /
+    // move / version-stack / soft-delete-restore. Phase 78 PERF-25 added
+    // `public, max-age=300, stale-while-revalidate=600` here speculatively
+    // — broken in practice because the browser served stale lists for 5
+    // minutes after every mutation, and `public` on a user-scoped endpoint
+    // also meant a shared CDN could have served one user's assets to
+    // another. Default Next.js API behavior (no-cache) is correct here.
+    return NextResponse.json({ assets });
   } catch (err) {
     console.error('GET assets error:', err);
     return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });
