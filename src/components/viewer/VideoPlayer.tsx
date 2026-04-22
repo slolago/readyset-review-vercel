@@ -572,9 +572,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
         <div className="relative">
           {/* Timed-point comment markers. Range markers moved into the scrubber
               below so the progress fill naturally "covers" them as playback
-              advances — behind the track, protruding 2px above it. */}
+              advances — behind the track, protruding 2px above it.
+              Strip height matches the 12px dot so dots sit immediately above
+              the range marker's protrusion with no visual gap. */}
           {duration > 0 && timedComments.length > 0 && (
-            <div className="relative h-4 mb-0.5">
+            <div className="relative h-3 mb-0.5">
               {timedComments.map((c) => {
                 const pct = ((c.timestamp ?? 0) / duration) * 100;
                 const hasAnnotation = !!(c.annotation?.shapes && c.annotation.shapes !== '[]');
@@ -582,7 +584,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                   <div
                     key={c.id}
                     style={{ left: `${pct}%` }}
-                    className="absolute top-0 -translate-x-1/2 group/marker"
+                    className="absolute top-0 -translate-x-1/2 z-20 group/marker"
                     onMouseEnter={() => { setHoveredComment(c); setTooltipPct(pct); }}
                     onMouseLeave={() => setHoveredComment(null)}
                   >
