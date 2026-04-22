@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { Toaster } from 'react-hot-toast';
 
@@ -20,7 +28,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="bg-frame-bg text-frame-textPrimary min-h-screen">
+      <body className={`${inter.className} bg-frame-bg text-frame-textPrimary min-h-screen`}>
         <AuthProvider>
           <ConfirmProvider>
           {children}

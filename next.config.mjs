@@ -16,6 +16,12 @@ const nextConfig = {
       },
     ],
   },
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+      preventFullImport: true,
+    },
+  },
   experimental: {
     serverComponentsExternalPackages: ['firebase-admin', '@google-cloud/storage', 'fluent-ffmpeg', 'ffmpeg-static', '@ffmpeg-installer/ffmpeg', '@ffprobe-installer/ffprobe'],
     outputFileTracingIncludes: {
