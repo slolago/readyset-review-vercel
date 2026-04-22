@@ -40,6 +40,7 @@ export default function AdminPage() {
   const fetchUsers = useCallback(async () => {
     try {
       const token = await getIdToken();
+      // Bounded by API — pagination UI deferred (see 78-01 PLAN).
       const res = await fetch('/api/admin/users', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -58,6 +59,7 @@ export default function AdminPage() {
     setProjectsLoading(true);
     try {
       const token = await getIdToken();
+      // Bounded by API — pagination UI deferred (see 78-01 PLAN).
       const res = await fetch('/api/admin/projects', {
         headers: { Authorization: `Bearer ${token}` },
       });

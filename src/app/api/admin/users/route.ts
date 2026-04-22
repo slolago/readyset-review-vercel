@@ -9,9 +9,22 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = getAdminDb();
-    const snap = await db.collection('users').orderBy('createdAt', 'desc').get();
+
+    // Pagination: ?limit=N (default 50, clamped to [1, 100]) + ?cursor=<docId>
+    const { searchParams } = new URL(request.url);
+    const limitRaw = Number(searchParams.get('limit'));
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 100) : 50;
+    const cursor = searchParams.get('cursor');
+
+    let query = db.collection('users').orderBy('createdAt', 'desc');
+    if (cursor) {
+      const cursorDoc = await db.collection('users').doc(cursor).get();
+      if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+    }
+    const snap = await query.limit(limit).get();
     const users = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    return NextResponse.json({ users });
+    const nextCursor = snap.size === limit ? snap.docs[snap.docs.length - 1].id : null;
+    return NextResponse.json({ users, nextCursor });
   } catch (err) {
     console.error('[GET /api/admin/users]', err);
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
