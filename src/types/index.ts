@@ -69,6 +69,13 @@ export interface Asset {
   spriteStripGcsPath?: string;
   /** Free-form user-supplied description. Writable via PUT /api/assets/[assetId]. */
   description?: string;
+  /**
+   * User-supplied tags (free-form labels). Managed via PATCH
+   * /api/assets/[assetId]/tags with atomic arrayUnion/arrayRemove. Stored
+   * lowercase + trimmed (see TAG_REGEX in the tags route). Absent on pre-
+   * tagging assets; treat as empty array for filter/search purposes.
+   */
+  tags?: string[];
   duration?: number;
   width?: number;
   height?: number;

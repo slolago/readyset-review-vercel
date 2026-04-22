@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Asset } from '@/types';
 import { useUserNames } from '@/hooks/useUserNames';
 import { useAuth } from '@/hooks/useAuth';
 import { RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/lib/format-date';
+import { TagEditor } from './TagEditor';
 
 interface FileInfoPanelProps {
   asset: Asset;
@@ -88,6 +89,13 @@ export function FileInfoPanel({ asset }: FileInfoPanelProps) {
   const uploaderNames = useUserNames(asset.uploadedBy ? [asset.uploadedBy] : []);
   const uploaderLabel = (asset.uploadedBy && uploaderNames[asset.uploadedBy]) || asset.uploadedBy || '—';
   const [probing, setProbing] = useState(false);
+  // Local copy of tags so TagEditor's optimistic updates show immediately
+  // without waiting for the parent to refetch the asset. Re-syncs when the
+  // user switches to a different asset (asset.id change).
+  const [tags, setTags] = useState<string[]>(asset.tags ?? []);
+  useEffect(() => {
+    setTags(asset.tags ?? []);
+  }, [asset.id, asset.tags]);
 
   const runProbe = async () => {
     setProbing(true);
@@ -206,6 +214,8 @@ export function FileInfoPanel({ asset }: FileInfoPanelProps) {
           Some fields may be inaccurate — client-extracted. Click Probe for server-verified metadata.
         </p>
       )}
+
+      <TagEditor assetId={asset.id} tags={tags} onTagsChange={setTags} />
 
       {sections.map((section) => (
         <div key={section.title}>
