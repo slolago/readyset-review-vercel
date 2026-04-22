@@ -50,6 +50,14 @@
         { "fieldPath": "collaboratorIds", "arrayConfig": "CONTAINS" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assetId", "order": "ASCENDING" },
+        { "fieldPath": "reviewLinkId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

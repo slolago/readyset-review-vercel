@@ -50,10 +50,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       ? folderIds
       : (link.folderId ? [link.folderId] : []);
 
-    // Resolve folder names via parallel direct doc gets
-    const folderDocs = await Promise.all(
-      effectiveFolderIds.map((id) => db.collection('folders').doc(id).get())
-    );
+    // Resolve folder names via a single batched getAll (1 RPC vs N).
+    const folderDocs = effectiveFolderIds.length
+      ? await db.getAll(...effectiveFolderIds.map((id) => db.collection('folders').doc(id)))
+      : [];
     const folders: any[] = [];
     for (let i = 0; i < folderDocs.length; i++) {
       const d = folderDocs[i];
@@ -63,22 +63,28 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       else folders.push({ id, _deleted: true });
     }
 
-    // Resolve assets (name, thumbnail only — no full signed URLs needed for editor)
+    // Resolve assets (name, thumbnail only — no full signed URLs needed for editor).
+    // Chunk the signed-URL fan-out by 20 to bound concurrent GCS signing pressure.
     const assets: any[] = [];
-    await Promise.all(
-      assetIds.map(async (id) => {
-        const d = await db.collection('assets').doc(id).get();
-        // SDC-02: treat soft-deleted as deleted tombstones
-        if (!d.exists || (d.data() as any).deletedAt) { assets.push({ id, _deleted: true }); return; }
-        const a = { id: d.id, ...d.data() } as any;
-        if (a.thumbnailGcsPath) {
-          try { a.thumbnailSignedUrl = await generateReadSignedUrl(a.thumbnailGcsPath); } catch (err) {
-            console.error('[GET /api/review-links/[token]/contents] sign thumbnail URL failed', err);
+    const CHUNK = 20;
+    for (let i = 0; i < assetIds.length; i += CHUNK) {
+      const chunk = assetIds.slice(i, i + CHUNK);
+      const results = await Promise.all(
+        chunk.map(async (id) => {
+          const d = await db.collection('assets').doc(id).get();
+          // SDC-02: treat soft-deleted as deleted tombstones
+          if (!d.exists || (d.data() as any).deletedAt) return { id, _deleted: true };
+          const a = { id: d.id, ...d.data() } as any;
+          if (a.thumbnailGcsPath) {
+            try { a.thumbnailSignedUrl = await generateReadSignedUrl(a.thumbnailGcsPath); } catch (err) {
+              console.error('[GET /api/review-links/[token]/contents] sign thumbnail URL failed', err);
+            }
           }
-        }
-        assets.push(a);
-      })
-    );
+          return a;
+        })
+      );
+      assets.push(...results.filter(Boolean));
+    }
 
     return NextResponse.json({
       assetIds,

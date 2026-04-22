@@ -235,7 +235,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ assets });
+    return NextResponse.json({ assets }, {
+      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
+    });
   } catch (err) {
     console.error('GET assets error:', err);
     return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });
