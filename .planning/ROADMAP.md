@@ -407,7 +407,10 @@ Plans:
   2. Comments queries for review links use the new composite index (no in-memory fallback warning in logs); review-link contents route uses `db.getAll` for folder batch and chunks asset fan-out by 20
   3. Google Fonts load via `next/font` with `display: swap` (no `@import url()` in `globals.css`); `lucide-react` imports are split per-route via `modularizeImports` in `next.config.mjs`
   4. `<link rel="preconnect">` for Firebase + GCS endpoints ships in the root layout; all raw `<img>` tags in Sidebar/ReviewHeader/AssetListView migrate to `next/image`; `date-fns` no longer appears on any hot-path route's critical bundle
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [x] 78-01-PLAN.md — PERF-24 cursor pagination on 3 admin routes + PERF-25 comments composite index + review-link db.getAll + chunked signed-URL fan-out + /api/assets Cache-Control + PERF-26 next/font + lucide-react modularizeImports + PERF-27 preconnect + AssetListView img→Image + date-fns dead-dep removal
 
 ## Progress
 
@@ -468,4 +471,4 @@ Plans:
 | 75. page-loading-and-server-components | v2.3 | 1/1 | Complete   | 2026-04-22 |
 | 76. asset-viewer-restructure | v2.3 | 1/1 | Complete   | 2026-04-22 |
 | 77. folder-browser-decomposition | v2.3 | 1/1 | Complete   | 2026-04-22 |
-| 78. data-layer-bundle-and-network | v2.3 | 0/? | Not started | - |
+| 78. data-layer-bundle-and-network | v2.3 | 1/1 | Complete   | 2026-04-22 |

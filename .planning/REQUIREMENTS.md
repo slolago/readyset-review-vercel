@@ -35,10 +35,10 @@ Synthesized from a 4-stream app-wide perf audit (pages, viewer/player, data laye
 
 ### Data layer + bundle + network (Phase 78)
 
-- [ ] **PERF-24**: `/api/admin/users`, `/api/admin/projects`, and `/api/review-links/all` use `limit(N)` + cursor-based pagination (`startAfter`). Admin surfaces no longer do unbounded scans; users with 500+ review links no longer OOM.
-- [ ] **PERF-25**: Firestore composite index added and deployed for comments `(assetId ASC, reviewLinkId ASC)` — kills the in-memory fallback in `src/app/api/comments/route.ts:83–103`. Review-link contents route uses `db.getAll(...)` instead of `Promise.all(.map(doc.get))` for N folder reads (N RPCs → 1). Asset signed-URL fan-out in `/api/review-links/[token]/contents` chunks by 20 instead of unbounded `Promise.all`. `/api/assets` GET adds `Cache-Control: public, max-age=300, stale-while-revalidate=600`.
-- [ ] **PERF-26**: Google Fonts move from `@import url('https://fonts.googleapis.com/...')` in `globals.css` to `next/font/google` in `src/app/layout.tsx` with `display: swap` — non-blocking font delivery. `next.config.mjs` gets `modularizeImports` for `lucide-react` so each route only bundles the icons it imports.
-- [ ] **PERF-27**: `<link rel="preconnect">` hints for `firestore.googleapis.com` + `storage.googleapis.com` in `src/app/layout.tsx`. Remaining raw `<img>` tags in `Sidebar.tsx`, `ReviewHeader.tsx`, and `AssetListView.tsx` (outside the v2.1 logo migration) migrate to `next/image`. `date-fns` duration formatting (the only use that's on a hot path) swaps to native `Intl.NumberFormat` or a ~100-line helper — cuts `date-fns` off the critical bundle entirely.
+- [x] **PERF-24**: `/api/admin/users`, `/api/admin/projects`, and `/api/review-links/all` use `limit(N)` + cursor-based pagination (`startAfter`). Admin surfaces no longer do unbounded scans; users with 500+ review links no longer OOM.
+- [x] **PERF-25**: Firestore composite index added and deployed for comments `(assetId ASC, reviewLinkId ASC)` — kills the in-memory fallback in `src/app/api/comments/route.ts:83–103`. Review-link contents route uses `db.getAll(...)` instead of `Promise.all(.map(doc.get))` for N folder reads (N RPCs → 1). Asset signed-URL fan-out in `/api/review-links/[token]/contents` chunks by 20 instead of unbounded `Promise.all`. `/api/assets` GET adds `Cache-Control: public, max-age=300, stale-while-revalidate=600`.
+- [x] **PERF-26**: Google Fonts move from `@import url('https://fonts.googleapis.com/...')` in `globals.css` to `next/font/google` in `src/app/layout.tsx` with `display: swap` — non-blocking font delivery. `next.config.mjs` gets `modularizeImports` for `lucide-react` so each route only bundles the icons it imports.
+- [x] **PERF-27**: `<link rel="preconnect">` hints for `firestore.googleapis.com` + `storage.googleapis.com` in `src/app/layout.tsx`. Remaining raw `<img>` tags in `Sidebar.tsx`, `ReviewHeader.tsx`, and `AssetListView.tsx` (outside the v2.1 logo migration) migrate to `next/image`. `date-fns` duration formatting (the only use that's on a hot path) swaps to native `Intl.NumberFormat` or a ~100-line helper — cuts `date-fns` off the critical bundle entirely.
 
 ## Absorbed from prior milestones
 
@@ -86,10 +86,10 @@ See `.planning/MILESTONES.md` — v1.7 through v2.2 shipped.
 | PERF-21 | Phase 76 | Complete |
 | PERF-22 | Phase 77 | Complete |
 | PERF-23 | Phase 77 | Complete |
-| PERF-24 | Phase 78 | Pending |
-| PERF-25 | Phase 78 | Pending |
-| PERF-26 | Phase 78 | Pending |
-| PERF-27 | Phase 78 | Pending |
+| PERF-24 | Phase 78 | Complete |
+| PERF-25 | Phase 78 | Complete |
+| PERF-26 | Phase 78 | Complete |
+| PERF-27 | Phase 78 | Complete |
 
 **Coverage:**
 - v2.3 requirements: 18 total
