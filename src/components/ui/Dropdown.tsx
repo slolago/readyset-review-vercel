@@ -22,6 +22,8 @@ interface DropdownProps {
 export function Dropdown({ trigger, items, align = 'right', className }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const [flipUp, setFlipUp] = useState(false);
+  const [panelHeight, setPanelHeight] = useState<number | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -33,10 +35,33 @@ export function Dropdown({ trigger, items, align = 'right', className }: Dropdow
     if (open && triggerRef.current) {
       setRect(triggerRef.current.getBoundingClientRect());
       setActiveIndex(0);
+      // Reset measured height so the next open re-measures against the
+      // current viewport (the menu's content might have changed).
+      setPanelHeight(null);
+      setFlipUp(false);
     } else if (!open) {
       setActiveIndex(-1);
     }
   }, [open]);
+
+  // Measure the panel once it's in the DOM, then decide whether to flip.
+  // The panel is initially rendered invisibly below the trigger; if it
+  // would overflow the viewport bottom AND flipping up gives more room,
+  // we swap to `bottom: viewport - rect.top` anchoring. Measures against
+  // the actual content — avoids hardcoded item-count heuristics.
+  useEffect(() => {
+    if (!open || !rect || !panelRef.current) return;
+    const measured = panelRef.current.getBoundingClientRect().height;
+    setPanelHeight(measured);
+
+    const spaceBelow = window.innerHeight - rect.bottom - 6;
+    const spaceAbove = rect.top - 6;
+    // Flip only when the menu actually overflows below AND there's more
+    // room above — avoids flipping up when the menu fits fine both ways.
+    if (measured > spaceBelow && spaceAbove > spaceBelow) {
+      setFlipUp(true);
+    }
+  }, [open, rect, items.length]);
 
   // Focus active item when it changes (roving tabindex)
   useEffect(() => {
@@ -135,11 +160,25 @@ export function Dropdown({ trigger, items, align = 'right', className }: Dropdow
             onKeyDown={handlePanelKeyDown}
             style={{
               position: 'fixed',
-              top: rect.bottom + 6,
+              // Flip-up anchors at the BOTTOM edge so long menus grow
+              // upward from the trigger — viewport-bottom overflow fixed.
+              // Before measurement (first paint) we render at the default
+              // below position but invisible, so the flip decision can
+              // happen before the user sees anything.
+              ...(flipUp
+                ? { bottom: window.innerHeight - rect.top + 6 }
+                : { top: rect.bottom + 6 }),
               ...(align === 'right'
                 ? { right: window.innerWidth - rect.right }
                 : { left: rect.left }),
+              // Cap height if the menu still can't fit (narrow viewport)
+              // so the menu becomes scrollable instead of clipped.
+              maxHeight: `${Math.max(120, window.innerHeight - 24)}px`,
+              overflowY: 'auto',
               zIndex: 9999,
+              // Hide until we've measured + decided on flip direction to
+              // avoid a visible jump on the first paint.
+              visibility: panelHeight === null ? 'hidden' : 'visible',
             }}
             className="bg-frame-card border border-frame-border rounded-xl shadow-2xl py-1 min-w-[160px] animate-fade-in"
           >
