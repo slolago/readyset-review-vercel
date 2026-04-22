@@ -587,7 +587,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                     onMouseLeave={() => setHoveredComment(null)}
                   >
                     <button
-                      className="w-full h-2 rounded-full bg-frame-accent/50 border border-frame-accent/80 hover:bg-frame-accent/70 transition-colors cursor-pointer"
+                      className="w-full h-2 rounded-full bg-white/80 border border-white hover:bg-white transition-colors cursor-pointer"
                       onClick={() => onCommentClick?.(c)}
                     />
                     {isHovered && (
@@ -604,8 +604,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                       >
                         <div className="bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl p-2.5 text-left">
                           <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[10px] font-mono text-frame-accent font-medium">
-                              IN {formatDuration(c.inPoint ?? 0)} - OUT {formatDuration(c.outPoint ?? 0)}
+                            <span className="text-[11px] font-mono text-white font-semibold tracking-wide">
+                              IN {formatDuration(c.inPoint ?? 0)} → OUT {formatDuration(c.outPoint ?? 0)}
                             </span>
                           </div>
                           <p className="text-xs font-medium text-white leading-none mb-0.5">{c.authorName}</p>
@@ -776,6 +776,51 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 
           {/* Background color picker */}
           <PlayerBgPicker value={playerBg} onChange={setPlayerBg} />
+
+          {/* Mark IN / OUT — writes to the same rangeIn/rangeOut state the
+              comment composer reads, so the composer's IN/OUT chips update
+              in sync. Only rendered when the parent lifted the state (i.e.
+              provided both change callbacks). Mirrors the sidebar's
+              keyboard-shortcut behavior (I / O) with a mouse affordance. */}
+          {onLoopInChange && onLoopOutChange && (
+            <>
+              <button
+                onClick={() => onLoopInChange(currentTime)}
+                title={`Mark IN at current time${loopIn !== undefined ? ` (currently ${formatDuration(loopIn)})` : ''}`}
+                className={`w-6 h-6 flex items-center justify-center font-mono text-base leading-none font-bold transition-colors ${
+                  loopIn !== undefined
+                    ? 'text-frame-accent hover:text-frame-accentHover'
+                    : 'text-white/40 hover:text-white/70'
+                }`}
+              >
+                {'{'}
+              </button>
+              <button
+                onClick={() => {
+                  if (loopIn === undefined) return;
+                  if (currentTime <= loopIn) return;
+                  onLoopOutChange(currentTime);
+                }}
+                disabled={loopIn === undefined || currentTime <= loopIn}
+                title={
+                  loopIn === undefined
+                    ? 'Mark IN first'
+                    : currentTime <= loopIn
+                    ? 'Out-point must come after in-point'
+                    : `Mark OUT at current time${loopOut !== undefined ? ` (currently ${formatDuration(loopOut)})` : ''}`
+                }
+                className={`w-6 h-6 flex items-center justify-center font-mono text-base leading-none font-bold transition-colors ${
+                  loopOut !== undefined
+                    ? 'text-frame-accent hover:text-frame-accentHover'
+                    : loopIn !== undefined && currentTime > loopIn
+                    ? 'text-white/40 hover:text-white/70'
+                    : 'text-white/20 cursor-not-allowed'
+                }`}
+              >
+                {'}'}
+              </button>
+            </>
+          )}
 
           {/* Loop toggle — per-session, resets on asset/version switch */}
           <button
