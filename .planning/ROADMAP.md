@@ -403,3 +403,14 @@ See [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md) for full phase deta
 | 76. asset-viewer-restructure | v2.3 | 1/1 | Human-verify | 2026-04-22 |
 | 77. folder-browser-decomposition | v2.3 | 1/1 | Complete | 2026-04-22 |
 | 78. data-layer-bundle-and-network | v2.3 | 1/1 | Complete | 2026-04-22 |
+
+## Backlog
+
+### Phase 999.1: export-modal-format-switch-bug (BACKLOG)
+
+**Goal:** In the asset viewer, opening Export modal → exporting as GIF → switching format toggle to MP4 without closing → clicking Export again still produces a GIF (and mirror: MP4 → GIF). Second export uses the format from the first submit. Likely `format` missing from `handleSubmit`'s `useCallback` deps in `src/components/viewer/ExportModal.tsx` — stale closure.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
