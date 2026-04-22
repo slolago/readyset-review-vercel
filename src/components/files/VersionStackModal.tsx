@@ -163,38 +163,62 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
           ) : versions.length === 0 ? (
             <p className="text-center text-sm text-frame-textMuted py-8">No versions found.</p>
           ) : (
-            versions.map((version, idx) => (
-              <div
-                key={version.id}
-                draggable={versions.length > 1}
-                onDragStart={(e) => {
-                  setDragIdx(idx);
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setHoverIdx(idx);
-                }}
-                onDragLeave={() => setHoverIdx(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (dragIdx !== null) handleReorder(dragIdx, idx);
-                  setDragIdx(null);
-                  setHoverIdx(null);
-                }}
-                onDragEnd={() => {
-                  setDragIdx(null);
-                  setHoverIdx(null);
-                }}
-                className={`flex items-center gap-3 px-5 py-3 hover:bg-frame-border/30 transition-colors ${
-                  hoverIdx === idx && dragIdx !== null && dragIdx !== idx
-                    ? 'border-t-2 border-frame-accent'
-                    : ''
-                } ${dragIdx === idx ? 'opacity-50' : ''}`}
-              >
-                {versions.length > 1 && (
-                  <GripVertical className="w-4 h-4 text-frame-textMuted cursor-grab flex-shrink-0" />
-                )}
+            versions.map((version, idx) => {
+              const canReorder = versions.length > 1;
+              const isDragging = dragIdx === idx;
+              const showInsertionAbove =
+                hoverIdx === idx && dragIdx !== null && dragIdx !== idx;
+              return (
+                <div key={version.id}>
+                  {/* Insertion line between rows — 2px accent bar that
+                      appears at the top of the hovered row while a drag is
+                      in flight, showing exactly where the dragged item will
+                      land. Keeps the row's own border/padding untouched so
+                      it doesn't shift other content around. */}
+                  {showInsertionAbove && (
+                    <div className="mx-5 h-0.5 bg-frame-accent rounded-full pointer-events-none" />
+                  )}
+                  <div
+                    draggable={canReorder}
+                    onDragStart={(e) => {
+                      if (!canReorder) return;
+                      setDragIdx(idx);
+                      e.dataTransfer.effectAllowed = 'move';
+                      // Some browsers require data on the transfer object
+                      // for the drag to initialize at all.
+                      e.dataTransfer.setData('text/plain', version.id);
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      if (dragIdx !== null && dragIdx !== idx) setHoverIdx(idx);
+                    }}
+                    onDragOver={(e) => {
+                      // Required for the drop event to fire; otherwise the
+                      // browser rejects the drop. Do NOT update hoverIdx here
+                      // — dragOver fires continuously and would re-render on
+                      // every mouse move. dragEnter handles the one-shot
+                      // update.
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragIdx !== null) handleReorder(dragIdx, idx);
+                      setDragIdx(null);
+                      setHoverIdx(null);
+                    }}
+                    onDragEnd={() => {
+                      setDragIdx(null);
+                      setHoverIdx(null);
+                    }}
+                    className={`flex items-center gap-3 px-5 py-3 transition-colors ${
+                      isDragging
+                        ? 'opacity-50 bg-frame-border/20'
+                        : 'hover:bg-frame-border/30'
+                    } ${canReorder ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  >
+                    {canReorder && (
+                      <GripVertical className="w-4 h-4 text-frame-textMuted flex-shrink-0" />
+                    )}
                 <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded font-mono ${
                   version.id === asset.id
                     ? 'bg-frame-accent text-white'
@@ -231,8 +255,10 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
                     </button>
                   </>
                 )}
-              </div>
-            ))
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 
