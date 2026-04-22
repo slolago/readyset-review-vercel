@@ -144,6 +144,7 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
   const [folderReviewTarget, setFolderReviewTarget] = useState<string | null>(null);
   const [addToLinkTarget, setAddToLinkTarget] = useState<{ assetIds?: string[]; folderIds?: string[] } | null>(null);
   const [showMoveModal, setShowMoveModal] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
   const [allFolders, setAllFolders] = useState<FolderType[]>([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -582,6 +583,20 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
     setShowMoveModal(true);
   };
 
+  const handleOpenCopyModal = async () => {
+    // Same folder-list prep as Move — the destination picker needs the full
+    // project tree. Reusing the endpoint avoids a second fetch.
+    const token = await getIdToken();
+    const res = await fetch(`/api/folders?projectId=${projectId}&all=true`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setAllFolders(data.folders);
+    }
+    setShowCopyModal(true);
+  };
+
   const handleRequestMoveItem = useCallback(async (itemId: string) => {
     setSelectedIds(new Set([itemId]));
     await handleOpenMoveModal();
@@ -698,6 +713,63 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
       fetchFolders();
     } catch {
       toast.error('Failed to move items');
+    }
+  };
+
+  // Mirror of handleMoveSelected but hits the copy endpoints — assets keep
+  // their originals, copies land in the target. Uses allSettled so a
+  // permission-denied on one item doesn't abort the rest (same resilience
+  // pattern as bulk move / bulk delete — v1.9 Phase 55).
+  const handleCopySelected = async (targetFolderId: string | null) => {
+    try {
+      const token = await getIdToken();
+      const ids = Array.from(selectedIds);
+      const assetIds = ids.filter((id) => assets.some((a) => a.id === id));
+      const folderIds = ids.filter((id) => folders.some((f) => f.id === id));
+
+      const results = await Promise.allSettled([
+        ...assetIds.map((id) =>
+          fetch('/api/assets/copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ assetId: id, targetFolderId }),
+          }),
+        ),
+        ...folderIds.map((id) =>
+          fetch('/api/folders/copy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ folderId: id, targetParentId: targetFolderId }),
+          }),
+        ),
+      ]);
+
+      let ok = 0;
+      let fail = 0;
+      results.forEach((r, i) => {
+        const id = i < assetIds.length ? assetIds[i] : folderIds[i - assetIds.length];
+        const name =
+          i < assetIds.length
+            ? assets.find((a) => a.id === id)?.name ?? id
+            : folders.find((f) => f.id === id)?.name ?? id;
+        if (r.status === 'fulfilled' && r.value.ok) {
+          ok++;
+        } else {
+          fail++;
+          console.error('Copy failed for', name, id, r.status === 'rejected' ? r.reason : r.value.status);
+        }
+      });
+
+      if (fail === 0) toast.success(`Copied ${ok} item(s)`);
+      else toast.error(`${ok} copied, ${fail} failed`);
+
+      setSelectedIds(new Set());
+      setShowCopyModal(false);
+      // Copies landing in the CURRENT folder should show up immediately.
+      refetchAssets();
+      fetchFolders();
+    } catch {
+      toast.error('Failed to copy items');
     }
   };
 
@@ -1475,6 +1547,13 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
             Move
           </button>
           <button
+            onClick={handleOpenCopyModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-border hover:bg-frame-borderLight rounded-lg transition-colors"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copy
+          </button>
+          <button
             onClick={handleDownloadSelected}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-border hover:bg-frame-borderLight rounded-lg transition-colors"
           >
@@ -1580,6 +1659,17 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
           selectedCount={selectedIds.size}
           onMove={handleMoveSelected}
           onClose={() => setShowMoveModal(false)}
+        />
+      )}
+
+      {showCopyModal && (
+        <MoveModal
+          folders={allFolders}
+          currentFolderId={folderId}
+          selectedCount={selectedIds.size}
+          title={`Copy ${selectedIds.size} item(s) to…`}
+          onMove={handleCopySelected}
+          onClose={() => setShowCopyModal(false)}
         />
       )}
 
