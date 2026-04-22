@@ -800,6 +800,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
               {isVideo ? (
                 <>
                   <video
+                    key={`compare-B-${assetB.id}`}
                     ref={videoBRef}
                     src={urlB}
                     crossOrigin="anonymous"
@@ -812,6 +813,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
                     onError={() => setErrB(true)}
                   />
                   <video
+                    key={`compare-A-${assetA.id}`}
                     ref={videoARef}
                     src={urlA}
                     crossOrigin="anonymous"
@@ -828,6 +830,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
+                    key={`compare-B-${assetB.id}`}
                     src={urlB}
                     alt={`V${assetB.version}`}
                     className="object-contain"
@@ -846,6 +849,7 @@ export function VersionComparison({ versions }: VersionComparisonProps) {
                   />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
+                    key={`compare-A-${assetA.id}`}
                     src={urlA}
                     alt={`V${assetA.version}`}
                     className="object-contain"
