@@ -224,6 +224,27 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
     }
   }, [assets, sortKey]);
 
+  // Uploads targeting the folder the user is CURRENTLY viewing. Shown as
+  // optimistic placeholder cards at the top of the grid/list so the user
+  // sees a card immediately after dropping a file — instead of waiting
+  // for the upload to complete and the refetch to land.
+  //
+  // An upload stays as a placeholder while it's in flight, AND briefly
+  // while 'complete' if the refetch hasn't yet returned the real asset
+  // (checked by assetId presence in the current assets list). Once the
+  // real card appears, the placeholder drops out on the next render.
+  const visibleUploadPlaceholders = useMemo(() => {
+    const assetIds = new Set(assets.map((a) => a.id));
+    return uploads.filter((u) => {
+      if (u.projectId !== projectId) return false;
+      if (u.folderId !== folderId) return false;
+      if (u.status === 'error' || u.status === 'cancelled') return false;
+      // Complete + real asset landed → let the real card take over.
+      if (u.status === 'complete' && u.assetId && assetIds.has(u.assetId)) return false;
+      return true;
+    });
+  }, [uploads, projectId, folderId, assets]);
+
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
   const rubberBandRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
@@ -1283,6 +1304,7 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
           <AssetListView
             assets={sortedAssets}
             projectId={projectId}
+            uploadPlaceholders={visibleUploadPlaceholders}
             onAssetDeleted={refetchAssets}
             onVersionUploaded={refetchAssets}
             onCopied={refetchAssets}
@@ -1297,6 +1319,7 @@ function FolderBrowserInner({ projectId, folderId, ancestorPath = '' }: FolderBr
           <AssetGrid
             assets={sortedAssets}
             projectId={projectId}
+            uploadPlaceholders={visibleUploadPlaceholders}
             onAssetDeleted={refetchAssets}
             onVersionUploaded={refetchAssets}
             onCopied={refetchAssets}

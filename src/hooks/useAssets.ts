@@ -277,6 +277,9 @@ export function useUpload() {
       file,
       progress: 0,
       status: 'pending',
+      projectId,
+      folderId,
+      createdAt: Date.now(),
     };
     setUploads((prev) => [...prev, newUpload]);
 

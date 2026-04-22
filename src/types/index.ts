@@ -222,6 +222,14 @@ export interface UploadItem {
   status: 'pending' | 'uploading' | 'complete' | 'error' | 'cancelled';
   assetId?: string;
   error?: string;
+  /** Project the upload targets — used by the asset grid to filter
+      placeholders to the folder the user is currently viewing. */
+  projectId: string;
+  /** Folder the upload targets (null = project root). */
+  folderId: string | null;
+  /** Epoch ms when the upload was initiated — used for sort + "Just now"
+      timestamp display on the optimistic placeholder card. */
+  createdAt: number;
 }
 
 // ---------- Export jobs (Phase 47) ----------

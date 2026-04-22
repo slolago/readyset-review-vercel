@@ -33,6 +33,7 @@ import { ReviewStatusBadge } from '@/components/ui/ReviewStatusBadge';
 import dynamic from 'next/dynamic';
 import { ModalSkeleton } from '@/components/ui/ModalSkeleton';
 import { SmartCopyModal } from './SmartCopyModal';
+import { UploadPlaceholderRow } from './UploadPlaceholderRow';
 
 const VersionStackModal = dynamic(
   () => import('./VersionStackModal').then((m) => m.VersionStackModal),
@@ -52,6 +53,10 @@ const REVIEW_STATUS_OPTIONS: { value: ReviewStatus | null; label: string }[] = [
 interface AssetListViewProps {
   assets: Asset[];
   projectId: string;
+  /** Active uploads targeting THIS folder — rendered as placeholder rows
+      at the top of the table so the list view has the same feedback as
+      the grid. */
+  uploadPlaceholders?: import('@/types').UploadItem[];
   onAssetDeleted?: () => void;
   onVersionUploaded?: () => void;
   onCopied?: () => void;
@@ -69,6 +74,7 @@ type SortDir = 'asc' | 'desc';
 export const AssetListView = memo(function AssetListView({
   assets,
   projectId,
+  uploadPlaceholders,
   onAssetDeleted,
   onVersionUploaded,
   onCopied,
@@ -115,7 +121,8 @@ export const AssetListView = memo(function AssetListView({
   const uploaderIds = useMemo(() => assets.map(a => a.uploadedBy).filter(Boolean), [assets]);
   const uploaderNames = useUserNames(uploaderIds);
 
-  if (assets.length === 0) return null;
+  const placeholders = uploadPlaceholders ?? [];
+  if (assets.length === 0 && placeholders.length === 0) return null;
 
   const allSelected = sorted.length > 0 && sorted.every(a => selectedIds?.has(a.id));
   const someSelected = !allSelected && sorted.some(a => selectedIds?.has(a.id));
@@ -133,7 +140,7 @@ export const AssetListView = memo(function AssetListView({
   return (
     <div>
       <h3 className="text-xs font-semibold text-frame-textMuted uppercase tracking-wider mb-3">
-        Assets ({assets.length})
+        Assets ({assets.length + placeholders.length})
       </h3>
       <table className="w-full text-sm">
         <thead>
@@ -192,6 +199,13 @@ export const AssetListView = memo(function AssetListView({
           </tr>
         </thead>
         <tbody>
+          {placeholders.map((item) => (
+            <UploadPlaceholderRow
+              key={`upload-${item.id}`}
+              item={item}
+              hasCheckboxColumn={!!onToggleSelect}
+            />
+          ))}
           {sorted.map(asset => (
             <AssetListRow
               key={asset.id}
