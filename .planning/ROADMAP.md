@@ -406,11 +406,10 @@ See [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md) for full phase deta
 
 ## Backlog
 
-### Phase 999.1: export-modal-format-switch-bug (BACKLOG)
+### Phase 999.1: export-modal-format-switch-bug — ✅ SHIPPED 2026-04-22
 
-**Goal:** In the asset viewer, opening Export modal → exporting as GIF → switching format toggle to MP4 without closing → clicking Export again still produces a GIF (and mirror: MP4 → GIF). Second export uses the format from the first submit. Likely `format` missing from `handleSubmit`'s `useCallback` deps in `src/components/viewer/ExportModal.tsx` — stale closure.
-**Requirements:** TBD
-**Plans:** 0 plans
+**Goal:** In the asset viewer, opening Export modal → exporting as GIF → switching format toggle to MP4 without closing → clicking Export again produces a new MP4 (not the stale GIF).
 
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+**Actual root cause** (differed from backlog guess): not a stale closure — `format` was in `handleSubmit`'s `useCallback` deps. The footer kept showing the Download button (`ui === 'ready' && signedUrl`) after a successful export. Clicking Download with the new format toggled downloaded the STALE GCS signedUrl (the GIF) with the new format's filename extension (`.mp4`). User got a GIF saved as `filename.mp4`.
+
+**Fix:** `useEffect` in `ExportModal.tsx` invalidates the cached export when `format`/`inPt`/`outPt`/`filename` change — drops `ui` back to `idle` + clears `signedUrl`/`errorMsg`, so the footer swaps Download → Export and the next click does a fresh encode. See `.planning/phases/999.1-export-modal-format-switch-bug/999.1-SUMMARY.md`.

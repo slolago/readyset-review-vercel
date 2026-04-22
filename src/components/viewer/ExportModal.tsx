@@ -101,6 +101,24 @@ export function ExportModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose, ui]);
 
+  // Invalidate the cached export when the user changes format / trim / name
+  // after a successful (or failed) encode. Without this, `ui === 'ready'`
+  // sticks and the footer keeps showing the Download button for the
+  // PREVIOUS export — clicking it re-downloads the stale GCS file with the
+  // NEW format's extension (e.g. a .gif blob saved as filename.mp4). The
+  // user's mental model is "change format → click again to get the new
+  // format"; resetting to idle restores the Export button so that actually
+  // does a fresh encode.
+  useEffect(() => {
+    if (!open) return;
+    if (ui === 'ready' || ui === 'failed') {
+      setUi('idle');
+      setSignedUrl(null);
+      setErrorMsg(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [format, inPt, outPt, filename]);
+
   const clipDur = Math.max(0, outPt - inPt);
   const clipTooLong = clipDur > MAX_CLIP;
   const rangeValid = outPt > inPt + 0.05 && !clipTooLong;
