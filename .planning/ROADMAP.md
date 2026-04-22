@@ -379,8 +379,11 @@ Plans:
   2. Submitting a comment makes it appear in the thread within ~50ms (optimistic) and reconciles with the server response; failure rolls back
   3. Switching between comments with annotations does not accumulate Fabric canvas instances (dispose runs on each unmount); read-only AnnotationCanvas does not mount when `displayShapes` is empty
   4. Toggling compare ↔ single mode leaves no dangling VUMeter / AudioContext / Fabric refs (verified via React DevTools or key-driven remount)
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans:
+- [ ] 76-01-PLAN.md — PERF-18 dynamic-import 5 modals + PERF-19 optimistic addComment + PERF-20 AnnotationCanvas guard + ExportModal deferred src + PERF-21 VersionComparison stable keys
 
 ### Phase 77: folder-browser-decomposition
 **Goal**: Project root + folder drill-down stop paying the full waterfall cost; FolderBrowser stops cascading re-renders across 200+ cards on every rename state change
