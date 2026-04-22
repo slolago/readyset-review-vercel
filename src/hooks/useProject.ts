@@ -52,8 +52,10 @@ export function useProject(projectId?: string) {
   );
 
   useEffect(() => {
-    fetchProject();
-  }, [fetchProject]);
+    // PERF-22: fire project + root folders in parallel, not serially.
+    // Both setters are independent — a rejection in one MUST NOT cancel the other.
+    Promise.all([fetchProject(), fetchFolders(null)]);
+  }, [fetchProject, fetchFolders]);
 
   return { project, folders, loading, error, refetch: fetchProject, fetchFolders };
 }
