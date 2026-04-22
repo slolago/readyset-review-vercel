@@ -570,56 +570,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
 
         {/* Timeline */}
         <div className="relative">
-          {/* Comment markers */}
-          {duration > 0 && (timedComments.length > 0 || rangeComments.length > 0) && (
+          {/* Timed-point comment markers. Range markers moved into the scrubber
+              below so the progress fill naturally "covers" them as playback
+              advances — behind the track, protruding 2px above it. */}
+          {duration > 0 && timedComments.length > 0 && (
             <div className="relative h-4 mb-0.5">
-              {rangeComments.map((c) => {
-                const startPct = ((c.inPoint ?? 0) / duration) * 100;
-                const endPct = ((c.outPoint ?? 0) / duration) * 100;
-                const widthPct = endPct - startPct;
-                const isHovered = hoveredComment?.id === c.id;
-                return (
-                  <div
-                    key={`range-${c.id}`}
-                    className="absolute top-1 group/range"
-                    style={{ left: `${startPct}%`, width: `${widthPct}%` }}
-                    onMouseEnter={() => { setHoveredComment(c); setTooltipPct(startPct); }}
-                    onMouseLeave={() => setHoveredComment(null)}
-                  >
-                    <button
-                      className="w-full h-2 rounded-full bg-white/80 border border-white hover:bg-white transition-colors cursor-pointer"
-                      onClick={() => onCommentClick?.(c)}
-                    />
-                    {isHovered && (
-                      <div
-                        className="absolute bottom-4 z-30 pointer-events-none"
-                        style={{
-                          minWidth: 180, maxWidth: 240,
-                          ...(startPct < 20
-                            ? { left: 0 }
-                            : startPct > 80
-                            ? { right: 0 }
-                            : { left: '50%', transform: 'translateX(-50%)' }),
-                        }}
-                      >
-                        <div className="bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl p-2.5 text-left">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[11px] font-mono text-white font-semibold tracking-wide">
-                              IN {formatDuration(c.inPoint ?? 0)} → OUT {formatDuration(c.outPoint ?? 0)}
-                            </span>
-                          </div>
-                          <p className="text-xs font-medium text-white leading-none mb-0.5">{c.authorName}</p>
-                          <p className="text-xs text-white/60 leading-snug line-clamp-3">{c.text.slice(0, 120)}</p>
-                        </div>
-                        <div
-                          className="w-2 h-2 bg-[#1e1e1e] border-r border-b border-white/10 rotate-45 -mt-1"
-                          style={startPct < 20 ? { marginLeft: 6 } : startPct > 80 ? { marginRight: 6, marginLeft: 'auto' } : { marginLeft: 'auto', marginRight: 'auto' }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
               {timedComments.map((c) => {
                 const pct = ((c.timestamp ?? 0) / duration) * 100;
                 const hasAnnotation = !!(c.annotation?.shapes && c.annotation.shapes !== '[]');
@@ -683,8 +638,62 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             onMouseDown={handleSeekMouseDown}
             onClick={handleSeekClick}
           >
-            <div className="absolute left-0 top-0 h-full bg-frame-accent rounded-full pointer-events-none" style={{ width: `${progress}%` }} />
-            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `${progress}%` }} />
+            {/* Range comment markers — painted on top of the gray track and
+                protruding 2px above it, but BEHIND the progress fill so the
+                purple sweeps over them as playback advances. */}
+            {duration > 0 && rangeComments.map((c) => {
+              const startPct = ((c.inPoint ?? 0) / duration) * 100;
+              const endPct = ((c.outPoint ?? 0) / duration) * 100;
+              const widthPct = endPct - startPct;
+              const isHovered = hoveredComment?.id === c.id;
+              return (
+                <div
+                  key={`range-${c.id}`}
+                  className="absolute -top-0.5 bottom-0 z-0 group/range"
+                  style={{ left: `${startPct}%`, width: `${widthPct}%` }}
+                  onMouseEnter={() => { setHoveredComment(c); setTooltipPct(startPct); }}
+                  onMouseLeave={() => setHoveredComment(null)}
+                >
+                  <button
+                    type="button"
+                    className="block w-full h-full rounded-full bg-white/80 border border-white hover:bg-white transition-colors cursor-pointer"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onCommentClick?.(c); }}
+                  />
+                  {isHovered && (
+                    <div
+                      className="absolute bottom-full mb-2 z-30 pointer-events-none"
+                      style={{
+                        minWidth: 180, maxWidth: 240,
+                        ...(startPct < 20
+                          ? { left: 0 }
+                          : startPct > 80
+                          ? { right: 0 }
+                          : { left: '50%', transform: 'translateX(-50%)' }),
+                      }}
+                    >
+                      <div className="bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl p-2.5 text-left">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[11px] font-mono text-white font-semibold tracking-wide">
+                            IN {formatDuration(c.inPoint ?? 0)} → OUT {formatDuration(c.outPoint ?? 0)}
+                          </span>
+                        </div>
+                        <p className="text-xs font-medium text-white leading-none mb-0.5">{c.authorName}</p>
+                        <p className="text-xs text-white/60 leading-snug line-clamp-3">{c.text.slice(0, 120)}</p>
+                      </div>
+                      <div
+                        className="w-2 h-2 bg-[#1e1e1e] border-r border-b border-white/10 rotate-45 -mt-1"
+                        style={startPct < 20 ? { marginLeft: 6 } : startPct > 80 ? { marginRight: 6, marginLeft: 'auto' } : { marginLeft: 'auto', marginRight: 'auto' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Progress fill — z-10 so it covers range markers as playback advances */}
+            <div className="absolute left-0 top-0 h-full bg-frame-accent rounded-full pointer-events-none z-10" style={{ width: `${progress}%` }} />
+            {/* Thumb — z-20, above everything */}
+            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20" style={{ left: `${progress}%` }} />
           </div>
         </div>
 
