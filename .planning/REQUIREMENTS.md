@@ -9,11 +9,11 @@ Synthesized from a 4-stream app-wide perf audit (pages, viewer/player, data laye
 
 ### Viewer critical path (Phase 74)
 
-- [ ] **PERF-10**: `<video>` element uses `preload="metadata"` instead of `preload="auto"`. Eliminates 1–3s of full-file download before first paint on slow connections.
-- [ ] **PERF-11**: `<video>` element sets `poster={asset.thumbnailUrl}` so the first frame is visible instantly instead of a black box while metadata loads.
-- [ ] **PERF-12**: `fabric.js` is pre-warmed via a fire-and-forget dynamic import on viewer mount — the first click of "Annotate" no longer waits 200–400ms for the module to download + parse. Still code-split out of the initial bundle.
-- [ ] **PERF-13**: `VUMeter` + its `AudioContext` + `captureStream()` initialize on first play (or first interaction), not on viewer mount. No 20–50ms wasted on cold load for users who never enable audio metering.
-- [ ] **PERF-14**: Asset viewer page renders `<VideoPlayer>` as soon as `useAsset()` resolves — comments load in a Suspense boundary with a skeleton, in parallel. Video becomes interactive before the comment thread arrives. (Covers the asset viewer + review page flows.)
+- [x] **PERF-10**: `<video>` element uses `preload="metadata"` instead of `preload="auto"`. Eliminates 1–3s of full-file download before first paint on slow connections.
+- [x] **PERF-11**: `<video>` element sets `poster={asset.thumbnailUrl}` so the first frame is visible instantly instead of a black box while metadata loads.
+- [x] **PERF-12**: `fabric.js` is pre-warmed via a fire-and-forget dynamic import on viewer mount — the first click of "Annotate" no longer waits 200–400ms for the module to download + parse. Still code-split out of the initial bundle.
+- [x] **PERF-13**: `VUMeter` + its `AudioContext` + `captureStream()` initialize on first play (or first interaction), not on viewer mount. No 20–50ms wasted on cold load for users who never enable audio metering.
+- [x] **PERF-14**: Asset viewer page renders `<VideoPlayer>` as soon as `useAsset()` resolves — comments load in a Suspense boundary with a skeleton, in parallel. Video becomes interactive before the comment thread arrives. (Covers the asset viewer + review page flows.)
 
 ### Page loading + Server Components (Phase 75)
 
@@ -72,11 +72,11 @@ See `.planning/MILESTONES.md` — v1.7 through v2.2 shipped.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PERF-10 | Phase 74 | Pending |
-| PERF-11 | Phase 74 | Pending |
-| PERF-12 | Phase 74 | Pending |
-| PERF-13 | Phase 74 | Pending |
-| PERF-14 | Phase 74 | Pending |
+| PERF-10 | Phase 74 | Complete |
+| PERF-11 | Phase 74 | Complete |
+| PERF-12 | Phase 74 | Complete |
+| PERF-13 | Phase 74 | Complete |
+| PERF-14 | Phase 74 | Complete |
 | PERF-15 | Phase 75 | Complete |
 | PERF-16 | Phase 75 | Complete |
 | PERF-17 | Phase 75 | Complete |

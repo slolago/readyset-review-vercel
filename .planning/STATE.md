@@ -1,89 +1,73 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.3
-milestone_name: — App-Wide Performance Polish
-status: completed
-stopped_at: Completed 78-01-PLAN.md
-last_updated: "2026-04-22T14:02:50.010Z"
-last_activity: 2026-04-22 — shipped 78-01 (admin pagination + firestore index/batching + next/font + preconnect + img→Image + date-fns cleanup; v2.3 complete 18/18)
+milestone_name: App-Wide Performance Polish
+status: shipped
+stopped_at: All 5 phases shipped; Firestore index deploy pending (operational step)
+last_updated: "2026-04-22T14:30:00.000Z"
+last_activity: 2026-04-22
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 5
   completed_plans: 5
+  percent: 100
 ---
 
 # State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-21)
+See: .planning/PROJECT.md (updated 2026-04-22)
 
 **Core value:** Fast, accurate video review
-**Current focus:** v2.3 App-Wide Performance Polish — 18 REQs across 5 phases
+**Current focus:** v2.3 shipped; awaiting next milestone
 
 ## Current Position
 
-Phase: 78 (data-layer-bundle-and-network) — complete
-Plan: 78-01 — shipped
-Status: v2.3 App-Wide Performance Polish complete (18/18 REQs across 5 phases). Operator step pending: `firebase deploy --only firestore:indexes`.
-Last activity: 2026-04-22 — shipped 78-01 (admin pagination + firestore index/batching + next/font + preconnect + img→Image + date-fns cleanup)
+Phase: All v2.3 phases shipped (74, 75, 76, 77, 78)
+Status: Milestone complete — 5/5 phases, 5/5 plans, 18/18 REQs
+Last activity: 2026-04-22 — Phase 78 verification passed; milestone archived
 
-## v2.3 Phase Structure
-
-| Phase | Name | Requirements |
-|-------|------|--------------|
-| 74 | viewer-critical-path | PERF-10, PERF-11, PERF-12, PERF-13, PERF-14 |
-| 75 | page-loading-and-server-components | PERF-15, PERF-16, PERF-17 |
-| 76 | asset-viewer-restructure | PERF-18, PERF-19, PERF-20, PERF-21 |
-| 77 | folder-browser-decomposition | PERF-22, PERF-23 |
-| 78 | data-layer-bundle-and-network | PERF-24, PERF-25, PERF-26, PERF-27 |
-
-**Coverage:** 18/18 requirements mapped.
-
-## Audit Findings (Source Material)
-
-Synthesized from 4 parallel explore agents:
-
-- **Pages audit** — 10 routes checked; 3 CRITICAL (asset viewer, review page, folder browser), 2 HIGH (admin, /projects), 3 MEDIUM
-- **Viewer audit** — 12 concrete bottlenecks, 3 CRITICAL on the video element itself (`preload="auto"`, no poster, sync Fabric load)
-- **Data-layer audit** — 10 findings beyond v2.0/v2.1's fixes; top offenders are admin pagination + missing comments index for review links
-- **Bundle audit** — Google Fonts blocking, no `modularizeImports`, no `next/dynamic` usage in the entire app, 10 components could flip to Server Components
+Progress: [██████████] 100% (5/5 phases)
 
 ## Accumulated Context
 
-### Key decisions (carried from prior milestones)
+### Key decisions (v2.3)
 
-- `ContextMenuProvider` + `useContextMenuController` singleton pattern (v2.2) — reuse for any new provider work
-- `RenameController` context (v2.2) — narrowed in Phase 77 to wrap only the content surface, not the whole FolderBrowserInner
-- Parallel mount-effect fetches via `Promise.all` (Phase 77) — fire-and-forget pattern when each callback has internal try/catch
-- `deepCopyFolder` requires `deletedAt: null` on every `.set()` to honor the Phase 63 composite-index query
-- `fetchAccessibleProjects` (v2.1) is the reusable access-check pattern for any admin/list route
-- `src/lib/signed-url-cache.ts::getOrCreateSignedUrl` is the single entry point for signed-URL regeneration
-- `<InlineRename />` primitive is the source of truth for inline editing
+- `ContextMenuProvider` + singleton menu state (v2.2) + `RenameController` scope narrowing (Phase 77) is the pattern for any future react context with high-cardinality consumers
+- `Skeleton` and `ModalSkeleton` primitives live in `src/components/ui/` — reuse across future loading states
+- Dynamic-import pattern: `dynamic(() => import('...').then(m => m.Named), { ssr: false, loading: () => <ModalSkeleton /> })` for heavy, user-triggered modals
+- Fabric.js is pre-warmed via fire-and-forget dynamic import on viewer mount — stays code-split but cache-warm
+- Optimistic state pattern in `useComments` (tempId + reconciliation + 3-path rollback) is the template for future optimistic mutations
+- Cursor-based pagination contract: `?limit=N&cursor=id` → `{ items, nextCursor }` — apply to future admin/list endpoints
 
 ### Recently shipped
 
+- v2.3 App-Wide Performance Polish (5 phases, shipped 2026-04-22)
 - v2.2 Dashboard & Annotation UX Fixes (4 phases, shipped 2026-04-21)
 - v2.1 Dashboard Performance (3 phases, shipped 2026-04-21)
-- v2.0 Architecture Hardening (7 phases, shipped 2026-04-20)
 
 ### Operational state
 
-- Firestore composite indexes deployed (v1.9 + v2.0 + v2.1 batches live); PERF-25 will add one more for comments `(assetId, reviewLinkId)`
-- collaboratorIds backfilled on 18 existing projects
-- Review-link passwords auto-migrate plaintext → bcrypt on first verify
+- **Pending:** `firebase deploy --only firestore:indexes` — activates new `comments(assetId, reviewLinkId)` composite index. Existing in-memory fallback keeps `/api/comments` correct until deployed.
+- Firestore composite indexes deployed (v1.9 + v2.0 + v2.1 batches live); v2.3 adds the comments review-link index (pending deploy)
+- `date-fns` removed from dependencies (package.json + lock) — `npm install` runs clean, bundle thinner
+- Admin list API endpoints now return `{ items, nextCursor }` shape — existing client reads first-page array unchanged (no UI regression)
+- Review-link passwords auto-migrate plaintext → bcrypt on first verify (v2.0 still active)
+- collaboratorIds backfilled on 18 existing projects (v2.1 rollout)
 
 ### Pending Todos
 
-None — starting v2.3 autonomous execution.
+None — v2.3 shipped end-to-end. Awaiting next feature/fix input from user.
 
 ### Blockers/Concerns
 
-- PERF-25 requires a `firebase deploy --only firestore:indexes` after code lands — same operational step pattern as v2.0 and v2.1. Non-blocking for code commits.
+- Phase 75 (Server Component flips): 3 of 10 candidates shipped; the other 6 require client-wrapper extraction refactors which are deferred. Not a blocker — documented in `.planning/phases/75-page-loading-and-server-components/75-01-SUMMARY.md`.
+- Phase 76 runtime UX checks (optimistic comment latency feel, compare-toggle memory cleanup via DevTools) flagged `human_needed` — purely observational, not a structural gap.
 
 ## Session Continuity
 
-Last session: 2026-04-22T14:02:50.004Z
-Stopped at: Completed 78-01-PLAN.md
+Last session: 2026-04-22
+Stopped at: v2.3 shipped — 7 milestones total this sprint (v1.7, v1.8, v1.9, v2.0, v2.1, v2.2, v2.3)
 Resume file: None

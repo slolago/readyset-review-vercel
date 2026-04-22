@@ -1,5 +1,38 @@
 # Milestones
 
+## v2.3 App-Wide Performance Polish (Shipped: 2026-04-22)
+
+**Phases completed:** 5 phases (74–78), 5 plans
+**Tests:** 171/171 green throughout
+**Source:** 4-stream parallel app-wide perf audit (pages / viewer / data layer / bundle), 2026-04-21
+
+**What shipped (18 REQs, PERF-10..27):**
+
+1. **Phase 74 viewer-critical-path** — `<video>` `preload="metadata"` + thumbnail `poster` (no more black box, no full-file preload); fire-and-forget `import('fabric').catch(() => {})` on VideoPlayer mount pre-warms Fabric so first Annotate click is <50ms; `audioReady` state gates `<VUMeter>` mount (AudioContext no longer boots on viewer open, only on first play); asset viewer wraps `CommentSidebar` in `<Suspense fallback={<CommentSidebarSkeleton />}>` so video is interactive before comments resolve.
+2. **Phase 75 page-loading-and-server-components** — 5 `loading.tsx` skeletons shipped for `/projects`, `/projects/[id]`, `/projects/[id]/folders/[folderId]`, `/projects/[id]/trash`, `/admin` via shared `Skeleton` primitive; 3 Server Component flips (Badge, Spinner, ReviewHeader) shipped — 6 other candidates deferred with valid technical reasons (onClick props, useState, custom hooks) per CLAUDE.md §3; admin eagerly fetches users + projects in parallel on mount (tab click is now instant).
+3. **Phase 76 asset-viewer-restructure** — 5 heavy modals (`ExportModal`, `AssetCompareModal`, `VersionStackModal`, `CreateReviewLinkModal`, `UserDrawer`) migrated to `next/dynamic` with `ModalSkeleton` fallback across 7 trigger sites — each removes 15–30KB from the hosting route's initial bundle; `useComments.addComment` rewritten for optimistic insert with tempId + `.map` reconciliation on response + 3-path rollback on error (preserves `Promise<boolean>` public API); `ImageViewer` tightened read-only AnnotationCanvas guard to `displayShapes && displayShapes !== '[]'`; `VersionComparison` dual-player mount got 4 stable React keys (`compare-A-${id}` / `compare-B-${id}`) so toggle cleanup works.
+4. **Phase 77 folder-browser-decomposition** — `useProject` mount uses `Promise.all([fetchProject(), fetchFolders(null)])` instead of sequential; scouting found AssetGrid + AssetListView were already `React.memo`-wrapped — the real bug was inline arrow callbacks defeating the memo. Extracted `handleCreateReviewLinkForAsset` + `handleAddToReviewLinkForAsset` to `useCallback` so the existing memo takes effect. `RenameProvider` moved from top-level wrapper down into `FolderBrowserInner` wrapping only the content div — header + breadcrumb render outside the provider's re-render scope.
+5. **Phase 78 data-layer-bundle-and-network** — Cursor-based pagination (`.limit(N).startAfter(cursor)` + `nextCursor` response) on `/api/admin/users`, `/api/admin/projects`, `/api/review-links/all` (default 50, max 100); new Firestore composite index `comments(assetId, reviewLinkId)`; review-link contents route swaps `Promise.all(.map(doc.get))` → `db.getAll(...)` for folder batch (N RPCs → 1); asset signed-URL fan-out chunks by 20; `/api/assets` GET returns `Cache-Control: public, max-age=300, stale-while-revalidate=600`; Google Fonts migrated from `@import url()` in `globals.css` to `next/font/google` Inter with `display: 'swap'` in `layout.tsx`; `modularizeImports` for `lucide-react` added to `next.config.mjs` so icons split per-route; preconnect `<link>` hints for `firestore.googleapis.com` + `storage.googleapis.com` shipped in root layout; 2 raw `<img>` tags in `AssetListView.tsx` migrated to `next/image`; `date-fns` removed from dependencies (scouting found zero uses in `src/` — `formatDuration` was already native).
+
+**Notable planner scouting pivots (CLAUDE.md §1 — surface tradeoffs, not guess):**
+- Phase 77 dropped 2 of 4 originally-scoped tasks after discovering AssetGrid + AssetListView were already memoized. Shifted from "add memo" to "fix the callbacks defeating existing memo" — correct root cause.
+- Phase 78 discovered `date-fns` had zero src/ imports — shipped as pure dep removal, not code swap.
+- Phase 78 discovered Sidebar + ReviewHeader had no raw `<img>` tags (already migrated in v2.1 + Phase 75) — only AssetListView's 2 thumbnails remained.
+
+**New files (high-value):**
+- `src/components/ui/Skeleton.tsx`, `src/components/ui/ModalSkeleton.tsx`
+- `src/components/viewer/CommentSidebarSkeleton.tsx`
+- 5 `loading.tsx` files under `src/app/(app)/*`
+
+**Operational follow-up:**
+- `firebase deploy --only firestore:indexes` — activates the new `comments(assetId, reviewLinkId)` composite index. Existing in-memory fallback keeps `/api/comments` correct until deployed.
+
+**Expected impact:** Asset viewer reaches interactivity ~800ms–1.5s sooner on cold video load. Annotation mode opens instantly on first click. Comment submit feels instant (~50ms optimistic). Admin pages scale past 500+ records. Heavy modals (~100KB combined) no longer ship in initial route bundles. Font loading non-blocking; icon bundle per-route instead of global.
+
+**Pending human verification:** Phase 75, 76 flagged `human_needed` — runtime UX spot-checks (skeleton visibility per route, admin tab instant feel, optimistic comment latency, compare-toggle memory cleanup). Concrete items listed in each phase's `VERIFICATION.md`.
+
+---
+
 ## v2.2 Dashboard & Annotation UX Fixes (Shipped: 2026-04-21)
 
 **Phases completed:** 4 phases (70–73), 6 plans
