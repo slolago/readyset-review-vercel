@@ -73,6 +73,8 @@ export default function DashboardClient({ initialStats }: DashboardClientProps) 
             label="Assets"
             value={statsLoading ? null : (stats?.assetCount.toString() ?? '—')}
             color="blue"
+            href="/assets"
+            tooltip="Browse and search every asset across your projects"
           />
           <StatCard
             icon={<Users className="w-5 h-5" />}
