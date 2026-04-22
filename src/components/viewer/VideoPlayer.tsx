@@ -360,7 +360,17 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
     onTimeUpdate?.(v.currentTime);
   };
 
+  // A click/mousedown that lands on a comment marker (dot or range bar) is
+  // handled by the marker's own onClick — we skip the click-position seek
+  // so the user ends up at the comment's anchor time, not the pixel they
+  // clicked. Drags are still always scrubs, regardless of where they start:
+  // mousedown DOES start the drag listener, but the initial seek is skipped
+  // for markers and the move listener takes over immediately on any movement.
+  const isCommentMarkerEvent = (e: React.MouseEvent<HTMLDivElement>) =>
+    (e.target as HTMLElement).closest('[data-comment-marker]') !== null;
+
   const handleSeekClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isCommentMarkerEvent(e)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const t = Math.max(0, Math.min(duration, ((e.clientX - rect.left) / rect.width) * duration));
     if (videoRef.current) videoRef.current.currentTime = t;
@@ -370,7 +380,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
   const handleSeekMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     setScrubbing(true);
     onUserInteraction?.();
-    handleSeekClick(e);
+    if (!isCommentMarkerEvent(e)) handleSeekClick(e);
     const trackEl = e.currentTarget;
     const onMove = (ev: MouseEvent) => {
       const rect = trackEl.getBoundingClientRect();
@@ -568,73 +578,17 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
       {/* ── Controls ── */}
       <div className="flex-shrink-0 bg-[#111] border-t border-white/5 px-4 pt-2 pb-3 space-y-2">
 
-        {/* Timeline */}
+        {/* Timeline — single scrubber container that hosts BOTH the range
+            markers (behind the progress fill, inside the scrubber's 8px
+            height) and the timed-comment dots (above the scrubber, at
+            z-30 so they always win over range markers AND the thumb).
+
+            All markers carry `data-comment-marker` so the scrubber's
+            seek handlers can distinguish "user clicked an empty track
+            spot" from "user clicked a marker" without stopping event
+            propagation on the marker — which would block drag-to-scrub
+            when the thumb is parked over a range. */}
         <div className="relative">
-          {/* Timed-point comment markers. Range markers moved into the scrubber
-              below so the progress fill naturally "covers" them as playback
-              advances — behind the track, protruding 2px above it.
-              Strip height matches the 12px dot so dots sit immediately above
-              the range marker's protrusion with no visual gap. */}
-          {duration > 0 && timedComments.length > 0 && (
-            <div className="relative h-3 mb-0.5">
-              {timedComments.map((c) => {
-                const pct = ((c.timestamp ?? 0) / duration) * 100;
-                const hasAnnotation = !!(c.annotation?.shapes && c.annotation.shapes !== '[]');
-                return (
-                  <div
-                    key={c.id}
-                    style={{ left: `${pct}%` }}
-                    className="absolute top-0 -translate-x-1/2 z-20 group/marker"
-                    onMouseEnter={() => { setHoveredComment(c); setTooltipPct(pct); }}
-                    onMouseLeave={() => setHoveredComment(null)}
-                  >
-                    <button
-                      onClick={() => onCommentClick?.(c)}
-                      className="w-3 h-3 rounded-full border-2 border-black transition-transform group-hover/marker:scale-125"
-                      style={{ backgroundColor: hasAnnotation ? '#fbbf24' : '#6c5ce7', display: 'block' }}
-                    />
-
-                    {/* Tooltip — shift right when near left edge, left when near right edge */}
-                    {hoveredComment?.id === c.id && (
-                      <div
-                        className="absolute bottom-5 z-30 pointer-events-none"
-                        style={{
-                          minWidth: 180, maxWidth: 240,
-                          ...(pct < 20
-                            ? { left: 0 }
-                            : pct > 80
-                            ? { right: 0 }
-                            : { left: '50%', transform: 'translateX(-50%)' }),
-                        }}
-                      >
-                        <div className="bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl p-2.5 text-left">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[10px] font-mono text-frame-accent font-medium">
-                              {formatDuration(c.timestamp ?? 0)}
-                            </span>
-                            {hasAnnotation && (
-                              <span className="text-[10px] text-yellow-400 flex items-center gap-0.5">
-                                <Pencil className="w-2.5 h-2.5" /> drawing
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs font-medium text-white leading-none mb-0.5">{c.authorName}</p>
-                          <p className="text-xs text-white/60 leading-snug line-clamp-3">{c.text}</p>
-                        </div>
-                        {/* Arrow — tracks the marker regardless of tooltip alignment */}
-                        <div
-                          className="w-2 h-2 bg-[#1e1e1e] border-r border-b border-white/10 rotate-45 -mt-1"
-                          style={pct < 20 ? { marginLeft: 6 } : pct > 80 ? { marginRight: 6, marginLeft: 'auto' } : { marginLeft: 'auto', marginRight: 'auto' }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Scrubber bar */}
           <div
             className="relative h-2 bg-white/15 rounded-full cursor-pointer group"
             onMouseDown={handleSeekMouseDown}
@@ -651,6 +605,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
               return (
                 <div
                   key={`range-${c.id}`}
+                  data-comment-marker="range"
                   className="absolute -top-0.5 bottom-0 z-0 group/range"
                   style={{ left: `${startPct}%`, width: `${widthPct}%` }}
                   onMouseEnter={() => { setHoveredComment(c); setTooltipPct(startPct); }}
@@ -659,7 +614,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
                   <button
                     type="button"
                     className="block w-full h-full rounded-full bg-white/80 border border-white hover:bg-white transition-colors cursor-pointer"
-                    onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onCommentClick?.(c); }}
                   />
                   {isHovered && (
@@ -694,8 +648,65 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             })}
             {/* Progress fill — z-10 so it covers range markers as playback advances */}
             <div className="absolute left-0 top-0 h-full bg-frame-accent rounded-full pointer-events-none z-10" style={{ width: `${progress}%` }} />
-            {/* Thumb — z-20, above everything */}
+            {/* Thumb — z-20, sits on top of the progress fill */}
             <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20" style={{ left: `${progress}%` }} />
+            {/* Timed-comment dots — positioned 12px above the scrubber's top
+                edge (bottom of dot flush with scrubber top, overlapping the
+                range marker's 2px protrusion for visual pairing). z-30 puts
+                them above BOTH the range marker (z-0) and the thumb (z-20),
+                so a comment pause-point never hides the dot. */}
+            {duration > 0 && timedComments.map((c) => {
+              const pct = ((c.timestamp ?? 0) / duration) * 100;
+              const hasAnnotation = !!(c.annotation?.shapes && c.annotation.shapes !== '[]');
+              return (
+                <div
+                  key={c.id}
+                  data-comment-marker="timed"
+                  style={{ left: `${pct}%` }}
+                  className="absolute -top-3 -translate-x-1/2 z-30 group/marker"
+                  onMouseEnter={() => { setHoveredComment(c); setTooltipPct(pct); }}
+                  onMouseLeave={() => setHoveredComment(null)}
+                >
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCommentClick?.(c); }}
+                    className="w-3 h-3 rounded-full border-2 border-black transition-transform group-hover/marker:scale-125"
+                    style={{ backgroundColor: hasAnnotation ? '#fbbf24' : '#6c5ce7', display: 'block' }}
+                  />
+                  {hoveredComment?.id === c.id && (
+                    <div
+                      className="absolute bottom-full mb-2 z-30 pointer-events-none"
+                      style={{
+                        minWidth: 180, maxWidth: 240,
+                        ...(pct < 20
+                          ? { left: 0 }
+                          : pct > 80
+                          ? { right: 0 }
+                          : { left: '50%', transform: 'translateX(-50%)' }),
+                      }}
+                    >
+                      <div className="bg-[#1e1e1e] border border-white/10 rounded-lg shadow-xl p-2.5 text-left">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[10px] font-mono text-frame-accent font-medium">
+                            {formatDuration(c.timestamp ?? 0)}
+                          </span>
+                          {hasAnnotation && (
+                            <span className="text-[10px] text-yellow-400 flex items-center gap-0.5">
+                              <Pencil className="w-2.5 h-2.5" /> drawing
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-medium text-white leading-none mb-0.5">{c.authorName}</p>
+                        <p className="text-xs text-white/60 leading-snug line-clamp-3">{c.text}</p>
+                      </div>
+                      <div
+                        className="w-2 h-2 bg-[#1e1e1e] border-r border-b border-white/10 rotate-45 -mt-1"
+                        style={pct < 20 ? { marginLeft: 6 } : pct > 80 ? { marginRight: 6, marginLeft: 'auto' } : { marginLeft: 'auto', marginRight: 'auto' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
