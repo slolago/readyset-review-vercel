@@ -383,7 +383,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 76-01-PLAN.md — PERF-18 dynamic-import 5 modals + PERF-19 optimistic addComment + PERF-20 AnnotationCanvas guard + ExportModal deferred src + PERF-21 VersionComparison stable keys
+- [x] 76-01-PLAN.md — PERF-18 dynamic-import 5 modals + PERF-19 optimistic addComment + PERF-20 AnnotationCanvas guard + ExportModal deferred src + PERF-21 VersionComparison stable keys
 
 ### Phase 77: folder-browser-decomposition
 **Goal**: Project root + folder drill-down stop paying the full waterfall cost; FolderBrowser stops cascading re-renders across 200+ cards on every rename state change
@@ -463,6 +463,6 @@ Plans:
 | 73. drawing-mode-transforms | v2.2 | 1/1 | Human-verify | 2026-04-21 |
 | 74. viewer-critical-path | v2.3 | 0/1 | Planned | - |
 | 75. page-loading-and-server-components | v2.3 | 1/1 | Complete   | 2026-04-22 |
-| 76. asset-viewer-restructure | v2.3 | 0/? | Not started | - |
+| 76. asset-viewer-restructure | v2.3 | 1/1 | Complete   | 2026-04-22 |
 | 77. folder-browser-decomposition | v2.3 | 0/? | Not started | - |
 | 78. data-layer-bundle-and-network | v2.3 | 0/? | Not started | - |

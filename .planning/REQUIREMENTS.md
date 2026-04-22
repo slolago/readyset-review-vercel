@@ -23,10 +23,10 @@ Synthesized from a 4-stream app-wide perf audit (pages, viewer/player, data laye
 
 ### Asset viewer restructure (Phase 76)
 
-- [ ] **PERF-18**: Heavy modals are `next/dynamic`-imported with `{ ssr: false }` + skeleton fallback — `ExportModal`, `AssetCompareModal`, `VersionStackModal`, `CreateReviewLinkModal`, `UserDrawer`. Each removes 15–30KB from the route that hosts the trigger until the modal actually opens.
-- [ ] **PERF-19**: `useComments.addComment` performs optimistic insert into local state; the POST response reconciles the temp ID. No more 100–300ms latency between submit and the comment appearing. Failure rolls back.
-- [ ] **PERF-20**: `AnnotationCanvas` only mounts its read-only overlay when `displayShapes` is non-empty AND non-`'[]'`. Fabric dispose runs in a dedicated `useEffect` cleanup so rapid comment-switching doesn't accumulate canvas instances. `ExportModal` defers its preview `<video>` `src` until the modal is actually open.
-- [ ] **PERF-21**: `VersionComparison` dual-player mount uses stable React keys (`compare-A-${assetA.id}` / `compare-B-${assetB.id}`) so toggling compare ↔ single cleanly unmounts and re-mounts each `AnnotationCanvas` + `VUMeter`. No dangling refs, no memory creep.
+- [x] **PERF-18**: Heavy modals are `next/dynamic`-imported with `{ ssr: false }` + skeleton fallback — `ExportModal`, `AssetCompareModal`, `VersionStackModal`, `CreateReviewLinkModal`, `UserDrawer`. Each removes 15–30KB from the route that hosts the trigger until the modal actually opens.
+- [x] **PERF-19**: `useComments.addComment` performs optimistic insert into local state; the POST response reconciles the temp ID. No more 100–300ms latency between submit and the comment appearing. Failure rolls back.
+- [x] **PERF-20**: `AnnotationCanvas` only mounts its read-only overlay when `displayShapes` is non-empty AND non-`'[]'`. Fabric dispose runs in a dedicated `useEffect` cleanup so rapid comment-switching doesn't accumulate canvas instances. `ExportModal` defers its preview `<video>` `src` until the modal is actually open.
+- [x] **PERF-21**: `VersionComparison` dual-player mount uses stable React keys (`compare-A-${assetA.id}` / `compare-B-${assetB.id}`) so toggling compare ↔ single cleanly unmounts and re-mounts each `AnnotationCanvas` + `VUMeter`. No dangling refs, no memory creep.
 
 ### Folder browser decomposition (Phase 77)
 
@@ -80,10 +80,10 @@ See `.planning/MILESTONES.md` — v1.7 through v2.2 shipped.
 | PERF-15 | Phase 75 | Complete |
 | PERF-16 | Phase 75 | Complete |
 | PERF-17 | Phase 75 | Complete |
-| PERF-18 | Phase 76 | Pending |
-| PERF-19 | Phase 76 | Pending |
-| PERF-20 | Phase 76 | Pending |
-| PERF-21 | Phase 76 | Pending |
+| PERF-18 | Phase 76 | Complete |
+| PERF-19 | Phase 76 | Complete |
+| PERF-20 | Phase 76 | Complete |
+| PERF-21 | Phase 76 | Complete |
 | PERF-22 | Phase 77 | Pending |
 | PERF-23 | Phase 77 | Pending |
 | PERF-24 | Phase 78 | Pending |
