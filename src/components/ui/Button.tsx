@@ -39,6 +39,16 @@ export function Button({
     lg: 'px-5 py-2.5 text-sm',
   };
 
+  // Default spinner inherits `border-frame-accent`, which is invisible
+  // against a `bg-frame-accent` primary button — makes the loading state
+  // look like the label is off-center (the text shifts right to make
+  // room for the invisible spinner). Override per variant so the spinner
+  // is always visible on its background.
+  const spinnerClass =
+    variant === 'primary' || variant === 'danger'
+      ? 'border-white/90'
+      : 'border-frame-accent';
+
   return (
     <button
       className={cn(base, variants[variant], sizes[size], className)}
@@ -46,7 +56,7 @@ export function Button({
       {...props}
     >
       {loading ? (
-        <Spinner size="sm" />
+        <Spinner size="sm" className={spinnerClass} />
       ) : (
         icon && <span className="flex-shrink-0">{icon}</span>
       )}

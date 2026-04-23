@@ -15,14 +15,31 @@
  */
 import { NextResponse } from 'next/server';
 import { ExifTool } from 'exiftool-vendored';
+import { existsSync } from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
+/**
+ * Diagnostic probe. Returns exiftool version AND verifies the custom
+ * Attrib config file is reachable from the Lambda runtime — the latter
+ * was the silent failure in v2.4 rollout (file missing from bundle, so
+ * exiftool ran successfully but wrote XMP without the Attrib namespace).
+ */
 export async function GET() {
-  // Per-request ExifTool instance. Cap concurrency and tasks so the process
-  // exits cleanly when the Lambda returns — no zombie perl across container
-  // reuses. See PITFALLS.md "exiftool process lifecycle."
+  // Config file bundle check — try all candidate paths, report which
+  // resolves. If none resolve, the stamp pipeline is broken even
+  // though exiftool itself works.
+  const cwd = process.cwd();
+  const candidates = [
+    path.join(cwd, 'public', 'exiftool-config', 'attrib.config'),
+    path.join(cwd, '.next', 'standalone', 'public', 'exiftool-config', 'attrib.config'),
+    path.join('/var/task', 'public', 'exiftool-config', 'attrib.config'),
+  ];
+  const configCheck = candidates.map((p) => ({ path: p, exists: existsSync(p) }));
+  const configPath = configCheck.find((c) => c.exists)?.path ?? null;
+
   const et = new ExifTool({ maxProcs: 1, maxTasksPerProcess: 1 });
 
   try {
@@ -34,6 +51,11 @@ export async function GET() {
         node: process.version,
         platform: process.platform,
         arch: process.arch,
+        cwd,
+      },
+      config: {
+        found: configPath,
+        candidates: configCheck,
       },
     });
   } catch (err) {
