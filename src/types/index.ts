@@ -136,6 +136,24 @@ export interface Asset {
   thumbnailSignedUrlExpiresAt?: Timestamp;
   spriteSignedUrl?: string;
   spriteSignedUrlExpiresAt?: Timestamp;
+
+  // v2.4 — Meta XMP attribution stamp (STAMP-04). Written by the stamp
+  // pipeline when a review link is created that includes this asset. The
+  // stamped file is served ONLY to review-link guests via `decorate()`;
+  // internal `/api/assets` always returns `gcsPath`'s signed URL, not this
+  // one. Invalidated by clearing both `stampedGcsPath` and `stampedAt` on
+  // rename or new-version upload (Phase 82).
+  stampedGcsPath?: string;
+  stampedSignedUrl?: string;
+  stampedSignedUrlExpiresAt?: Timestamp;
+  stampedAt?: Timestamp;
+
+  // v2.4 — universal mutation clock for stamp invalidation. Written by
+  // `PUT /api/assets/[id]` (any whitelisted field change, including rename)
+  // and by `/api/upload/complete` (new version upload-complete). The stamp
+  // route's freshness check compares `stampedAt < updatedAt` to decide
+  // whether the cached stamp is still valid.
+  updatedAt?: Timestamp;
 }
 
 export interface AnnotationData {
@@ -255,7 +273,7 @@ export type ExportStatus = 'queued' | 'encoding' | 'running' | 'ready' | 'failed
 // ---------- Generalized jobs (Phase 60) ----------
 // Unified observability for probe, sprite, thumbnail, and export pipelines.
 // Exports are now rows in the `jobs` collection with type:'export'.
-export type JobType = 'probe' | 'sprite' | 'thumbnail' | 'export';
+export type JobType = 'probe' | 'sprite' | 'thumbnail' | 'export' | 'metadata-stamp';
 export type JobStatus = 'queued' | 'running' | 'ready' | 'failed';
 
 export interface Job {

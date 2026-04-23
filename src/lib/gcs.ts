@@ -120,6 +120,42 @@ export async function downloadToFile(gcsPath: string, localPath: string): Promis
 }
 
 /**
+ * Streaming upload from a local file to GCS. Preferred over `uploadBuffer`
+ * when the source is on disk — a 500MB video read into a Buffer on a
+ * 1GB-memory Lambda will OOM even before we consider heap overhead.
+ *
+ * Uses `createReadStream()` → `file.createWriteStream({ resumable: false })`
+ * and awaits the `finish` event. `resumable: false` matches `uploadBuffer`'s
+ * behavior (simple PUT, no resumable-session state machine — faster for
+ * files under ~5MB, negligible difference above).
+ *
+ * Introduced for v2.4 stamp pipeline (PITFALLS.md HIGH finding: memory
+ * bomb on large stamped videos). Reuse for any future server-side pipeline
+ * that produces a file on /tmp and needs to upload to GCS.
+ */
+export async function uploadStream(
+  localPath: string,
+  gcsPath: string,
+  contentType: string,
+): Promise<void> {
+  const { createReadStream } = await import('fs');
+  const storage = getStorage();
+  const bucket = storage.bucket(BUCKET_NAME);
+  const file = bucket.file(gcsPath);
+
+  return new Promise<void>((resolve, reject) => {
+    const readStream = createReadStream(localPath);
+    const writeStream = file.createWriteStream({ contentType, resumable: false });
+
+    readStream.on('error', reject);
+    writeStream.on('error', reject);
+    writeStream.on('finish', () => resolve());
+    readStream.pipe(writeStream);
+  });
+}
+
+
+/**
  * Confirm a GCS object actually exists and has non-zero size.
  * Used by upload/complete to reject cancelled or failed uploads before
  * flipping asset.status to 'ready'.
