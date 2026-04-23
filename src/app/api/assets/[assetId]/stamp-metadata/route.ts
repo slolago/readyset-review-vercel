@@ -140,10 +140,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       status: 'running',
       // FieldValue sentinels are compatible with the admin SDK's write path
       // but clash with the client-SDK Timestamp type used in @/types. The
-      // probe/sprite routes cast via `as any` for the same reason.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // probe/sprite routes cast via `as any` for the same reason — this
+      // project's eslint config doesn't enforce no-explicit-any, so no
+      // disable comment is needed (adding one would reference an unconfigured
+      // rule and break the Vercel build).
       startedAt: FieldValue.serverTimestamp() as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       error: FieldValue.delete() as any,
     });
 
@@ -191,7 +192,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // 9. Mark job ready.
     await updateJob(jobId, {
       status: 'ready',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       completedAt: FieldValue.serverTimestamp() as any,
     });
 
