@@ -361,7 +361,7 @@ See [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md) for full phase deta
 **Plans**: TBD
 
 Plans:
-- [ ] 79-01: Deploy perl/exiftool spike to Vercel + verify updatedAt coverage + confirm Data field format
+- [x] 79-01: Deploy perl/exiftool spike to Vercel + verify updatedAt coverage + confirm Data field format
 
 ### Phase 80: stamp-pipeline-standalone
 **Goal**: `POST /api/assets/[id]/stamp-metadata` works end-to-end and can be called in isolation — no review-link touching yet
@@ -376,8 +376,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 80-01: exiftool-vendored + .config vendored + types + stamp route (download → stamp → upload → Firestore update) + job infra wiring
-- [ ] 80-02: Invalidation writes on rename and new-version-upload paths + streaming GCS upload helper
+- [x] 80-01: exiftool-vendored + .config vendored + types + stamp route (download → stamp → upload → Firestore update) + job infra wiring
+- [x] 80-02: Invalidation writes on rename and new-version-upload paths + streaming GCS upload helper
 
 ### Phase 81: review-link-integration
 **Goal**: Creating a review link triggers stamp jobs fully async; guests receive stamped URLs; the internal viewer is unaffected
@@ -391,7 +391,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 81-01: POST /api/review-links fires stamp jobs fully async + decorate() stamp-aware URL selection with original fallback
+- [x] 81-01: POST /api/review-links fires stamp jobs fully async + decorate() stamp-aware URL selection with original fallback
 
 ### Phase 82: invalidation-and-ux
 **Goal**: Stale stamps auto-invalidate on rename and new version; stamp failure never blocks the link; the user sees feedback while stamps run
@@ -405,8 +405,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 82-01: Rename + new-version invalidation (clear stampedGcsPath/stampedAt) + old stamped GCS cleanup on re-stamp
-- [ ] 82-02: Graceful stamp-failure fallback in review link creation + "Applying metadata..." spinner in CreateReviewLinkModal
+- [x] 82-01: Rename + new-version invalidation (clear stampedGcsPath/stampedAt) + old stamped GCS cleanup on re-stamp
+- [x] 82-02: Graceful stamp-failure fallback in review link creation + "Applying metadata..." spinner in CreateReviewLinkModal
 **UI hint**: yes
 
 ## Progress
@@ -469,10 +469,10 @@ Plans:
 | 76. asset-viewer-restructure | v2.3 | 1/1 | Human-verify | 2026-04-22 |
 | 77. folder-browser-decomposition | v2.3 | 1/1 | Complete | 2026-04-22 |
 | 78. data-layer-bundle-and-network | v2.3 | 1/1 | Complete | 2026-04-22 |
-| 79. platform-spike | v2.4 | 0/1 | Not started | - |
-| 80. stamp-pipeline-standalone | v2.4 | 0/2 | Not started | - |
-| 81. review-link-integration | v2.4 | 0/1 | Not started | - |
-| 82. invalidation-and-ux | v2.4 | 0/2 | Not started | - |
+| 79. platform-spike | v2.4 | 1/1 | Human-verify | 2026-04-23 |
+| 80. stamp-pipeline-standalone | v2.4 | 2/2 | Human-verify | 2026-04-23 |
+| 81. review-link-integration | v2.4 | 1/1 | Human-verify | 2026-04-23 |
+| 82. invalidation-and-ux | v2.4 | 2/2 | Human-verify | 2026-04-23 |
 
 ## Backlog
 
