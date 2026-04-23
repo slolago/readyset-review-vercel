@@ -33,6 +33,11 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const [passwordRequired, setPasswordRequired] = useState(false);
+  // Only true after the user has actually SUBMITTED a wrong password —
+  // distinct from "password required, none attempted yet" so the initial
+  // visit doesn't render the "Incorrect password" red banner before the
+  // user has typed anything.
   const [passwordError, setPasswordError] = useState(false);
   const [guestInfo, setGuestInfo] = useState<{ name: string; email: string } | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -90,13 +95,22 @@ export default function ReviewPage() {
       const headers: Record<string, string> = {};
       if (effectivePwd) headers['x-review-password'] = effectivePwd;
       const res = await fetch(`/api/review-links/${token}?${qs}`, { headers });
-      if (res.status === 401) { setPasswordError(true); setLoading(false); return; }
+      if (res.status === 401) {
+        setPasswordRequired(true);
+        // Only flag as error if the user actually submitted a password
+        // (first visit on a password-locked link shouldn't show
+        // "Incorrect password" before they've typed anything).
+        setPasswordError(effectivePwd !== undefined && effectivePwd !== '');
+        setLoading(false);
+        return;
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || 'Review link not found or expired');
       }
       const json = await res.json();
       setData(json);
+      setPasswordRequired(false);
       setPasswordError(false);
       if (pwd !== undefined) setPasswordValue(pwd);
     } catch (err) {
@@ -356,7 +370,7 @@ export default function ReviewPage() {
     }
   }
 
-  if (passwordError || (!data && !loading)) {
+  if (passwordRequired || (!data && !loading)) {
     return (
       <div className="min-h-screen bg-frame-bg flex items-center justify-center p-4">
         <div className="bg-frame-card border border-frame-border rounded-2xl p-8 w-full max-w-sm shadow-2xl relative overflow-hidden">
@@ -498,6 +512,7 @@ export default function ReviewPage() {
               onOutPointChange={setRangeOut}
               readOnly={!data.reviewLink.allowComments}
               guestName={guestInfo?.name}
+              isGuest
             />
           </>
         ) : (
@@ -578,7 +593,13 @@ export default function ReviewPage() {
                           </div>
                         ) : (
                           <div key={asset.id} className="relative group">
-                            <AssetCard asset={asset} onClick={() => handleSelectAsset(asset)} hideActions />
+                            <AssetCard
+                              asset={asset}
+                              onClick={() => handleSelectAsset(asset)}
+                              hideActions
+                              displayDateOverride={data?.reviewLink?.createdAt}
+                              displayDateLabel="Shared"
+                            />
                             {data.reviewLink.allowDownloads && ((asset as any).downloadUrl ?? (asset as any).signedUrl) && (
                               <button
                                 onClick={(e) => {

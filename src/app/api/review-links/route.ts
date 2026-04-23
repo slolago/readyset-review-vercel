@@ -7,6 +7,14 @@ import { serializeReviewLink, hashPassword } from '@/lib/review-links';
 import { Timestamp } from 'firebase-admin/firestore';
 import { customAlphabet } from 'nanoid';
 
+// v2.4: POST awaits per-asset stamp jobs; each stamp HTTP call can take
+// 5-15s (download + exiftool + upload). Parallel fan-out keeps total
+// wall time ≈ max(individual), but 60s caps the safe batch size at ~20
+// typical-sized assets. Past that, some stamps may be abandoned; the
+// link is still created and guests fall back to the original URL.
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 const generateShortToken = customAlphabet(
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
   8
@@ -105,11 +113,16 @@ export async function POST(request: NextRequest) {
     const doc = await db.collection('reviewLinks').doc(token).get();
     const docData = doc.data() as Record<string, unknown>;
 
-    // v2.4 STAMP-01/-09 — trigger Meta XMP stamp jobs for every asset this
-    // link will directly expose. Fully async (fire-and-forget); failures
-    // logged but never block the 201. Guests see original URLs until stamps
-    // complete (decorate() fallback); internal viewer always sees original.
-    void triggerStampJobs({
+    // v2.4 STAMP-01 — trigger Meta XMP stamp jobs for every asset this
+    // link will directly expose. AWAITED (not fire-and-forget) because
+    // Vercel serverless kills the function as soon as the HTTP response
+    // is sent — fire-and-forget fetches never reach their destination in
+    // practice. Individual stamp failures are tolerated via Promise
+    // .allSettled; guests fall back to the original URL via decorate()'s
+    // signedViaStamp check per STAMP-08. The CreateReviewLinkModal's
+    // spinner ("Applying metadata…") stays up for the real duration now
+    // that the POST actually waits.
+    await triggerStampJobs({
       db,
       projectId,
       assetIds: cleanAssetIds,
@@ -197,15 +210,36 @@ async function triggerStampJobs(opts: {
       }
     }
 
-    // Fire-and-forget per asset. Same pattern upload/complete uses for
-    // probe + sprite triggers. Vercel's runtime keeps the parent function
-    // alive long enough for the outbound fetches to connect.
-    Array.from(ids).forEach((aid) => {
-      fetch(`${origin}/api/assets/${aid}/stamp-metadata`, {
-        method: 'POST',
-        headers: { Authorization: authHeader },
-      }).catch((err) => console.warn('[review-links] stamp trigger failed', aid, err));
-    });
+    // Fire stamps in parallel and AWAIT all of them via Promise.allSettled.
+    // The HTTP call to the stamp route returns once that child function
+    // has completed the full stamp pipeline (download → exiftool →
+    // upload → Firestore update). For a typical MP4 that's 5-15s;
+    // fan-out parallelism means N stamps cost ~max(individual time),
+    // which fits within Vercel's 60s maxDuration for batches up to ~20
+    // assets. Individual failures are logged but do not fail the parent
+    // POST — STAMP-08 guarantees the link is created regardless.
+    const results = await Promise.allSettled(
+      Array.from(ids).map((aid) =>
+        fetch(`${origin}/api/assets/${aid}/stamp-metadata`, {
+          method: 'POST',
+          headers: { Authorization: authHeader },
+        }).then(async (res) => {
+          if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            throw new Error(`stamp ${aid} → ${res.status} ${body.slice(0, 200)}`);
+          }
+          return aid;
+        }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === 'rejected');
+    if (failed.length > 0) {
+      // Log each individually for ops visibility. Review link still
+      // succeeds — guest fallback handles unstamped assets.
+      for (const r of failed) {
+        console.warn('[review-links] stamp trigger failed:', (r as PromiseRejectedResult).reason);
+      }
+    }
   } catch (err) {
     console.warn('[review-links] stamp enumeration failed', err);
   }

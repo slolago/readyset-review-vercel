@@ -12,6 +12,15 @@ import { RatingStars } from '@/components/ui/RatingStars';
 
 interface FileInfoPanelProps {
   asset: Asset;
+  /**
+   * Guest (review-link) mode. Hides internal-only affordances:
+   *   - Probe button (requires auth + write permission)
+   *   - Tag editor (guests can't edit tags)
+   *   - Rating editor (guests can't edit ratings)
+   * The panel still shows uploader / date / codec / etc. — guests can
+   * see the asset's metadata, they just can't mutate it.
+   */
+  isGuest?: boolean;
 }
 
 function formatBytes(bytes: number): string {
@@ -85,10 +94,19 @@ function formatContainer(fmt?: string): string {
 interface Row { label: string; value: string; }
 interface Section { title: string; rows: Row[]; }
 
-export function FileInfoPanel({ asset }: FileInfoPanelProps) {
+export function FileInfoPanel({ asset, isGuest = false }: FileInfoPanelProps) {
   const { getIdToken } = useAuth();
-  const uploaderNames = useUserNames(asset.uploadedBy ? [asset.uploadedBy] : []);
-  const uploaderLabel = (asset.uploadedBy && uploaderNames[asset.uploadedBy]) || asset.uploadedBy || '—';
+  // Skip the useUserNames hook for guests — it hits /api/users (auth-gated)
+  // and returns empty for guests, so the UID bleeds through as the display
+  // name. Review-link API resolves uploadedByName server-side and includes
+  // it on each asset in the response instead.
+  const uploaderNames = useUserNames(!isGuest && asset.uploadedBy ? [asset.uploadedBy] : []);
+  const uploaderFromServer = (asset as unknown as { uploadedByName?: string }).uploadedByName;
+  const uploaderLabel =
+    uploaderFromServer ||
+    (asset.uploadedBy && uploaderNames[asset.uploadedBy]) ||
+    (isGuest ? '—' : asset.uploadedBy) ||
+    '—';
   const [probing, setProbing] = useState(false);
   // Local copy of tags so TagEditor's optimistic updates show immediately
   // without waiting for the parent to refetch the asset. Re-syncs when the
@@ -233,7 +251,7 @@ export function FileInfoPanel({ asset }: FileInfoPanelProps) {
         <p className="text-xs uppercase tracking-wide text-frame-textMuted font-semibold">
           File Information
         </p>
-        {asset.type === 'video' && (
+        {asset.type === 'video' && !isGuest && (
           <button
             onClick={runProbe}
             disabled={probing}
@@ -246,32 +264,36 @@ export function FileInfoPanel({ asset }: FileInfoPanelProps) {
         )}
       </div>
 
-      {asset.type === 'video' && !asset.probed && (
+      {asset.type === 'video' && !asset.probed && !isGuest && (
         <p className="text-[11px] text-frame-textMuted -mt-3 leading-snug">
           Some fields may be inaccurate — client-extracted. Click Probe for server-verified metadata.
         </p>
       )}
 
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-frame-textMuted mb-2 font-semibold">
-          Rating
-        </p>
-        <div className="flex items-center gap-3">
-          <RatingStars value={rating} onChange={handleRatingChange} size="md" />
-          {rating > 0 && (
-            <button
-              type="button"
-              onClick={() => handleRatingChange(0)}
-              disabled={savingRating}
-              className="text-[11px] text-frame-textMuted hover:text-white transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
+      {!isGuest && (
+        <>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-frame-textMuted mb-2 font-semibold">
+              Rating
+            </p>
+            <div className="flex items-center gap-3">
+              <RatingStars value={rating} onChange={handleRatingChange} size="md" />
+              {rating > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleRatingChange(0)}
+                  disabled={savingRating}
+                  className="text-[11px] text-frame-textMuted hover:text-white transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
 
-      <TagEditor assetId={asset.id} tags={tags} onTagsChange={setTags} />
+          <TagEditor assetId={asset.id} tags={tags} onTagsChange={setTags} />
+        </>
+      )}
 
       {sections.map((section) => (
         <div key={section.title}>

@@ -925,13 +925,14 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
           )}
 
           {/* Download still — captures the current video frame as a JPEG.
-              Icon-only button with a Frame.io-style pill tooltip appearing
-              to the left on hover, to keep the controls row compact. */}
+              Icon-only with tooltip. Raised the base opacity to text-white
+              (was text-white/60, which blended into the dark controls row
+              and got lost next to the higher-contrast labeled buttons). */}
           <div className="relative group/still">
             <button
               onClick={handleDownloadStill}
               aria-label="Download still"
-              className="w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              className="w-7 h-7 flex items-center justify-center text-white hover:text-frame-accent transition-colors"
             >
               <ArrowDownToLine className="w-4 h-4" />
             </button>
@@ -940,12 +941,15 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(({
             </div>
           </div>
 
-          {/* Download — visible when downloadUrl is provided */}
+          {/* Download — visible when downloadUrl is provided. Made more
+              prominent: accent-colored border + full-opacity text so
+              review-link guests can actually find it. Guests specifically
+              flagged this button as hard to see in v2.4 feedback. */}
           {downloadUrl && (
             <button
               onClick={() => forceDownload(downloadUrl, asset.name)}
               title="Download"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/70 hover:text-white border border-white/10 hover:border-white/30 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-frame-accent/15 border border-frame-accent/40 hover:bg-frame-accent/25 hover:border-frame-accent rounded-lg transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Download

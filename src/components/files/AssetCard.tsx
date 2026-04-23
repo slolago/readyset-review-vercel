@@ -60,12 +60,23 @@ interface AssetCardProps {
   isDropTarget?: boolean;
   /** Sibling assets in the same folder — used for the "Stack onto…" picker. */
   folderSiblings?: Asset[];
+  /**
+   * Override the date shown in the info row. Review-link guests see when
+   * the link was created (the date that matters to them), not when the
+   * underlying asset was first uploaded months ago. Accepts anything
+   * `coerceToDate` can parse — Firestore Timestamp, seconds pair, ISO
+   * string, epoch number, Date.
+   */
+  displayDateOverride?: unknown;
+  /** Label shown next to the date. Defaults to no label (just the date). */
+  displayDateLabel?: string;
 }
 
 export const AssetCard = memo(function AssetCard({
   asset, onClick, onDeleted, onVersionUploaded, onCopied, onDuplicated,
   onRequestMove, onCreateReviewLink, onAddToReviewLink, isSelected, onToggleSelect, onDragStart, hideActions,
-  onDragOver, onDragLeave, onDrop, isDropTarget, folderSiblings
+  onDragOver, onDragLeave, onDrop, isDropTarget, folderSiblings,
+  displayDateOverride, displayDateLabel,
 }: AssetCardProps) {
   const { getIdToken } = useAuth();
   const confirm = useConfirm();
@@ -353,16 +364,31 @@ export const AssetCard = memo(function AssetCard({
 
   const isUploading = asset.status === 'uploading';
 
+  // Caller can override which date is shown — review-link guests pass the
+  // link-creation date here so they see when they received the asset,
+  // not when it was originally uploaded to the platform.
+  const dateSource = displayDateOverride ?? asset.createdAt;
   const uploadDate: Date | null =
-    typeof (asset.createdAt as any)?.toDate === 'function'
-      ? (asset.createdAt as any).toDate()
-      : (asset.createdAt as any)?._seconds
-      ? new Date((asset.createdAt as any)._seconds * 1000)
+    typeof (dateSource as any)?.toDate === 'function'
+      ? (dateSource as any).toDate()
+      : (dateSource as any)?._seconds
+      ? new Date((dateSource as any)._seconds * 1000)
+      : (dateSource as any)?.seconds
+      ? new Date((dateSource as any).seconds * 1000)
+      : dateSource instanceof Date
+      ? dateSource
+      : typeof dateSource === 'string' || typeof dateSource === 'number'
+      ? new Date(dateSource)
       : null;
-  const uploadDateLabel = uploadDate
+  const formatted = uploadDate
     ? uploadDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
       ', ' +
       uploadDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : '';
+  const uploadDateLabel = formatted
+    ? displayDateLabel
+      ? `${displayDateLabel} ${formatted}`
+      : formatted
     : '';
 
   // Unified action list (three-dots dropdown + right-click menu consume this).

@@ -90,6 +90,40 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return path.some((ancestorId) => editableRoots.includes(ancestorId));
     };
 
+    // Resolve uploader UIDs → display names in a single batched `getAll`,
+    // attach as `uploadedByName` on each asset. Guest FileInfoPanel reads
+    // this so the Info tab shows a real name instead of the raw Firebase
+    // Auth UID (guests can't hit /api/users themselves — auth-gated).
+    const attachUploaderNames = async (assets: Array<Record<string, unknown>>): Promise<void> => {
+      const uids = Array.from(
+        new Set(
+          assets
+            .map((a) => (typeof a.uploadedBy === 'string' ? a.uploadedBy : null))
+            .filter((s): s is string => !!s),
+        ),
+      );
+      if (uids.length === 0) return;
+      try {
+        const refs = uids.map((uid) => db.collection('users').doc(uid));
+        const docs = await db.getAll(...refs);
+        const nameByUid = new Map<string, string>();
+        for (const d of docs) {
+          if (!d.exists) continue;
+          const data = d.data() as { name?: string; email?: string } | undefined;
+          const display = data?.name || data?.email || '';
+          if (display) nameByUid.set(d.id, display);
+        }
+        for (const a of assets) {
+          const uid = typeof a.uploadedBy === 'string' ? a.uploadedBy : null;
+          if (uid && nameByUid.has(uid)) {
+            (a as { uploadedByName?: string }).uploadedByName = nameByUid.get(uid)!;
+          }
+        }
+      } catch (err) {
+        console.error('[GET /api/review-links/[token]] uploader name resolve failed', err);
+      }
+    };
+
     // Signed-URL write-back buffer (Phase 62 CACHE-02). Filled by decorate(),
     // flushed before each terminal NextResponse.json() below.
     const pendingUrlWrites: Array<{ id: string; patch: Record<string, unknown> }> = [];
@@ -262,6 +296,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const liveAssetDocs = assetsSnap.docs.filter((d) => !(d.data() as any).deletedAt);
       const decoratedAssets = await Promise.all(liveAssetDocs.map((d) => decorate({ id: d.id, ...d.data() })));
       const assets = groupByVersion(decoratedAssets, !!link.showAllVersions);
+      await attachUploaderNames(assets);
 
       const subfoldersSnap = await db.collection('folders')
         .where('projectId', '==', link.projectId)
@@ -361,6 +396,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Remove password from response
+    await attachUploaderNames(assets);
     await flushUrlWrites();
     const safeLink = serializeReviewLink(link);
 

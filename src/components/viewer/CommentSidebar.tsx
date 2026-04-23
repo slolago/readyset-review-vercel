@@ -50,6 +50,11 @@ interface CommentSidebarProps {
   onSeek?: (time: number) => void;
   readOnly?: boolean;
   guestName?: string;
+  /** Review-link guest mode — forwarded to FileInfoPanel to hide the
+   *  Probe button, Rating editor, and Tag editor (all auth-gated).
+   *  Comments can still be added when `allowComments` is on; readOnly
+   *  vs. isGuest are orthogonal concerns. */
+  isGuest?: boolean;
 }
 
 export function CommentSidebar({
@@ -60,7 +65,7 @@ export function CommentSidebar({
   onAddComment, onResolveComment, onDeleteComment, onEditComment, onSeek,
   onSelectComment,
   inPoint: inPointProp, outPoint: outPointProp, onInPointChange, onOutPointChange,
-  readOnly = false, guestName,
+  readOnly = false, guestName, isGuest = false,
 }: CommentSidebarProps) {
   const { user } = useAuth();
   const [text, setText] = useState('');
@@ -215,7 +220,7 @@ export function CommentSidebar({
       </div>
 
       {/* Info tab panel */}
-      {activeTab === 'info' && <FileInfoPanel asset={asset} />}
+      {activeTab === 'info' && <FileInfoPanel asset={asset} isGuest={isGuest} />}
 
       {/* Comments list */}
       {activeTab === 'comments' && <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-1">
