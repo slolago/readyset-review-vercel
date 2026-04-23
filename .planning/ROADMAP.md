@@ -14,7 +14,7 @@
 - ✅ **v2.1 — Dashboard Performance** - Phases 67–69 (shipped 2026-04-21)
 - ✅ **v2.2 — Dashboard & Annotation UX Fixes** - Phases 70–73 (shipped 2026-04-21)
 - ✅ **v2.3 — App-Wide Performance Polish** - Phases 74–78 (shipped 2026-04-22)
-- 🚧 **v2.4 — Meta XMP Stamping on Delivery** - Phases 79–82 (in progress)
+- ✅ **v2.4 — Meta XMP Stamping on Delivery** - Phases 79–82 (shipped 2026-04-23, pending human verification)
 
 ## Phases
 
@@ -344,70 +344,16 @@ See [milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md) for full phase deta
 
 </details>
 
-### 🚧 v2.4 — Meta XMP Stamping on Delivery (In Progress)
+<details>
+<summary>✅ v2.4 — Meta XMP Stamping on Delivery (Phases 79–82) - SHIPPED 2026-04-23</summary>
 
-**Milestone Goal:** Every asset delivered through a review link is automatically stamped with Meta-required XMP attribution (`http://ns.attribution.com/ads/1.0/`) using server-side `exiftool-vendored`, matching the `scf-metadata` desktop app 1:1. Stamps are cached per asset, invalidated on rename / new version, and served exclusively to review-link guests. Internal viewers always receive the original.
+See [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) for full phase details.
+
+4 phases: platform-spike, stamp-pipeline-standalone, review-link-integration, invalidation-and-ux. 13 STAMP REQs. Replicates the `scf-metadata` Electron desktop app as a server-side exiftool-vendored pipeline triggered on review-link creation. Fully async, per-asset cached, `updatedAt`-driven invalidation. Pending human verification on Vercel runtime.
+
+</details>
 
 ## Phase Details
-
-### Phase 79: platform-spike
-**Goal**: All three runtime unknowns verified before a single line of stamp production code is written
-**Depends on**: Phase 78
-**Requirements**: STAMP-13
-**Success Criteria** (what must be TRUE):
-  1. A real Vercel Pro deploy of a one-route spike (`et.version()` call) returns successfully — the perl binary resolves and exiftool is usable in the Lambda runtime
-  2. A code read of `PUT /api/assets/[assetId]` (rename) and `/api/upload/complete` confirms `updatedAt: FieldValue.serverTimestamp()` is written on both paths — or those writes have been added and verified
-  3. A sample file stamped by the `scf-metadata` desktop app is inspected with `exiftool -Attrib:all` and the exact `Data` field literal value (pipe-wrapped or plain JSON) is documented for use in the production implementation
-**Plans**: TBD
-
-Plans:
-- [x] 79-01: Deploy perl/exiftool spike to Vercel + verify updatedAt coverage + confirm Data field format
-
-### Phase 80: stamp-pipeline-standalone
-**Goal**: `POST /api/assets/[id]/stamp-metadata` works end-to-end and can be called in isolation — no review-link touching yet
-**Depends on**: Phase 79
-**Requirements**: STAMP-01, STAMP-02, STAMP-03, STAMP-10, STAMP-11
-**Success Criteria** (what must be TRUE):
-  1. Calling the stamp route on a video asset produces a new GCS object at `stampedGcsPath` that contains all four `Attrib` XMP fields (`FbId`, `ExtId`, `Created`, `Data`) readable by `exiftool -Attrib:all`
-  2. Calling the stamp route twice on the same asset produces an `Attrib` array of length 2 — prior attribution history is preserved, not clobbered
-  3. Calling the stamp route on a JPEG or PNG asset stamps it identically to a video — no format errors, no format-specific branching required
-  4. After renaming an asset, `stampedGcsPath` and `stampedAt` are cleared on the Firestore doc; calling the stamp route again writes the new filename as `ExtId`
-  5. After uploading a new version into a stack, the new version's `stampedGcsPath` and `stampedAt` are cleared; other versions in the stack are unaffected
-**Plans**: TBD
-
-Plans:
-- [x] 80-01: exiftool-vendored + .config vendored + types + stamp route (download → stamp → upload → Firestore update) + job infra wiring
-- [x] 80-02: Invalidation writes on rename and new-version-upload paths + streaming GCS upload helper
-
-### Phase 81: review-link-integration
-**Goal**: Creating a review link triggers stamp jobs fully async; guests receive stamped URLs; the internal viewer is unaffected
-**Depends on**: Phase 80
-**Requirements**: STAMP-04, STAMP-05, STAMP-09
-**Success Criteria** (what must be TRUE):
-  1. A user creates a review link containing one video — the POST response returns immediately (under 3 seconds) with the link token; a guest who opens the link after stamps complete downloads an MP4 containing the four `Attrib` XMP fields
-  2. Multiple review links created for the same asset share a single stamped GCS copy — only one exiftool run occurs regardless of how many links reference that asset
-  3. An authenticated user opening the same asset in the internal viewer (`/api/assets`) receives the original file URL, not the stamped copy — comments, annotations, and version comparison continue working normally
-  4. If stamp jobs are still running when a guest opens the review link, they receive the original file with no error — the link is always usable
-**Plans**: TBD
-
-Plans:
-- [x] 81-01: POST /api/review-links fires stamp jobs fully async + decorate() stamp-aware URL selection with original fallback
-
-### Phase 82: invalidation-and-ux
-**Goal**: Stale stamps auto-invalidate on rename and new version; stamp failure never blocks the link; the user sees feedback while stamps run
-**Depends on**: Phase 81
-**Requirements**: STAMP-06, STAMP-07, STAMP-08, STAMP-12
-**Success Criteria** (what must be TRUE):
-  1. A user renames an asset that already has a stamp, then creates a new review link — the guest downloads a freshly-stamped file with the updated filename as `ExtId`; the old stamped GCS object is deleted
-  2. A user uploads a new version into a stack that has a stamp — the next review link creation for that version triggers a fresh stamp; other versions in the stack are not re-stamped
-  3. When stamp jobs fail for one or more assets, the review link is created and shared successfully — the guest receives the original file for any unstamped asset rather than an error
-  4. The `CreateReviewLinkModal` shows an "Applying metadata…" status while stamp jobs are pending and transitions to the copy-link view as soon as the link token is ready — the user is not blocked waiting for stamps to complete
-**Plans**: TBD
-
-Plans:
-- [x] 82-01: Rename + new-version invalidation (clear stampedGcsPath/stampedAt) + old stamped GCS cleanup on re-stamp
-- [x] 82-02: Graceful stamp-failure fallback in review link creation + "Applying metadata..." spinner in CreateReviewLinkModal
-**UI hint**: yes
 
 ## Progress
 

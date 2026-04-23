@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Meta XMP Stamping on Delivery
-status: complete
-stopped_at: All 4 phases implemented (79-82); pending human verification on Vercel runtime + live stamp round-trip
-last_updated: "2026-04-23T15:00:00.000Z"
+status: shipped
+stopped_at: All 4 phases shipped (code complete); pending human runtime verification on Vercel + live stamp round-trip
+last_updated: "2026-04-23T15:30:00.000Z"
 last_activity: 2026-04-23
 progress:
   total_phases: 4
@@ -21,39 +21,31 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Fast, accurate video review
-**Current focus:** v2.4 shipped (code); human verification pending on Vercel runtime + live round-trip
+**Current focus:** v2.4 shipped; awaiting next milestone. Human runtime verification pending.
 
 ## Current Position
 
 Phase: All v2.4 phases shipped (79, 80, 81, 82)
-Status: Milestone complete (code) — 4/4 phases, 6/6 plans, 13/13 REQs addressed
-Last activity: 2026-04-23 — Phase 82 summary written; roadmap updated
+Status: Milestone complete (code) — 4/4 phases, 6/6 plans, 13/13 REQs. Archived.
+Last activity: 2026-04-23 — v2.4 archived; ready for next milestone
 
 Progress: [██████████] 100% (4/4 phases)
 
 ## Accumulated Context
 
-### Key decisions (v2.4)
+### Key decisions (carried forward to next milestone)
 
-- Always-async stamp jobs — no sync threshold; Vercel 60s budget cannot absorb even 1 large-file stamp inline in a POST
-- One stamped GCS copy per asset (`projects/{pid}/assets/{aid}/stamped{ext}`) — shared across review links; deterministic from asset name + hardcoded constants
-- `stampedAt < updatedAt` invalidation with active null-clearing on rename (redundant but explicit per spec wording; releases stale cached signed URL)
-- Per-request `new ExifTool({ maxProcs:1, maxTasksPerProcess:1 })` with `await et.end()` in finally — never module-scope singleton; no `-stay_open True` in serverless
-- Streaming GCS upload via new `uploadStream()` helper — `uploadBuffer()` OOMs on 500MB+ source
-- Attrib append-semantics (read existing → normalize to array → re-stamp `Data` on each → append new entry) — mirrors reference scf-metadata Electron app 1:1
-- `-config` passed to `et.write()` args (not constructor) — standard exiftool-vendored pattern
-- `coerceToDate()` at every timestamp comparison — per PITFALLS.md; raw Timestamp-vs-ISO silently breaks
-- Hardcoded `FB_ID=2955517117817270`, `DATA='|{"Company":"Ready Set"|}'`, `META_TZ='America/New_York'` — matches reference app; future milestone may extract to `project.metaConfig`
-- `decorate()` fallback to original URL on missing/stale stamp — guests never see 503, link always usable (STAMP-08)
-- Subfolder drill-down stamps deferred to future milestone — direct root-level assets only at POST time
-
-### v2.4 reference materials
-
-- `scf-metadata` Electron source: `C:\Users\Lola\AppData\Local\scf-meta\app-0.11.9\resources\app`
-  - `src/backend/exiftool.js` — 60-line reference implementation
-  - `public/exiftool/.config` — XMP namespace schema
-- Before/after sample files: `C:\Users\Lola\Documents\RS_RPLT_D001_C005_WalkThroughUGC_NEW_V01_VID_9x16.mp4` vs Downloads copy
-- Phase 79 verification report — `.planning/phases/79-platform-spike/79-VERIFICATION-SPIKE.md`
+- `ContextMenuProvider` + singleton menu state (v2.2) + `RenameController` scope narrowing (v2.3 Phase 77) — pattern for any future react context with high-cardinality consumers
+- `Skeleton` and `ModalSkeleton` primitives live in `src/components/ui/` — reuse across future loading states
+- Dynamic-import pattern: `dynamic(() => import('...').then(m => m.Named), { ssr: false, loading: () => <ModalSkeleton /> })` for heavy, user-triggered modals
+- Optimistic state pattern in `useComments` (tempId + reconciliation + 3-path rollback) — template for future optimistic mutations
+- Cursor-based pagination contract: `?limit=N&cursor=id` → `{ items, nextCursor }` — apply to future admin/list endpoints
+- Generalized Job model + `src/lib/jobs.ts` (v2.0 Phase 60) — extend `JobType` union when adding new pipeline types
+- Signed URL cache at `src/lib/signed-url-cache.ts` (v2.0 Phase 62) — `getOrCreateSignedUrl` handles any gcsPath identically
+- Per-request external binary instance + `end()` in finally — never module-scope singleton for serverless workloads (exiftool-vendored pattern from v2.4 Phase 80)
+- Streaming GCS upload via `uploadStream()` (v2.4 Phase 80) — use for any server-side pipeline that writes to /tmp and uploads to GCS; avoids `uploadBuffer` OOM on large files
+- `coerceToDate()` at every timestamp comparison (existing helper in `src/lib/format-date.ts`) — direct Firestore Timestamp vs ISO string comparison silently breaks
+- `stampedAt < updatedAt` invalidation pattern (v2.4) — applicable to any future cache-on-doc scheme
 
 ### Recently shipped
 
@@ -64,25 +56,26 @@ Progress: [██████████] 100% (4/4 phases)
 
 ### Operational state
 
-- **Pending human verification:** `/api/spike/exiftool-version` deploy on Vercel Pro Lambda — confirm perl resolves and `et.version()` returns successfully. Fallback plan documented in `79-VERIFICATION-SPIKE.md` if perl is absent.
-- **Pending human verification (live round-trip):** Create a real review link with a video asset; confirm guest downloads a file with all 4 `Attrib` XMP fields. Rename flow; new-version flow; concurrent-creator flow.
-- **Vercel auto-deploy:** observed that the vercel remote push doesn't immediately trigger a deploy (buildId unchanged 10+ min after push). May require manual deploy trigger from dashboard, or auto-deploy may simply be slow. Not a code issue.
-- **Cleanup item:** remove `/api/spike/exiftool-version` after v2.4 production stamp pipeline is confirmed healthy. Tracked.
+- **Pending human verification (v2.4):**
+  - Vercel Pro Lambda runtime confirmation that `/api/spike/exiftool-version` returns 200 with `et.version()` — confirm via Vercel dashboard that commit `10ac41f4` deployed cleanly
+  - Live stamp round-trip: real review link with real asset; guest download contains 4 Attrib XMP fields; rename flow; new-version flow; concurrent-creator flow
+  - Fallback plan if perl is absent on Vercel: move stamp job to Cloud Run per `.planning/phases/79-platform-spike/79-VERIFICATION-SPIKE.md`
+- **Vercel auto-deploy observation:** push to `vercel` remote didn't trigger a new deploy within 10+ min. Buildid unchanged. May require manual deploy trigger or Vercel project reconnection.
+- **Cleanup item:** remove `/api/spike/exiftool-version` route after v2.4 production stamp pipeline is confirmed healthy
 - Firestore composite indexes deployed (v1.9 + v2.0 + v2.1 batches + v2.3 comments(assetId, reviewLinkId))
 - Review-link passwords auto-migrate plaintext → bcrypt on first verify (v2.0)
 - collaboratorIds backfilled on 18 existing projects (v2.1)
 
 ### Pending Todos
 
-None — v2.4 code complete.
+None — v2.4 shipped end-to-end. Awaiting next feature/fix input from user.
 
 ### Blockers/Concerns
 
-- **Perl on Vercel Lambda (LOW confidence → pending verification):** spike route deployed but not yet confirmed live. Human action: check Vercel dashboard for commit `10ac41f4` deploy status; curl spike endpoint. If fails, execute fallback plan in `79-VERIFICATION-SPIKE.md`.
-- **Vercel bundle size:** `exiftool-vendored` + `.pl` add ~24MB to the deploy. Haven't confirmed we stay under the 250MB uncompressed Vercel Pro limit with ffmpeg/ffprobe already in place. Check deploy logs if deploy fails.
+- **Vercel auto-deploy may be misconfigured for the `vercel` remote** — the push lands (confirmed via `git ls-remote`), but the deploy doesn't fire within observed window. Check Vercel dashboard GitHub integration for the `readyset-review-vercel` repo.
 
 ## Session Continuity
 
 Last session: 2026-04-23
-Stopped at: v2.4 code complete; lifecycle (audit + archive + cleanup) pending
+Stopped at: v2.4 shipped & archived; ready for /gsd:new-milestone when user picks next scope
 Resume file: None

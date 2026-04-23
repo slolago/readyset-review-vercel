@@ -10,20 +10,9 @@ A fully-featured media review platform for internal teams: upload video/image as
 
 Fast, accurate video review — frame-level precision, rich metadata, and fluid version management without leaving the browser.
 
-## Current Milestone: v2.4 Meta XMP Stamping on Delivery
+## Latest Milestone: v2.4 Meta XMP Stamping on Delivery (Shipped 2026-04-23, pending human runtime verification)
 
-**Goal:** Every asset delivered through a review link is automatically stamped with the Meta-required XMP attribution (namespace `http://ns.attribution.com/ads/1.0/`) produced by the `scf-metadata` desktop app, without any manual user step. The stamp is cached on the asset, invalidated on rename / new version, and served only to review-link guests — the internal viewer keeps the original.
-
-**Target features:**
-- Server-side exiftool stamping replicating 1:1 what the `scf-metadata` Electron app does (same `.config`, same 4 `Attrib:` fields, same hardcoded FbId/Data constants)
-- New `metadata-stamp` job type in the existing jobs infrastructure; `POST /api/assets/[id]/stamp-metadata` route following the `/probe` + `/generate-sprite` pattern
-- `Asset.stampedGcsPath` + timestamp fields + signed-URL cache; lazy re-stamp invalidation on rename / new version upload
-- `POST /api/review-links` triggers stamps for included assets (sync ≤3, async polling 4+)
-- Review-link GET `decorate()` prefers stamped URL as `signedUrl` + `downloadUrl` for guests; `/api/assets` (internal viewer path) keeps using the original
-- Works for images too (JPEG / PNG / etc.) via exiftool's transparent format support
-- UI feedback — "Applying metadata…" spinner in `CreateReviewLinkModal`, "Meta-stamped" badge per asset in the review link page
-
-**Key context:** `exiftool-vendored` npm package ~30MB Linux x64 fits Vercel's 250MB bundle ceiling; desktop-app reference source lives at `C:\Users\Lola\AppData\Local\scf-meta\app-0.11.9\resources\app\src\backend\exiftool.js` (Electron + Svelte, Fuerza Studio, MIT license). Constants hardcoded in v2.4 (`FB_ID=2955517117817270`, `DATA='{"Company":"Ready Set"}'`) — refactor to `project.metaConfig` deferred.
+13 STAMP REQs across 4 phases (79–82). Server-side `exiftool-vendored` pipeline replicating the `scf-metadata` desktop app 1:1; triggered on review-link creation; cached per asset; invalidated via `stampedAt < updatedAt` + active null-clearing on rename; fully async with original-URL fallback for guests. See [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md).
 
 ## Prior Milestone: v2.3 App-Wide Performance Polish (Shipped 2026-04-22)
 
@@ -158,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-04-23 — v2.4 started*
+*Last updated: 2026-04-23 — v2.4 shipped*

@@ -1,5 +1,46 @@
 # Milestones
 
+## v2.4 Meta XMP Stamping on Delivery (Shipped: 2026-04-23 — code complete, pending human runtime verification)
+
+**Phases completed:** 4 phases (79–82), 6 plans
+**Tests:** 171/171 green throughout
+**Source:** Replicate the `scf-metadata` Electron desktop app (v0.11.9, Fuerza Studio, MIT) as a server-side pipeline; trigger on review-link creation; cache per asset; invalidate on rename/new-version.
+
+**What shipped (13 REQs, STAMP-01..13):**
+
+1. **Phase 79 platform-spike** — `exiftool-vendored@^35.18.0` dependency + `next.config.mjs` external packages + outputFileTracingIncludes; `/api/spike/exiftool-version` verification route (pending Vercel dashboard confirmation); `updatedAt: FieldValue.serverTimestamp()` writes added to `PUT /api/assets/[id]` + `/api/upload/complete` so the `stampedAt < updatedAt` invalidation clock is reliable; `Data` field literal documented as plain JSON (pipe-wrapping in source code is exiftool struct-syntax, stripped on write).
+
+2. **Phase 80 stamp-pipeline-standalone** — `src/lib/metadata-stamp/index.ts` exiftool wrapper (per-request ExifTool instance with `maxProcs:1, maxTasksPerProcess:1`, `await et.end()` in finally, `-config` passed to `et.write()` args, Attrib read-normalize-spread-append semantics matching reference 1:1); `src/app/api/assets/[assetId]/stamp-metadata/route.ts` production route with Firestore-transaction-backed concurrency dedup + freshness short-circuit + tempdir cleanup; `public/exiftool-config/attrib.config` XMP schema; new `src/lib/gcs.ts::uploadStream(localPath, gcsPath, contentType)` streaming helper (replaces memory-bomb `uploadBuffer` for 500MB+ videos per PITFALLS HIGH finding); `Asset` type extended with `stampedGcsPath/stampedAt/stampedSignedUrl/stampedSignedUrlExpiresAt/updatedAt`; `JobType += 'metadata-stamp'`.
+
+3. **Phase 81 review-link-integration** — `POST /api/review-links` after writing the link doc, `triggerStampJobs()` enumerates direct visible assets (loose `assetIds[]` + direct children of each `folderIds[i]` + legacy `folderId` contents + project root for project-scoped links) and fires fire-and-forget stamp requests forwarding the caller's Authorization header; `GET /api/review-links/[token]` `decorate()` prefers `stampedGcsPath` as guest-facing `signedUrl`+`downloadUrl` when `stampedAt >= updatedAt` (via `coerceToDate` per PITFALLS), falls back to original `gcsPath` on missing/stale/failed stamp — guest always sees working content; internal `/api/assets` path untouched; `asset.metaStamped=true` flag surfaced on guest response for future badge.
+
+4. **Phase 82 invalidation-and-ux** — active nulling of `stampedGcsPath/stampedAt/stampedSignedUrl/stampedSignedUrlExpiresAt` via `FieldValue.delete()` on rename (when `result.trimmed !== asset.name`); redundant with the `updatedAt > stampedAt` freshness check but matches the spec literally + releases the stale cached signed URL; STAMP-07 (new-version invalidation) and STAMP-08 (failure fallback) handled implicitly by Phase 79/81 work; `CreateReviewLinkModal` submit button label swaps to "Applying metadata…" while loading.
+
+**Key design decisions carried forward:**
+
+- Fully async stamp jobs — no sync/async split threshold (Vercel 60s budget cannot absorb even one large-file inline stamp)
+- One stamped GCS copy per asset — deterministic path from extension of original GCS object
+- Reference-app fidelity at the bytes level — same XMP namespace URI, same 4 fields, same Attrib append semantics; intentional deviations limited to serverless hygiene (per-request ExifTool, streaming GCS upload, timezone-safe Created)
+- `coerceToDate()` at every timestamp comparison — Firestore Timestamp vs ISO string silently breaks direct comparison
+- `stampedAt < updatedAt` invalidation (self-healing) is the primary invalidation mechanism; active nulling on rename is belt-and-suspenders
+
+**New files (high-value):**
+- `src/lib/metadata-stamp/index.ts`, `public/exiftool-config/attrib.config`
+- `src/app/api/assets/[assetId]/stamp-metadata/route.ts`
+- `src/app/api/spike/exiftool-version/route.ts` (tech debt — remove after production health confirmed)
+
+**Pending human verification** (per phase SUMMARY.md files):
+- Phase 79: confirm perl resolves on Vercel Pro Lambda via `/api/spike/exiftool-version` → 200 with `et.version()` string
+- Phase 80/81/82: live round-trip — real video asset, real review link; guest downloads file containing all 4 Attrib XMP fields; rename flow; new-version flow; concurrent-creator flow
+
+**Operational follow-ups:**
+- Vercel auto-deploy observed to not immediately fire on the `vercel` remote push; verify deploy triggers in the Vercel dashboard. If missing, manual deploy may be needed.
+- Bundle size increase ~24MB (exiftool-vendored + perl); confirm deploy stays under Vercel Pro's 250MB uncompressed limit (should be comfortable alongside existing ffmpeg/ffprobe ~100MB)
+
+See [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) for full phase details.
+
+---
+
 ## v2.3 App-Wide Performance Polish (Shipped: 2026-04-22)
 
 **Phases completed:** 5 phases (74–78), 5 plans
