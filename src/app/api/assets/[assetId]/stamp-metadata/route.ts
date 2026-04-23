@@ -29,7 +29,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { downloadToFile, uploadStream } from '@/lib/gcs';
 import { canProbeAsset } from '@/lib/permissions';
-import { createJob, updateJob } from '@/lib/jobs';
+import { createJob, updateJob, sweepStaleJobs } from '@/lib/jobs';
 import { stampAsset, stampedGcsPathFor } from '@/lib/metadata-stamp';
 import { coerceToDate } from '@/lib/format-date';
 import type { Project } from '@/types';
@@ -45,6 +45,15 @@ interface RouteParams {
  * Find an in-flight metadata-stamp job for this asset. Returns the job id
  * if present, null otherwise. Used for concurrency dedup — two review-link
  * creates on the same asset should trigger exactly one stamp run.
+ *
+ * Post-filters by startedAt to ignore ZOMBIE jobs — rows stuck in
+ * status='running' because Vercel SIGKILL'd the function (or the route
+ * threw an un-catchable error) before the try/catch could mark them
+ * failed. Without this filter, a single failed stamp attempt blocks ALL
+ * future stamps for the asset until sweepStaleJobs cleans up (which
+ * won't fire unless someone opens the jobs GET endpoint for the asset).
+ * Seen in v2.4 rollout: stamps failing silently, zombies accumulating,
+ * new review links seeing "reused" and never actually stamping.
  */
 async function findRunningStampJob(assetId: string): Promise<string | null> {
   const db = getAdminDb();
@@ -53,10 +62,29 @@ async function findRunningStampJob(assetId: string): Promise<string | null> {
     .where('type', '==', 'metadata-stamp')
     .where('assetId', '==', assetId)
     .where('status', 'in', ['queued', 'running'])
-    .limit(1)
+    .limit(5)
     .get();
   if (snap.empty) return null;
-  return snap.docs[0].id;
+
+  // 90s cutoff — tighter than sweepStaleJobs's default 120s because a
+  // real stamp should be well under 60s (Vercel maxDuration) and we
+  // want to unblock legitimate retries quickly.
+  const cutoffMs = Date.now() - 90_000;
+  for (const d of snap.docs) {
+    const data = d.data() as {
+      status?: string;
+      startedAt?: { toMillis?: () => number; _seconds?: number; seconds?: number };
+    };
+    // A `queued` job is always considered live (just created, no startedAt yet).
+    if (data.status === 'queued') return d.id;
+    // A `running` job is live only if its startedAt is within the cutoff.
+    const startedAtMs =
+      data.startedAt?.toMillis?.() ??
+      (data.startedAt?._seconds ?? data.startedAt?.seconds ?? 0) * 1000;
+    if (startedAtMs > cutoffMs) return d.id;
+    // Otherwise it's a zombie — fall through to the next doc.
+  }
+  return null;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -68,6 +96,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   let tempDir: string | null = null;
 
   try {
+    // 0. Lazy sweep: any 'running' stamp job with startedAt >90s ago is a
+    //    zombie from a SIGKILL'd prior invocation. Mark them failed now so
+    //    the findRunningStampJob dedup below doesn't see them as live.
+    //    Identical pattern to /api/assets/[id]/jobs's sweep call.
+    try {
+      const swept = await sweepStaleJobs(90_000);
+      if (swept > 0) console.log('[stamp-metadata] swept stale jobs:', swept);
+    } catch (sweepErr) {
+      // Don't let sweep failure block the stamp; log + continue.
+      console.warn('[stamp-metadata] sweep failed', sweepErr);
+    }
+
     // 1. Fetch asset + permission check. Same pattern as probe/sprite.
     const snap = await db.collection('assets').doc(params.assetId).get();
     if (!snap.exists) return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
