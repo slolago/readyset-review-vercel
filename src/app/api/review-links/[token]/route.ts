@@ -13,6 +13,7 @@ import type { Project, ReviewLink } from '@/types';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { serializeReviewLink, hashPassword } from '@/lib/review-links';
 import { extractReviewPassword } from '@/lib/review-password';
+import { coerceToDate } from '@/lib/format-date';
 
 interface RouteParams {
   params: { token: string };
@@ -112,7 +113,45 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const decorate = async (asset: any) => {
       const patch: Record<string, unknown> = {};
 
-      if (asset.gcsPath) {
+      // v2.4 STAMP-04/-05/-08 — prefer the Meta-stamped copy for guests when
+      // it's fresh (stampedAt >= updatedAt). Stale / missing stamps fall
+      // through to the original gcsPath below — guests always see working
+      // content. Internal /api/assets never runs this branch (separate route).
+      const stampedAt = coerceToDate(asset.stampedAt);
+      const assetUpdatedAt = coerceToDate(asset.updatedAt);
+      const stampFresh = Boolean(
+        asset.stampedGcsPath &&
+        stampedAt &&
+        (!assetUpdatedAt || stampedAt.getTime() >= assetUpdatedAt.getTime())
+      );
+
+      let signedViaStamp = false;
+      if (stampFresh && asset.stampedGcsPath) {
+        try {
+          const res = await getOrCreateSignedUrl({
+            gcsPath: asset.stampedGcsPath,
+            cached: asset.stampedSignedUrl,
+            cachedExpiresAt: asset.stampedSignedUrlExpiresAt,
+            ttlMinutes: 120,
+          });
+          // Guest-facing signedUrl is the stamped URL. The original signedUrl
+          // cache on the asset doc is NOT mutated — keeps the internal
+          // viewer's cached URL valid.
+          asset.signedUrl = res.url;
+          asset.metaStamped = true;
+          signedViaStamp = true;
+          if (res.fresh) {
+            patch.stampedSignedUrl = res.url;
+            patch.stampedSignedUrlExpiresAt = res.expiresAt;
+          }
+        } catch (err) {
+          console.error('[GET /api/review-links/[token]] sign stamped URL failed — falling back to original', err);
+          // signedViaStamp stays false → fall through to the original
+          // gcsPath block below.
+        }
+      }
+
+      if (!signedViaStamp && asset.gcsPath) {
         try {
           const res = await getOrCreateSignedUrl({
             gcsPath: asset.gcsPath,
@@ -167,9 +206,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           console.error('[GET /api/review-links/[token]] sign sprite URL failed', err);
         }
       }
-      if (asset.gcsPath && link.allowDownloads) {
-        try { asset.downloadUrl = await generateDownloadSignedUrl(asset.gcsPath, asset.name); } catch (err) {
-          console.error('[GET /api/review-links/[token]] sign download URL failed', err);
+      if (link.allowDownloads) {
+        // v2.4 STAMP-04 — prefer the stamped GCS path for the download URL
+        // too. Guest clicks Download → receives the stamped file with the
+        // Meta XMP attribution embedded. Falls back to the original when
+        // the stamp is absent or stale (signedViaStamp tracks this).
+        const downloadPath =
+          signedViaStamp && asset.stampedGcsPath ? asset.stampedGcsPath : asset.gcsPath;
+        if (downloadPath) {
+          try {
+            asset.downloadUrl = await generateDownloadSignedUrl(downloadPath, asset.name);
+          } catch (err) {
+            console.error('[GET /api/review-links/[token]] sign download URL failed', err);
+          }
         }
       }
 
