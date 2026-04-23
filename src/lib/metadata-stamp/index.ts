@@ -144,13 +144,32 @@ export async function stampAsset(localPath: string, assetName: string): Promise<
   // stderr message later in the pipeline.
   const configPath = getAttribConfigPath();
 
-  const et = new ExifTool({ maxProcs: 1, maxTasksPerProcess: 1 });
+  // `checkPerl: false` bypasses the `which perl` preflight check that
+  // otherwise throws "Perl must be installed" on Vercel Lambda — perl IS
+  // available (the spike route's et.version() succeeds), but it's not on
+  // the default $PATH, so the `which perl` command returns empty. The
+  // actual exiftool spawn works because exiftool-vendored.pl's shebang
+  // resolves perl through the Node child_process spawn which knows the
+  // Lambda's real paths. checkPerl is a belt-and-suspenders pre-flight
+  // we don't need.
+  //
+  // Passing `-config` via `exiftoolArgs` (the constructor option) instead
+  // of per-call via `.read()` / `.write()` args. Per-call args trigger a
+  // re-spawn that hit the checkPerl code path that failed in production.
+  // exiftoolArgs are embedded in the initial spawn args, matching the
+  // reference scf-metadata Electron app's pattern.
+  const et = new ExifTool({
+    maxProcs: 1,
+    maxTasksPerProcess: 1,
+    checkPerl: false,
+    exiftoolArgs: ['-config', configPath, '-stay_open', 'True', '-@', '-'],
+  });
 
   try {
     // Read existing Attrib entries. A freshly-uploaded asset has no Attrib;
     // a previously-stamped asset has ≥1. exiftool-vendored returns a single
     // entry as an object, multiple as an array — normalize to array.
-    const tags = await et.read(localPath, ['-config', configPath]);
+    const tags = await et.read(localPath);
     const existing = (tags as Tags & { Attrib?: unknown }).Attrib;
     const oldAttrib: Array<Record<string, unknown>> = Array.isArray(existing)
       ? (existing as Array<Record<string, unknown>>)
@@ -175,10 +194,12 @@ export async function stampAsset(localPath: string, assetName: string): Promise<
     // `-config` passed per-call (not via constructor) — exiftool-vendored
     // merges these args with its internal stay_open bootstrap.
     // `-overwrite_original` writes in-place on the /tmp copy.
+    // -config already baked into exiftoolArgs in the constructor —
+    // don't pass again. Only pass -overwrite_original per-write.
     await et.write(
       localPath,
       { Attrib } as unknown as Tags,
-      ['-config', configPath, '-overwrite_original'],
+      ['-overwrite_original'],
     );
 
     return Attrib.length;
