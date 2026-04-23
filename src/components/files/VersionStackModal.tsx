@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowUp, ArrowDown, Unlink, Trash2, X } from 'lucide-react';
 import type { Asset } from '@/types';
 import toast from 'react-hot-toast';
@@ -17,7 +17,16 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
   const [versions, setVersions] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [reordering, setReordering] = useState(false);
+  // Tracks whether the user reordered during this modal session. Re-used as
+  // the signal to trigger parent refresh on close — without it the caller's
+  // asset list keeps showing the pre-reorder V# mapping.
+  const reorderedRef = useRef(false);
   const confirm = useConfirm();
+
+  const handleClose = () => {
+    if (reorderedRef.current) onDeleted?.();
+    onClose();
+  };
 
   const fetchVersions = async () => {
     setLoading(true);
@@ -127,7 +136,9 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ orderedIds: reordered.map((v) => v.id) }),
       });
-      if (!res.ok) {
+      if (res.ok) {
+        reorderedRef.current = true;
+      } else {
         toast.error('Reorder failed');
       }
       // Always re-sync from server — optimistic state may diverge if server
@@ -144,7 +155,7 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="bg-frame-card border border-frame-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
@@ -153,7 +164,7 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-frame-border">
           <h3 className="text-sm font-semibold text-white">Version stack</h3>
-          <button onClick={onClose} className="text-frame-textMuted hover:text-white transition-colors">
+          <button onClick={handleClose} className="text-frame-textMuted hover:text-white transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -241,7 +252,7 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
         {/* Footer */}
         <div className="px-5 py-3 border-t border-frame-border">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-full mt-2 py-2 text-sm text-frame-textMuted hover:text-white transition-colors"
           >
             Close
