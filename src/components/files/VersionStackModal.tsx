@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { GripVertical, Unlink, Trash2, X } from 'lucide-react';
+import { ArrowUp, ArrowDown, Unlink, Trash2, X } from 'lucide-react';
 import type { Asset } from '@/types';
 import toast from 'react-hot-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -16,8 +16,7 @@ export interface VersionStackModalProps {
 export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: VersionStackModalProps) {
   const [versions, setVersions] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [reordering, setReordering] = useState(false);
   const confirm = useConfirm();
 
   const fetchVersions = async () => {
@@ -112,11 +111,14 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
   };
 
   const handleReorder = async (fromIdx: number, toIdx: number) => {
-    if (fromIdx === toIdx) return;
+    if (fromIdx === toIdx || reordering) return;
+    if (toIdx < 0 || toIdx >= versions.length) return;
+
     const reordered = [...versions];
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
     setVersions(reordered); // optimistic
+    setReordering(true);
 
     try {
       const token = await getIdToken();
@@ -134,6 +136,8 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
     } catch {
       toast.error('Reorder failed');
       await fetchVersions();
+    } finally {
+      setReordering(false);
     }
   };
 
@@ -165,97 +169,69 @@ export function VersionStackModal({ asset, onClose, onDeleted, getIdToken }: Ver
           ) : (
             versions.map((version, idx) => {
               const canReorder = versions.length > 1;
-              const isDragging = dragIdx === idx;
-              const showInsertionAbove =
-                hoverIdx === idx && dragIdx !== null && dragIdx !== idx;
+              const canMoveUp = canReorder && idx > 0;
+              const canMoveDown = canReorder && idx < versions.length - 1;
               return (
-                <div key={version.id}>
-                  {/* Insertion line between rows — 2px accent bar that
-                      appears at the top of the hovered row while a drag is
-                      in flight, showing exactly where the dragged item will
-                      land. Keeps the row's own border/padding untouched so
-                      it doesn't shift other content around. */}
-                  {showInsertionAbove && (
-                    <div className="mx-5 h-0.5 bg-frame-accent rounded-full pointer-events-none" />
+                <div
+                  key={version.id}
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-frame-border/30 transition-colors"
+                >
+                  {canReorder && (
+                    <div className="flex flex-col gap-0.5 flex-shrink-0">
+                      <button
+                        onClick={() => handleReorder(idx, idx - 1)}
+                        disabled={!canMoveUp || reordering}
+                        className="p-0.5 rounded text-frame-textMuted hover:text-white hover:bg-frame-border/50 disabled:opacity-30 disabled:hover:text-frame-textMuted disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                        title="Move up"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleReorder(idx, idx + 1)}
+                        disabled={!canMoveDown || reordering}
+                        className="p-0.5 rounded text-frame-textMuted hover:text-white hover:bg-frame-border/50 disabled:opacity-30 disabled:hover:text-frame-textMuted disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors"
+                        title="Move down"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   )}
-                  <div
-                    draggable={canReorder}
-                    onDragStart={(e) => {
-                      if (!canReorder) return;
-                      setDragIdx(idx);
-                      e.dataTransfer.effectAllowed = 'move';
-                      // Some browsers require data on the transfer object
-                      // for the drag to initialize at all.
-                      e.dataTransfer.setData('text/plain', version.id);
-                    }}
-                    onDragEnter={(e) => {
-                      e.preventDefault();
-                      if (dragIdx !== null && dragIdx !== idx) setHoverIdx(idx);
-                    }}
-                    onDragOver={(e) => {
-                      // Required for the drop event to fire; otherwise the
-                      // browser rejects the drop. Do NOT update hoverIdx here
-                      // — dragOver fires continuously and would re-render on
-                      // every mouse move. dragEnter handles the one-shot
-                      // update.
-                      e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (dragIdx !== null) handleReorder(dragIdx, idx);
-                      setDragIdx(null);
-                      setHoverIdx(null);
-                    }}
-                    onDragEnd={() => {
-                      setDragIdx(null);
-                      setHoverIdx(null);
-                    }}
-                    className={`flex items-center gap-3 px-5 py-3 transition-colors ${
-                      isDragging
-                        ? 'opacity-50 bg-frame-border/20'
-                        : 'hover:bg-frame-border/30'
-                    } ${canReorder ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                  >
-                    {canReorder && (
-                      <GripVertical className="w-4 h-4 text-frame-textMuted flex-shrink-0" />
-                    )}
-                <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded font-mono ${
-                  version.id === asset.id
-                    ? 'bg-frame-accent text-white'
-                    : 'bg-frame-accent/20 text-frame-accent'
-                }`}>
-                  V{idx + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-white truncate">{version.name}</p>
-                    {version.id === asset.id && (
-                      <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-frame-accent font-semibold">Current</span>
-                    )}
+                  <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded font-mono ${
+                    version.id === asset.id
+                      ? 'bg-frame-accent text-white'
+                      : 'bg-frame-accent/20 text-frame-accent'
+                  }`}>
+                    V{idx + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-white truncate">{version.name}</p>
+                      {version.id === asset.id && (
+                        <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-frame-accent font-semibold">Current</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-frame-textMuted">
+                      {formatDate(version.createdAt)} &middot; {version.uploadedBy}
+                    </p>
                   </div>
-                  <p className="text-xs text-frame-textMuted">
-                    {formatDate(version.createdAt)} &middot; {version.uploadedBy}
-                  </p>
-                </div>
-                {versions.length > 1 && (
-                  <>
-                    <button
-                      onClick={() => handleUnstack(version)}
-                      className="flex-shrink-0 text-frame-textMuted hover:text-white transition-colors"
-                      title={`Unstack V${idx + 1} — leaves comments and review links intact`}
-                    >
-                      <Unlink className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(version)}
-                      className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
-                      title={`Delete V${idx + 1}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-                  </div>
+                  {versions.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => handleUnstack(version)}
+                        className="flex-shrink-0 text-frame-textMuted hover:text-white transition-colors"
+                        title={`Unstack V${idx + 1} — leaves comments and review links intact`}
+                      >
+                        <Unlink className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(version)}
+                        className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
+                        title={`Delete V${idx + 1}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               );
             })
