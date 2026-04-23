@@ -8,6 +8,7 @@ import { RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate } from '@/lib/format-date';
 import { TagEditor } from './TagEditor';
+import { RatingStars } from '@/components/ui/RatingStars';
 
 interface FileInfoPanelProps {
   asset: Asset;
@@ -96,6 +97,42 @@ export function FileInfoPanel({ asset }: FileInfoPanelProps) {
   useEffect(() => {
     setTags(asset.tags ?? []);
   }, [asset.id, asset.tags]);
+
+  // Local rating state — optimistic update pattern matches TagEditor. Re-syncs
+  // when switching assets. The PUT call fires on change; on failure we revert.
+  const [rating, setRating] = useState<number>(asset.rating ?? 0);
+  const [savingRating, setSavingRating] = useState(false);
+  useEffect(() => {
+    setRating(asset.rating ?? 0);
+  }, [asset.id, asset.rating]);
+
+  const handleRatingChange = async (next: number) => {
+    if (savingRating || next === rating) return;
+    const prev = rating;
+    setRating(next); // optimistic
+    setSavingRating(true);
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`/api/assets/${asset.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        // Server translates 0 → FieldValue.delete() via the null coercion path.
+        body: JSON.stringify({ rating: next === 0 ? null : next }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to save rating');
+      }
+    } catch (e) {
+      setRating(prev); // revert
+      toast.error((e as Error).message);
+    } finally {
+      setSavingRating(false);
+    }
+  };
 
   const runProbe = async () => {
     setProbing(true);
@@ -214,6 +251,25 @@ export function FileInfoPanel({ asset }: FileInfoPanelProps) {
           Some fields may be inaccurate — client-extracted. Click Probe for server-verified metadata.
         </p>
       )}
+
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-frame-textMuted mb-2 font-semibold">
+          Rating
+        </p>
+        <div className="flex items-center gap-3">
+          <RatingStars value={rating} onChange={handleRatingChange} size="md" />
+          {rating > 0 && (
+            <button
+              type="button"
+              onClick={() => handleRatingChange(0)}
+              disabled={savingRating}
+              className="text-[11px] text-frame-textMuted hover:text-white transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
 
       <TagEditor assetId={asset.id} tags={tags} onTagsChange={setTags} />
 

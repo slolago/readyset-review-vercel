@@ -18,6 +18,7 @@ const ICON_COMPONENTS: Record<IconName, React.ComponentType<{ className?: string
 import type { Asset, Folder } from '@/types';
 import type { ReviewStatus } from '@/types';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { RatingStars } from '@/components/ui/RatingStars';
 import { useContextMenuController } from '@/components/ui/ContextMenu';
 import { useRenameController } from './FolderBrowser';
 import { buildFileBrowserActions } from './fileBrowserActions';
@@ -662,6 +663,9 @@ export const AssetCard = memo(function AssetCard({
         <div className="flex items-center justify-between mt-0.5">
           <p className="text-xs text-frame-textMuted">{formatBytes(asset.size)}</p>
           <div className="flex items-center gap-2">
+            {asset.rating && asset.rating > 0 && (
+              <RatingStars value={asset.rating} readOnly size="sm" />
+            )}
             {commentCount > 0 && (
               <span className="flex items-center gap-0.5 text-xs text-frame-textMuted">
                 <MessageSquare className="w-3 h-3" />

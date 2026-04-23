@@ -6,6 +6,7 @@ import { Search, Film, X, Check } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AssetCard } from '@/components/files/AssetCard';
 import { FilterPopover } from '@/components/ui/FilterPopover';
+import { RatingStars } from '@/components/ui/RatingStars';
 import type { Asset } from '@/types';
 
 interface AssetWithProject extends Asset {
@@ -25,6 +26,8 @@ export default function AssetsPage() {
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [durationMin, setDurationMin] = useState<string>('');
   const [durationMax, setDurationMax] = useState<string>('');
+  // 0 = no filter; 1–5 = show assets rated >= minRating.
+  const [minRating, setMinRating] = useState<number>(0);
 
   const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
   const [limit, setLimit] = useState<number | null>(null);
@@ -108,22 +111,28 @@ export default function AssetsPage() {
         if (durMin !== null && !Number.isNaN(durMin) && d < durMin) return false;
         if (durMax !== null && !Number.isNaN(durMax) && d > durMax) return false;
       }
+      if (minRating > 0) {
+        // Unrated assets are excluded while the rating filter is active —
+        // matches the "show me the best" mental model.
+        if (!a.rating || a.rating < minRating) return false;
+      }
       if (!q) return true;
       if (a.name.toLowerCase().includes(q)) return true;
       if (a.projectName && a.projectName.toLowerCase().includes(q)) return true;
       if ((a.tags ?? []).some((t) => t.toLowerCase().includes(q))) return true;
       return false;
     });
-  }, [assets, query, selectedProjectIds, selectedTags, durMin, durMax, durationActive]);
+  }, [assets, query, selectedProjectIds, selectedTags, durMin, durMax, durationActive, minRating]);
 
   const anyFilterActive =
-    selectedProjectIds.size > 0 || selectedTags.size > 0 || durationActive;
+    selectedProjectIds.size > 0 || selectedTags.size > 0 || durationActive || minRating > 0;
 
   const clearAll = () => {
     setSelectedProjectIds(new Set());
     setSelectedTags(new Set());
     setDurationMin('');
     setDurationMax('');
+    setMinRating(0);
   };
 
   const capped =
@@ -201,6 +210,10 @@ export default function AssetsPage() {
             onMinChange={setDurationMin}
             onMaxChange={setDurationMax}
           />
+        </FilterPopover>
+
+        <FilterPopover label="Rating" activeCount={minRating > 0 ? 1 : 0}>
+          <RatingThresholdInput value={minRating} onChange={setMinRating} />
         </FilterPopover>
 
         {anyFilterActive && (
@@ -484,6 +497,42 @@ function DurationRangeInput({
         Only assets with a duration (video / audio) are filtered — images and
         documents are hidden while this filter is active.
       </p>
+    </div>
+  );
+}
+
+function RatingThresholdInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="p-3 space-y-2">
+      <p className="text-[10px] font-semibold text-frame-textMuted uppercase tracking-wider">
+        Minimum rating
+      </p>
+      <div className="flex items-center gap-3">
+        <RatingStars value={value} onChange={onChange} size="md" />
+        <span className="text-xs text-frame-textSecondary tabular-nums min-w-[40px]">
+          {value > 0 ? `${value}+ ★` : 'Any'}
+        </span>
+      </div>
+      <p className="text-[10px] text-frame-textMuted leading-relaxed">
+        Shows assets rated at or above the selected threshold. Unrated assets
+        are hidden while this filter is active. Click the current star to
+        clear.
+      </p>
+      {value > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange(0)}
+          className="text-[11px] text-frame-textMuted hover:text-white transition-colors"
+        >
+          Clear
+        </button>
+      )}
     </div>
   );
 }

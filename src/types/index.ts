@@ -96,6 +96,11 @@ export interface Asset {
   commentCount?: number;
   frameRate?: number;
   reviewStatus?: ReviewStatus;
+  /**
+   * User-supplied 1–5 star rating. Unset / 0 means unrated. Writable via
+   * PUT /api/assets/[assetId]. Used to filter and sort on the /assets page.
+   */
+  rating?: number;
   /** Soft-delete marker — set by DELETE endpoint, cleared by restore. null on live docs (Phase 63+) or absent (pre-Phase 63). */
   deletedAt?: Timestamp | null;
   /** User id of the user who soft-deleted the item. Absent on live docs. */

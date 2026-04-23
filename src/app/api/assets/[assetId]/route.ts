@@ -94,13 +94,29 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const rawUpdates = await request.json();
     // Whitelist: only safe, user-mutable asset metadata. Never allow changing
     // gcsPath/projectId/uploadedBy/createdAt/status/versionGroupId/size etc.
-    const ALLOWED = ['name', 'folderId', 'reviewStatus', 'description'];
+    const ALLOWED = ['name', 'folderId', 'reviewStatus', 'description', 'rating'];
     const updates: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(rawUpdates)) {
       if (ALLOWED.includes(k)) updates[k] = v;
     }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
+    }
+
+    // Rating: coerce + validate. 0 clears the rating (stored as null -> deleted
+    // by the FieldValue.delete() pass below).
+    if ('rating' in updates) {
+      const r = updates.rating;
+      if (r === null || r === 0) {
+        updates.rating = null;
+      } else if (typeof r === 'number' && Number.isInteger(r) && r >= 1 && r <= 5) {
+        updates.rating = r;
+      } else {
+        return NextResponse.json(
+          { error: 'rating must be an integer 1–5, or 0/null to clear' },
+          { status: 400 }
+        );
+      }
     }
 
     // DC-03: rename collision check. Scopes siblings by projectId + folderId,
