@@ -146,6 +146,27 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           console.error('[GET /api/review-links/[token]] sign thumbnail URL failed', err);
         }
       }
+      // Sprite strip for hover scrub on the guest-facing AssetCard. Mirrors
+      // the authenticated /api/assets decorate pattern. Without this, guests
+      // fall through to the lazy /generate-sprite fetch which 401s for them
+      // and leaves the card with no scrub affordance.
+      if (asset.spriteStripGcsPath) {
+        try {
+          const res = await getOrCreateSignedUrl({
+            gcsPath: asset.spriteStripGcsPath,
+            cached: asset.spriteSignedUrl,
+            cachedExpiresAt: asset.spriteSignedUrlExpiresAt,
+            ttlMinutes: 720,
+          });
+          asset.spriteSignedUrl = res.url;
+          if (res.fresh) {
+            patch.spriteSignedUrl = res.url;
+            patch.spriteSignedUrlExpiresAt = res.expiresAt;
+          }
+        } catch (err) {
+          console.error('[GET /api/review-links/[token]] sign sprite URL failed', err);
+        }
+      }
       if (asset.gcsPath && link.allowDownloads) {
         try { asset.downloadUrl = await generateDownloadSignedUrl(asset.gcsPath, asset.name); } catch (err) {
           console.error('[GET /api/review-links/[token]] sign download URL failed', err);
