@@ -61,6 +61,12 @@ const nextConfig = {
         './node_modules/exiftool-vendored/**',
         './node_modules/exiftool-vendored.pl/**',
       ],
+      '/api/spike/stamp-test': [
+        './node_modules/exiftool-vendored/**',
+        './node_modules/exiftool-vendored.pl/**',
+        './src/lib/metadata-stamp/**',
+        './public/exiftool-config/**',
+      ],
       '/api/assets/*/stamp-metadata': [
         './node_modules/exiftool-vendored/**',
         './node_modules/exiftool-vendored.pl/**',
