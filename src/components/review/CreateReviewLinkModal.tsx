@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
-import { Copy, Check, Link, ExternalLink } from 'lucide-react';
+import { Copy, Check, Link, ExternalLink, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface CreateReviewLinkModalProps {
@@ -29,13 +29,18 @@ export function CreateReviewLinkModal({
   const [showAllVersions, setShowAllVersions] = useState(false);
   const [password, setPassword] = useState('');
   const [expiresIn, setExpiresIn] = useState<'never' | '1d' | '7d' | '30d'>('never');
-  const [loading, setLoading] = useState(false);
+  // Tracks which flow is currently loading so the right spinner label
+  // shows on the right button. null when idle.
+  const [loading, setLoading] = useState<null | 'normal' | 'metadata'>(null);
   const [createdLink, setCreatedLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleCreate = async (applyMetadata: boolean) => {
+    if (!name.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    setLoading(applyMetadata ? 'metadata' : 'normal');
     try {
       const token = await getIdToken();
       const res = await fetch('/api/review-links', {
@@ -54,6 +59,7 @@ export function CreateReviewLinkModal({
           allowApprovals,
           showAllVersions,
           password: password || undefined,
+          applyMetadata,
           expiresAt: (() => {
             if (expiresIn === 'never') return undefined;
             const ms = { '1d': 86400000, '7d': 604800000, '30d': 2592000000 }[expiresIn];
@@ -69,11 +75,15 @@ export function CreateReviewLinkModal({
       const data = await res.json();
       const url = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/review/${data.link.token}`;
       setCreatedLink(url);
-      toast.success('Review link created!');
+      toast.success(
+        applyMetadata
+          ? 'Review link created with Meta metadata applied!'
+          : 'Review link created!',
+      );
     } catch (err) {
       toast.error((err as Error).message || 'Failed to create review link');
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
@@ -119,7 +129,16 @@ export function CreateReviewLinkModal({
           </Button>
         </div>
       ) : (
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            // Default submit (Enter key) creates a normal link without
+            // metadata. Users who want metadata click the second button
+            // explicitly.
+            if (!loading) handleCreate(false);
+          }}
+          className="space-y-4"
+        >
           {assetIds?.length ? (
             <p className="text-xs text-frame-textMuted mb-3">This link will include {assetIds.length} selected asset{assetIds.length !== 1 ? 's' : ''}.</p>
           ) : null}
@@ -253,27 +272,44 @@ export function CreateReviewLinkModal({
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
-              Cancel
-            </Button>
+          {/* Two-button CTA — normal vs with-metadata.
+              - "Create Link" → fast; no stamp jobs fired; matches
+                pre-v2.4 behavior. Default (Enter-key submit).
+              - "Create + Apply Metadata" → fires the exiftool stamp
+                pipeline for every directly-exposed asset; parent POST
+                awaits all stamps; can take 15-60s per mid-sized video.
+                Guests receive stamped URLs once ready. */}
+          <div className="space-y-2 pt-2">
+            <div className="flex gap-3">
+              <Button type="button" variant="secondary" onClick={onClose} className="flex-1" disabled={loading !== null}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                loading={loading === 'normal'}
+                disabled={loading !== null}
+                icon={<Link className="w-4 h-4" />}
+                className="flex-1"
+              >
+                {loading === 'normal' ? 'Creating…' : 'Create Link'}
+              </Button>
+            </div>
             <Button
-              type="submit"
-              loading={loading}
-              icon={<Link className="w-4 h-4" />}
-              className="flex-1"
+              type="button"
+              variant="outline"
+              loading={loading === 'metadata'}
+              disabled={loading !== null}
+              onClick={() => handleCreate(true)}
+              icon={<Sparkles className="w-4 h-4" />}
+              className="w-full"
             >
-              {/*
-                v2.4 STAMP-12 — label surfaces that metadata stamping is
-                being coordinated. The actual exiftool jobs run async on the
-                server (fire-and-forget from POST); this label covers the
-                ~500ms window before the link token is returned. Copy-link
-                view appears as soon as the token arrives; guests receive
-                stamped URLs whenever the job lands (or the original URL
-                as graceful fallback if the stamp is still pending).
-              */}
-              {loading ? 'Applying metadata…' : 'Create Link'}
+              {loading === 'metadata' ? 'Applying metadata…' : 'Create + Apply Meta Metadata'}
             </Button>
+            <p className="text-[10px] text-frame-textMuted leading-snug pt-1">
+              {loading === 'metadata'
+                ? 'Stamping each asset with Meta XMP attribution — this may take up to a minute per video.'
+                : 'Metadata stamp embeds Meta Ads attribution (Attrib XMP namespace) in every asset the guest receives. Leave off for fast standard delivery.'}
+            </p>
           </div>
         </form>
       )}

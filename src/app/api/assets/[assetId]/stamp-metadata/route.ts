@@ -35,15 +35,14 @@ import { coerceToDate } from '@/lib/format-date';
 import type { Project } from '@/types';
 
 export const runtime = 'nodejs';
-// Vercel Hobby caps at 60s. Pro/Enterprise allow 300s / 900s. For
-// files large enough that the full GCS-download → exiftool →
-// GCS-upload cycle exceeds 60s on Hobby's network bandwidth, the
-// function SIGKILLs mid-work and the job stays 'running' forever.
-// Mitigation: sweepStaleJobs(90s) + zombie-aware dedup at route
-// entry so repeat attempts aren't blocked. For reliable stamping of
-// videos >30MB, the project needs Pro (300s limit) or a background-
-// worker architecture (out of scope v2.4).
-export const maxDuration = 60;
+// 300s = Vercel Pro/Enterprise ceiling. Hobby silently caps this to
+// 60s (per-account plan enforcement). The 300 setting is a forward-
+// compatible declaration for when the project moves off Hobby — on
+// Pro, stamps of mid-sized videos (30-100MB) fit comfortably. On
+// Hobby it still works at a 60s effective cap; files that can't
+// complete in that window simply serve the original URL to guests
+// via decorate()'s STAMP-08 fallback.
+export const maxDuration = 300;
 
 interface RouteParams {
   params: { assetId: string };

@@ -7,14 +7,15 @@ import { serializeReviewLink, hashPassword } from '@/lib/review-links';
 import { Timestamp } from 'firebase-admin/firestore';
 import { customAlphabet } from 'nanoid';
 
-// v2.4: POST awaits per-asset stamp jobs. Hobby caps maxDuration at
-// 60s; Pro allows 300s. On Hobby, files that don't fit in 60s will
-// have their stamps SIGKILL'd — the review link is still created and
-// guests see the original URL via decorate()'s fallback (STAMP-08).
-// For reliable stamping of large videos, upgrade to Pro and raise
-// this to 300.
+// 300s is Vercel Pro's ceiling; Hobby silently caps to 60s. Keeping
+// the 300 declaration so that on Pro the full stamp cycle for larger
+// videos fits comfortably; on Hobby, stamps that don't finish in the
+// effective 60s limit get SIGKILL'd and the guest sees the original
+// URL via decorate()'s STAMP-08 fallback. When Metadata option is
+// off in the modal, triggerStampJobs is skipped entirely — the POST
+// returns in well under a second.
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const generateShortToken = customAlphabet(
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
@@ -71,7 +72,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const { name, projectId, folderId, folderIds, allowComments, password, expiresAt,
-            allowDownloads, allowApprovals, showAllVersions, assetIds } = await request.json();
+            allowDownloads, allowApprovals, showAllVersions, assetIds,
+            // v2.4 — opt-in Meta XMP stamping. When false (default), the
+            // link is created like pre-v2.4: fast, no stamp jobs, guests
+            // get the original URLs. When true, every directly-exposed
+            // asset gets stamped via triggerStampJobs before the 201 is
+            // returned; guests receive stamped URLs (with original-URL
+            // fallback if stamp job fails). Two-button UX in
+            // CreateReviewLinkModal sets this flag per click.
+            applyMetadata } = await request.json();
 
     if (!name || !projectId) return NextResponse.json({ error: 'name and projectId required' }, { status: 400 });
     if (assetIds && assetIds.length > 200) return NextResponse.json({ error: 'Maximum 200 assets per link' }, { status: 400 });
@@ -114,24 +123,28 @@ export async function POST(request: NextRequest) {
     const doc = await db.collection('reviewLinks').doc(token).get();
     const docData = doc.data() as Record<string, unknown>;
 
-    // v2.4 STAMP-01 — trigger Meta XMP stamp jobs for every asset this
-    // link will directly expose. AWAITED (not fire-and-forget) because
-    // Vercel serverless kills the function as soon as the HTTP response
-    // is sent — fire-and-forget fetches never reach their destination in
+    // v2.4 STAMP-01 — opt-in Meta XMP stamping. Only triggered when
+    // applyMetadata === true; otherwise skipped entirely so the POST
+    // returns fast (matches pre-v2.4 behavior for "normal" links).
+    //
+    // When enabled: AWAITED (not fire-and-forget) because Vercel
+    // serverless kills the function as soon as the HTTP response is
+    // sent — fire-and-forget fetches never reach their destination in
     // practice. Individual stamp failures are tolerated via Promise
     // .allSettled; guests fall back to the original URL via decorate()'s
     // signedViaStamp check per STAMP-08. The CreateReviewLinkModal's
-    // spinner ("Applying metadata…") stays up for the real duration now
-    // that the POST actually waits.
-    await triggerStampJobs({
-      db,
-      projectId,
-      assetIds: cleanAssetIds,
-      folderIds: cleanFolderIds,
-      legacyFolderId: cleanAssetIds || cleanFolderIds ? null : folderId ?? null,
-      origin: request.nextUrl.origin,
-      authHeader: request.headers.get('Authorization'),
-    });
+    // spinner stays up for the real stamp duration.
+    if (applyMetadata === true) {
+      await triggerStampJobs({
+        db,
+        projectId,
+        assetIds: cleanAssetIds,
+        folderIds: cleanFolderIds,
+        legacyFolderId: cleanAssetIds || cleanFolderIds ? null : folderId ?? null,
+        origin: request.nextUrl.origin,
+        authHeader: request.headers.get('Authorization'),
+      });
+    }
 
     return NextResponse.json({ link: serializeReviewLink({ id: token, ...docData }) }, { status: 201 });
   } catch (err) {
