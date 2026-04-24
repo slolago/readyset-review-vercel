@@ -300,8 +300,12 @@ export function CreateReviewLinkModal({
               loading={loading === 'metadata'}
               disabled={loading !== null}
               onClick={() => handleCreate(true)}
-              icon={<Sparkles className="w-4 h-4" />}
-              className="w-full"
+              icon={<Sparkles className="w-4 h-4 text-frame-accent" />}
+              // Accent-tinted — clearly branded with the app's purple so
+              // it reads as a "premium secondary" action (not buried as
+              // plain outline). Same pattern as the review-link Download
+              // button upgrade.
+              className="w-full bg-frame-accent/10 border-frame-accent/40 text-white hover:bg-frame-accent/20 hover:border-frame-accent hover:text-white disabled:hover:bg-frame-accent/10 disabled:hover:border-frame-accent/40"
             >
               {loading === 'metadata' ? 'Applying metadata…' : 'Create + Apply Meta Metadata'}
             </Button>
